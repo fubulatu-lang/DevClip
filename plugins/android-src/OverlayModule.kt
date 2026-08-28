@@ -1,11 +1,11 @@
 package com.devclip.app
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
-import android.text.TextUtils
 import android.view.accessibility.AccessibilityManager
 import com.facebook.react.bridge.*
 
@@ -13,6 +13,9 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
     override fun getName() = "DevClipOverlay"
+
+    private fun prefs() =
+        reactApplicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
 
     @ReactMethod
     fun requestOverlayPermission(promise: Promise) {
@@ -28,10 +31,15 @@ class OverlayModule(reactContext: ReactApplicationContext) :
             Uri.parse("package:${context.packageName}")
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
-        // The user has to flip the switch manually; the app should re-check
-        // with isOverlayPermissionGranted (or just retry startBubble) once
-        // they come back.
         promise.resolve(false)
+    }
+
+    @ReactMethod
+    fun isOverlayPermissionGranted(promise: Promise) {
+        val context = reactApplicationContext
+        val canDraw = Build.VERSION.SDK_INT < Build.VERSION_CODES.M ||
+            Settings.canDrawOverlays(context)
+        promise.resolve(canDraw)
     }
 
     @ReactMethod
@@ -45,7 +53,7 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun isAccessibilityServiceEnabled(promise: Promise) {
         val context = reactApplicationContext
-        val am = context.getSystemService(android.content.Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
         val enabledServices = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
         val target = "${context.packageName}/${ClipboardAccessibilityService::class.java.name}"
         val isEnabled = enabledServices.any {
@@ -57,6 +65,7 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun startBubble() {
         val context = reactApplicationContext
+        prefs().edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, true).apply()
         val intent = Intent(context, OverlayService::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
@@ -68,6 +77,7 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     @ReactMethod
     fun stopBubble() {
         val context = reactApplicationContext
+        prefs().edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, false).apply()
         context.stopService(Intent(context, OverlayService::class.java))
     }
 
@@ -85,4 +95,43 @@ class OverlayModule(reactContext: ReactApplicationContext) :
             context.startService(intent)
         }
     }
+
+    @ReactMethod
+    fun setBubbleSize(size: String) {
+        prefs().edit().putString(Prefs.KEY_BUBBLE_SIZE, size).apply()
+        // If the bubble is currently showing, restart it so the new size takes effect immediately.
+        if (prefs().getBoolean(Prefs.KEY_BUBBLE_RUNNING, false)) {
+            startBubble()
+        }
+    }
+
+    @ReactMethod
+    fun setAutoStartOnBoot(enabled: Boolean) {
+        prefs().edit().putBoolean(Prefs.KEY_AUTO_START_ON_BOOT, enabled).apply()
+    }
+
+    @ReactMethod
+    fun isBubbleRunning(promise: Promise) {
+        promise.resolve(prefs().getBoolean(Prefs.KEY_BUBBLE_RUNNING, false))
+    }
+
+    @ReactMethod
+    fun pasteIntoFocusedField(text: String, promise: Promise) {
+        val service = ClipboardAccessibilityService.instance
+        if (service == null) {
+            promise.resolve(false)
+            return
+        }
+        promise.resolve(service.pasteIntoFocusedField(text))
+    }
+}
+
+/** Shared preferences keys used to pass simple settings from JS into native
+ *  components (OverlayService, BootReceiver) that can run independently of
+ *  the JS thread. */
+object Prefs {
+    const val NAME = "devclip_prefs"
+    const val KEY_BUBBLE_RUNNING = "bubble_running"
+    const val KEY_BUBBLE_SIZE = "bubble_size" // "small" | "medium" | "large"
+    const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
 }

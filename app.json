@@ -2,6 +2,7 @@
   "expo": {
     "name": "DevClip",
     "slug": "DevClip",
+    "owner": "sharptalons",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,7 @@
     "android": {
       "package": "com.devclip.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#3B47E0",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -23,6 +24,11 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["./plugins/withDevClipNative.js"]
+    "plugins": ["./plugins/withDevClipNative.js"],
+    "extra": {
+      "eas": {
+        "projectId": "fffa0f4f-570a-48f1-993b-733b279cd69b"
+      }
+    }
   }
 }

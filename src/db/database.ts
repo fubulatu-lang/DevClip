@@ -89,6 +89,23 @@ export async function deleteClip(id: number): Promise<void> {
   await db.runAsync('DELETE FROM clips WHERE id = ?;', [id]);
 }
 
+export async function deleteAllClips(): Promise<void> {
+  const db = getDb();
+  await db.execAsync('DELETE FROM clips;');
+}
+
+// Keeps only the most recent `max` clips (by created_at). max <= 0 means unlimited.
+export async function trimClipsToMax(max: number): Promise<void> {
+  if (max <= 0) return;
+  const db = getDb();
+  await db.runAsync(
+    `DELETE FROM clips WHERE id NOT IN (
+       SELECT id FROM clips ORDER BY created_at DESC LIMIT ?
+     );`,
+    [max]
+  );
+}
+
 // Swaps sort_order between two clips (used for up/down manual reordering).
 export async function swapClipOrder(a: Clip, b: Clip): Promise<void> {
   const db = getDb();
@@ -96,6 +113,24 @@ export async function swapClipOrder(a: Clip, b: Clip): Promise<void> {
   try {
     await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [b.sortOrder, a.id]);
     await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [a.sortOrder, b.id]);
+    await db.execAsync('COMMIT;');
+  } catch (e) {
+    await db.execAsync('ROLLBACK;');
+    throw e;
+  }
+}
+
+// Rewrites sort_order to match the given id order exactly. Used when the
+// user switches to Manual sort, so manual reordering starts from whatever
+// order they were just looking at (e.g. Newest first) instead of jumping
+// back to original insertion order.
+export async function snapshotOrder(orderedIds: number[]): Promise<void> {
+  const db = getDb();
+  await db.execAsync('BEGIN TRANSACTION;');
+  try {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [i, orderedIds[i]]);
+    }
     await db.execAsync('COMMIT;');
   } catch (e) {
     await db.execAsync('ROLLBACK;');

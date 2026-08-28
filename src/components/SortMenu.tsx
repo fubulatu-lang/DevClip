@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, ScrollView } from 'react-native';
+import { StyleSheet, ScrollView, Text } from 'react-native';
 import { SortMode } from '../types/clip';
+import { useTheme } from '../theme/ThemeContext';
+import Pressy from './Pressy';
 
 const OPTIONS: { value: SortMode; label: string }[] = [
   { value: 'date-desc', label: 'Newest' },
   { value: 'date-asc', label: 'Oldest' },
-  { value: 'title-asc', label: 'Title A-Z' },
-  { value: 'title-desc', label: 'Title Z-A' },
+  { value: 'title-asc', label: 'Title A–Z' },
+  { value: 'title-desc', label: 'Title Z–A' },
   { value: 'manual', label: 'Manual' },
 ];
 
@@ -16,33 +18,31 @@ interface Props {
 }
 
 export default function SortMenu({ value, onChange }: Props) {
+  const { colors, radii, spacing, type } = useTheme();
+  const styles = StyleSheet.create({
+    wrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
+    chip: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: 7,
+      borderRadius: radii.pill,
+      backgroundColor: colors.surfaceSunken,
+      marginRight: spacing.xs,
+    },
+    chipActive: { backgroundColor: colors.ink },
+    chipText: { fontSize: 12, fontFamily: type.semibold, color: colors.inkSoft },
+    chipTextActive: { color: colors.bg },
+  });
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.wrap}>
-      {OPTIONS.map((opt) => (
-        <TouchableOpacity
-          key={opt.value}
-          style={[styles.chip, value === opt.value && styles.chipActive]}
-          onPress={() => onChange(opt.value)}
-        >
-          <Text style={[styles.chipText, value === opt.value && styles.chipTextActive]}>
-            {opt.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrap}>
+      {OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <Pressy key={opt.value} onPress={() => onChange(opt.value)} style={[styles.chip, active && styles.chipActive]}>
+            <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
+          </Pressy>
+        );
+      })}
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: 8, marginBottom: 4 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#eee',
-    marginHorizontal: 4,
-  },
-  chipActive: { backgroundColor: '#4a6cf7' },
-  chipText: { fontSize: 12, color: '#333' },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
-});

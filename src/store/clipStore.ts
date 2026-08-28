@@ -10,10 +10,12 @@ interface ClipStoreState {
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   setSearch: (q: string) => void;
-  setSort: (s: SortMode) => void;
+  setSort: (s: SortMode) => Promise<void>;
   addClip: (content: string, title?: string | null) => Promise<void>;
   updateClip: (id: number, content: string, title: string | null) => Promise<void>;
   deleteClip: (id: number) => Promise<void>;
+  clearAll: () => Promise<void>;
+  trimToMax: (max: number) => Promise<void>;
   moveUp: (index: number) => Promise<void>;
   moveDown: (index: number) => Promise<void>;
 }
@@ -40,9 +42,16 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
     get().refresh();
   },
 
-  setSort: (s: SortMode) => {
+  setSort: async (s: SortMode) => {
+    const { sort: previousSort, clips } = get();
+    if (s === 'manual' && previousSort !== 'manual') {
+      // Snapshot the order the user is currently looking at (e.g. Newest
+      // first) as the new manual order, instead of jumping back to
+      // whatever order clips were originally inserted in.
+      await db.snapshotOrder(clips.map((c) => c.id));
+    }
     set({ sort: s });
-    get().refresh();
+    await get().refresh();
   },
 
   addClip: async (content: string, title: string | null = null) => {
@@ -57,6 +66,16 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
 
   deleteClip: async (id: number) => {
     await db.deleteClip(id);
+    await get().refresh();
+  },
+
+  clearAll: async () => {
+    await db.deleteAllClips();
+    await get().refresh();
+  },
+
+  trimToMax: async (max: number) => {
+    await db.trimClipsToMax(max);
     await get().refresh();
   },
 

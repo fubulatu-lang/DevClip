@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
+import { Search } from 'lucide-react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   value: string;
@@ -7,12 +9,29 @@ interface Props {
 }
 
 export default function SearchBar({ value, onChange }: Props) {
+  const { colors, radii, spacing, type } = useTheme();
+  const styles = StyleSheet.create({
+    wrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surfaceSunken,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.md,
+      height: 40,
+      marginHorizontal: spacing.md,
+      marginTop: spacing.sm,
+    },
+    input: { flex: 1, fontSize: 14, fontFamily: type.medium, color: colors.ink, padding: 0 },
+  });
+
   return (
     <View style={styles.wrap}>
+      <Search size={16} strokeWidth={1.5} color={colors.inkFaint} />
       <TextInput
         style={styles.input}
-        placeholder="Search title or content..."
-        placeholderTextColor="#888"
+        placeholder="Search title or content"
+        placeholderTextColor={colors.inkFaint}
         value={value}
         onChangeText={onChange}
         autoCorrect={false}
@@ -20,14 +39,3 @@ export default function SearchBar({ value, onChange }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: { paddingHorizontal: 10, paddingTop: 8, paddingBottom: 4 },
-  input: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 14,
-  },
-});

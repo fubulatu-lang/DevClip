@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Modal, View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { Trash2, Check } from 'lucide-react-native';
 import { Clip } from '../types/clip';
+import { useTheme } from '../theme/ThemeContext';
+import Pressy from './Pressy';
 
 interface Props {
   clip: Clip | null;
@@ -10,6 +13,7 @@ interface Props {
 }
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
+  const { colors, radii, spacing, shadow, type } = useTheme();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -19,6 +23,92 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       setContent(clip.content);
     }
   }, [clip]);
+
+  const styles = StyleSheet.create({
+    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+    shell: {
+      backgroundColor: 'rgba(0,0,0,0.03)',
+      padding: 6,
+      borderTopLeftRadius: radii.lg + 6,
+      borderTopRightRadius: radii.lg + 6,
+    },
+    sheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: radii.lg,
+      borderTopRightRadius: radii.lg,
+      borderRadius: radii.sm,
+      padding: spacing.lg,
+      ...shadow.floating,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: radii.pill,
+      backgroundColor: colors.borderStrong,
+      alignSelf: 'center',
+      marginBottom: spacing.md,
+    },
+    eyebrow: {
+      fontFamily: type.bold,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: colors.inkFaint,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+    },
+    titleInput: {
+      fontFamily: type.semibold,
+      fontSize: 15,
+      color: colors.ink,
+      backgroundColor: colors.surfaceSunken,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+    },
+    contentInput: {
+      fontFamily: type.regular,
+      fontSize: 14,
+      color: colors.ink,
+      backgroundColor: colors.surfaceSunken,
+      borderRadius: radii.sm,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+      minHeight: 120,
+      lineHeight: 20,
+    },
+    actions: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, gap: spacing.sm },
+    deleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 10,
+      paddingHorizontal: spacing.md,
+      borderRadius: radii.pill,
+      backgroundColor: colors.dangerSoft,
+      marginRight: 'auto',
+    },
+    deleteText: { fontFamily: type.semibold, fontSize: 13, color: colors.danger },
+    saveBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.ink,
+      borderRadius: radii.pill,
+      paddingLeft: spacing.lg,
+      paddingRight: 6,
+      paddingVertical: 6,
+    },
+    saveText: { fontFamily: type.semibold, fontSize: 13, color: colors.bg },
+    saveIconWrap: {
+      width: 26,
+      height: 26,
+      borderRadius: radii.pill,
+      backgroundColor: 'rgba(128,128,128,0.25)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
 
   if (!clip) return null;
 
@@ -31,62 +121,47 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
 
   return (
     <Modal visible={!!clip} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
-          <Text style={styles.label}>Title (optional)</Text>
-          <TextInput
-            style={styles.titleInput}
-            value={title}
-            onChangeText={setTitle}
-            placeholder="Add a title..."
-          />
+      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
 
-          <Text style={styles.label}>Content</Text>
-          <TextInput
-            style={styles.contentInput}
-            value={content}
-            onChangeText={setContent}
-            multiline
-          />
+        <View style={styles.shell}>
+          <View style={styles.sheet}>
+            <View style={styles.handle} />
 
-          <View style={styles.row}>
-            <TouchableOpacity style={[styles.btn, styles.deleteBtn]} onPress={handleDelete}>
-              <Text style={styles.deleteText}>Delete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.btn} onPress={onClose}>
-              <Text>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.btn, styles.saveBtn]}
-              onPress={() => onSave(clip.id, content, title.trim() || null)}
-            >
-              <Text style={styles.saveText}>Save</Text>
-            </TouchableOpacity>
+            <Text style={styles.eyebrow}>Title</Text>
+            <TextInput
+              style={styles.titleInput}
+              value={title}
+              onChangeText={setTitle}
+              placeholder="Untitled"
+              placeholderTextColor={colors.inkFaint}
+            />
+
+            <Text style={styles.eyebrow}>Content</Text>
+            <TextInput
+              style={styles.contentInput}
+              value={content}
+              onChangeText={setContent}
+              multiline
+              textAlignVertical="top"
+            />
+
+            <View style={styles.actions}>
+              <Pressy onPress={handleDelete} style={styles.deleteBtn}>
+                <Trash2 size={15} strokeWidth={1.75} color={colors.danger} />
+                <Text style={styles.deleteText}>Delete</Text>
+              </Pressy>
+
+              <Pressy onPress={() => onSave(clip.id, content, title.trim() || null)} style={styles.saveBtn}>
+                <Text style={styles.saveText}>Save</Text>
+                <View style={styles.saveIconWrap}>
+                  <Check size={13} strokeWidth={2} color={colors.bg} />
+                </View>
+              </Pressy>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16 },
-  label: { fontSize: 12, color: '#666', marginTop: 8, marginBottom: 4 },
-  titleInput: { borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 8, fontSize: 14 },
-  contentInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 8,
-    fontSize: 14,
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  row: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16, gap: 8 },
-  btn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 8 },
-  deleteBtn: { marginRight: 'auto', backgroundColor: '#fdeaea' },
-  deleteText: { color: '#c0392b', fontWeight: '600' },
-  saveBtn: { backgroundColor: '#4a6cf7' },
-  saveText: { color: '#fff', fontWeight: '600' },
-});

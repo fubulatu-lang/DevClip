@@ -1,7 +1,6 @@
 import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import App from './App';
-import PopupScreen from './src/screens/PopupScreen';
 import appJson from './app.json';
 
 const appName = appJson.expo.name;
@@ -12,7 +11,8 @@ registerRootComponent(App);
 
 // A second, independent root component that OverlayService.kt mounts inside
 // its own small WindowManager window (the floating bubble's popup). It reuses
-// the exact same PopupScreen UI/state logic as the full app.
-AppRegistry.registerComponent('DevClipPopup', () => PopupScreen);
+// the exact same App -> PopupScreen tree (including the font-loading gate)
+// as the full app, so styling is identical in both places.
+AppRegistry.registerComponent('DevClipPopup', () => App);
 
 export default appName;

@@ -89,14 +89,19 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
 
     private fun addBubble() {
         val bubble = View(this).apply {
-            setBackgroundColor(Color.parseColor("#4a6cf7"))
             background = android.graphics.drawable.GradientDrawable().apply {
                 shape = android.graphics.drawable.GradientDrawable.OVAL
-                setColor(Color.parseColor("#4a6cf7"))
+                setColor(Color.parseColor("#3D4CF0"))
             }
         }
 
-        val size = (56 * resources.displayMetrics.density).toInt()
+        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        val sizeDp = when (prefs.getString(Prefs.KEY_BUBBLE_SIZE, "medium")) {
+            "small" -> 44
+            "large" -> 72
+            else -> 56
+        }
+        val size = (sizeDp * resources.displayMetrics.density).toInt()
         val params = WindowManager.LayoutParams(
             size, size, overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,

@@ -1,22 +1,51 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, AppState } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { CircleDot } from 'lucide-react-native';
 import ClipListView from './ClipListView';
-import SettingsPanel from '../components/SettingsPanel';
+import SettingsScreen from './SettingsScreen';
+import OnboardingScreen from './OnboardingScreen';
+import Pressy from '../components/Pressy';
 import { PopupState } from '../types/clip';
-import { resizePopupWindow, isNativeOverlayAvailable } from '../native/OverlayModule';
+import {
+  resizePopupWindow,
+  isNativeOverlayAvailable,
+  startBubble,
+  stopBubble,
+  requestOverlayPermission,
+  isOverlayPermissionGranted,
+  isBubbleRunning,
+} from '../native/OverlayModule';
+import { useTheme } from '../theme/ThemeContext';
+import { useSettingsStore } from '../store/settingsStore';
 
-// Sizes are approximate dp values for the native floating window (Phase 2).
-// In Expo Go / a plain foreground app these are visual-only (the app itself
-// just renders differently); the native resize call is a no-op until the
-// custom dev client (Phase 2) is built.
 const SIZES: Record<PopupState, { width: number; height: number }> = {
   small: { width: 300, height: 400 },
   expanded: { width: 360, height: 640 },
-  full: { width: -1, height: -1 }, // -1 = fill screen, handled natively
+  full: { width: -1, height: -1 },
 };
 
+const TABS: { key: PopupState; label: string }[] = [
+  { key: 'small', label: 'Small' },
+  { key: 'expanded', label: 'Expanded' },
+  { key: 'full', label: 'Full App' },
+];
+
 export default function PopupScreen() {
+  const { colors, radii, spacing, shadow, type } = useTheme();
   const [state, setState] = useState<PopupState>('small');
+  const [showSettings, setShowSettings] = useState(false);
+  const [bubbleRunning, setBubbleRunning] = useState(false);
+  const hasOnboarded = useSettingsStore((s) => s.hasOnboarded);
+  const setOnboarded = useSettingsStore((s) => s.setOnboarded);
+
+  useEffect(() => {
+    isBubbleRunning().then(setBubbleRunning);
+    const sub = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active') isBubbleRunning().then(setBubbleRunning);
+    });
+    return () => sub.remove();
+  }, []);
 
   const changeState = (next: PopupState) => {
     setState(next);
@@ -26,61 +55,128 @@ export default function PopupScreen() {
     }
   };
 
+  const toggleBubble = async () => {
+    if (bubbleRunning) {
+      stopBubble();
+      setBubbleRunning(false);
+      return;
+    }
+    const granted = (await isOverlayPermissionGranted()) || (await requestOverlayPermission());
+    if (granted) {
+      startBubble();
+      setBubbleRunning(true);
+    }
+  };
+
+  const floating = state !== 'full';
+
+  const styles = StyleSheet.create({
+    outer: { flex: 1, backgroundColor: colors.bg },
+    outerFloating: {
+      padding: 5,
+      borderRadius: radii.lg + 6,
+      backgroundColor: 'rgba(128,128,128,0.08)',
+      ...shadow.floating,
+    },
+    inner: { flex: 1, backgroundColor: colors.bg },
+    innerFloating: { borderRadius: radii.lg, overflow: 'hidden' },
+    hero: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.sm,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    heroLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    logoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
+    title: { fontFamily: type.extrabold, fontSize: 17, color: colors.ink, letterSpacing: -0.3 },
+    gearBtn: {
+      width: 30,
+      height: 30,
+      borderRadius: radii.pill,
+      backgroundColor: colors.surfaceSunken,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    gearIcon: { fontSize: 14 },
+    switcherRow: { flexDirection: 'row', gap: spacing.xs },
+    bubbleBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 7,
+      borderRadius: radii.pill,
+      backgroundColor: colors.surfaceSunken,
+    },
+    bubbleBtnActive: { backgroundColor: colors.accentSoft },
+    bubbleBtnText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkSoft },
+    bubbleBtnTextActive: { color: colors.accent },
+    tabBar: {
+      flex: 1,
+      flexDirection: 'row',
+      backgroundColor: colors.surfaceSunken,
+      borderRadius: radii.pill,
+      padding: 3,
+    },
+    tab: { flex: 1, paddingVertical: 6, borderRadius: radii.pill, alignItems: 'center' },
+    tabActive: { backgroundColor: colors.surface, ...shadow.card },
+    tabText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkFaint },
+    tabTextActive: { color: colors.ink },
+  });
+
+  if (!hasOnboarded) {
+    return <OnboardingScreen onDone={setOnboarded} />;
+  }
+
   return (
-    <SafeAreaView style={[styles.container, state !== 'full' && styles.floating]}>
-      <View style={styles.header}>
-        <Text style={styles.title}>DevClip</Text>
-        <View style={styles.toggleRow}>
-          <ToggleButton label="Small" active={state === 'small'} onPress={() => changeState('small')} />
-          <ToggleButton
-            label="Expanded"
-            active={state === 'expanded'}
-            onPress={() => changeState('expanded')}
-          />
-          <ToggleButton label="Full App" active={state === 'full'} onPress={() => changeState('full')} />
+    <View style={[styles.outer, floating && styles.outerFloating]}>
+      <SafeAreaView
+        style={[styles.inner, floating && styles.innerFloating]}
+        edges={floating ? [] : ['top', 'bottom']}
+      >
+        <View style={styles.hero}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroLeft}>
+              <View style={styles.logoDot} />
+              <Text style={styles.title}>DevClip</Text>
+            </View>
+            <Pressy onPress={() => setShowSettings(true)} style={styles.gearBtn}>
+              <Text style={styles.gearIcon}>⚙</Text>
+            </Pressy>
+          </View>
+
+          <View style={styles.switcherRow}>
+            {isNativeOverlayAvailable() && (
+              <Pressy onPress={toggleBubble} style={[styles.bubbleBtn, bubbleRunning && styles.bubbleBtnActive]}>
+                <CircleDot size={13} strokeWidth={2} color={bubbleRunning ? colors.accent : colors.inkFaint} />
+                <Text style={[styles.bubbleBtnText, bubbleRunning && styles.bubbleBtnTextActive]}>
+                  {bubbleRunning ? 'Bubble on' : 'Bubble off'}
+                </Text>
+              </Pressy>
+            )}
+            <View style={styles.tabBar}>
+              {TABS.map((tab) => {
+                const active = state === tab.key;
+                return (
+                  <Pressy key={tab.key} onPress={() => changeState(tab.key)} style={[styles.tab, active && styles.tabActive]}>
+                    <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
+                  </Pressy>
+                );
+              })}
+            </View>
+          </View>
         </View>
-      </View>
-      {state === 'full' && <SettingsPanel />}
-      <ClipListView />
-    </SafeAreaView>
+
+        {showSettings ? <SettingsScreen onBack={() => setShowSettings(false)} /> : <ClipListView />}
+      </SafeAreaView>
+    </View>
   );
 }
-
-function ToggleButton({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <TouchableOpacity style={[styles.toggleBtn, active && styles.toggleBtnActive]} onPress={onPress}>
-      <Text style={[styles.toggleText, active && styles.toggleTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  floating: {
-    borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    overflow: 'hidden',
-  },
-  header: {
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ddd',
-  },
-  title: { fontSize: 16, fontWeight: '700', marginBottom: 6 },
-  toggleRow: { flexDirection: 'row', gap: 6 },
-  toggleBtn: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, backgroundColor: '#eee' },
-  toggleBtnActive: { backgroundColor: '#4a6cf7' },
-  toggleText: { fontSize: 11, color: '#333' },
-  toggleTextActive: { color: '#fff', fontWeight: '600' },
-});

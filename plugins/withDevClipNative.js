@@ -36,6 +36,7 @@ function withDevClipNativeFiles(config) {
         'OverlayService.kt',
         'OverlayModule.kt',
         'OverlayPackage.kt',
+        'BootReceiver.kt',
       ];
       for (const file of ktFiles) {
         fs.copyFileSync(path.join(SRC_DIR, file), path.join(javaDir, file));
@@ -62,6 +63,7 @@ function withDevClipManifest(config) {
       'android.permission.FOREGROUND_SERVICE',
       'android.permission.FOREGROUND_SERVICE_SPECIAL_USE',
       'android.permission.POST_NOTIFICATIONS',
+      'android.permission.RECEIVE_BOOT_COMPLETED',
     ];
     androidManifest.manifest['uses-permission'] =
       androidManifest.manifest['uses-permission'] || [];
@@ -120,6 +122,26 @@ function withDevClipManifest(config) {
       });
     }
 
+    // --- Receivers ---
+    mainApplication.receiver = mainApplication.receiver || [];
+    const hasBootReceiver = mainApplication.receiver.some(
+      (r) => r['$']['android:name'] === '.BootReceiver'
+    );
+    if (!hasBootReceiver) {
+      mainApplication.receiver.push({
+        $: {
+          'android:name': '.BootReceiver',
+          'android:exported': 'true',
+          'android:enabled': 'true',
+        },
+        'intent-filter': [
+          {
+            action: [{ $: { 'android:name': 'android.intent.action.BOOT_COMPLETED' } }],
+          },
+        ],
+      });
+    }
+
     return config;
   });
 }
@@ -130,7 +152,7 @@ function withDevClipStrings(config) {
       [
         {
           $: { name: 'devclip_accessibility_description' },
-          _: 'Lets DevClip save text you copy anywhere on your phone.',
+          _: 'Lets DevClip save text you copy anywhere on your phone, and paste a saved clip directly into the text field you were using.',
         },
       ],
       config.modResults
