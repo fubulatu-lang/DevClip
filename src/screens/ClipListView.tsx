@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
@@ -14,8 +14,23 @@ import { useTheme } from '../theme/ThemeContext';
 
 export default function ClipListView() {
   const { colors, radii, spacing, type } = useTheme();
-  const { clips, search, sort, init, setSearch, setSort, addClip, updateClip, deleteClip, moveUp, moveDown, trimToMax } =
-    useClipStore();
+  const {
+    clips,
+    search,
+    sort,
+    loading,
+    error,
+    init,
+    setSearch,
+    setSort,
+    addClip,
+    updateClip,
+    deleteClip,
+    moveUp,
+    moveDown,
+    trimToMax,
+    dismissError,
+  } = useClipStore();
   const maxClips = useSettingsStore((s) => s.maxClips);
   const [editing, setEditing] = useState<Clip | null>(null);
 
@@ -34,29 +49,60 @@ export default function ClipListView() {
     }
   };
 
-  const styles = StyleSheet.create({
-    container: { flex: 1 },
-    captureBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginHorizontal: spacing.md,
-      marginTop: spacing.xs,
-      backgroundColor: colors.accentSoft,
-      paddingVertical: 11,
-      borderRadius: radii.pill,
-    },
-    captureText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.accent },
-    empty: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: spacing.sm, paddingHorizontal: spacing.xl },
-    emptyText: { fontFamily: type.medium, fontSize: 12.5, color: colors.inkFaint, textAlign: 'center', lineHeight: 18 },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: { flex: 1 },
+        captureBtn: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          marginHorizontal: spacing.md,
+          marginTop: spacing.xs,
+          backgroundColor: colors.accentSoft,
+          paddingVertical: 11,
+          borderRadius: radii.pill,
+        },
+        captureText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.accent },
+        empty: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: spacing.sm, paddingHorizontal: spacing.xl },
+        emptyText: { fontFamily: type.medium, fontSize: 12.5, color: colors.inkFaint, textAlign: 'center', lineHeight: 18 },
+        errorBanner: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginHorizontal: spacing.md,
+          marginTop: spacing.xs,
+          backgroundColor: colors.dangerSoft,
+          paddingVertical: 8,
+          paddingHorizontal: spacing.md,
+          borderRadius: radii.sm,
+          gap: spacing.sm,
+        },
+        errorText: { flex: 1, fontFamily: type.medium, fontSize: 12, color: colors.danger },
+        errorDismiss: { fontFamily: type.semibold, fontSize: 12, color: colors.danger },
+      }),
+    [colors, radii, spacing, type]
+  );
 
   return (
-    <View style={styles.container}>
-      <Pressy onPress={handleCapture} style={styles.captureBtn}>
+    <View style={styles.container} accessibilityLiveRegion="polite">
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+          <Pressy onPress={dismissError} accessibilityLabel="Dismiss error" hitSlop={8}>
+            <Text style={styles.errorDismiss}>Dismiss</Text>
+          </Pressy>
+        </View>
+      )}
+
+      <Pressy
+        onPress={handleCapture}
+        style={styles.captureBtn}
+        accessibilityLabel="Capture current clipboard"
+      >
         <ClipboardPaste size={15} strokeWidth={1.75} color={colors.accent} />
-        <Text style={styles.captureText}>Capture current clipboard</Text>
+        <Text style={styles.captureText}>{loading ? 'Loading…' : 'Capture current clipboard'}</Text>
       </Pressy>
 
       <SearchBar value={search} onChange={setSearch} />

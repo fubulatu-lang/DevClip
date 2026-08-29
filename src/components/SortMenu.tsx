@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, ScrollView, Text } from 'react-native';
 import { SortMode } from '../types/clip';
 import { useTheme } from '../theme/ThemeContext';
@@ -19,26 +19,44 @@ interface Props {
 
 export default function SortMenu({ value, onChange }: Props) {
   const { colors, radii, spacing, type } = useTheme();
-  const styles = StyleSheet.create({
-    wrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
-    chip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: 7,
-      borderRadius: radii.pill,
-      backgroundColor: colors.surfaceSunken,
-      marginRight: spacing.xs,
-    },
-    chipActive: { backgroundColor: colors.ink },
-    chipText: { fontSize: 12, fontFamily: type.semibold, color: colors.inkSoft },
-    chipTextActive: { color: colors.bg },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        wrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
+        chip: {
+          paddingHorizontal: spacing.md,
+          paddingVertical: 7,
+          borderRadius: radii.pill,
+          backgroundColor: colors.surfaceSunken,
+          marginRight: spacing.xs,
+          minHeight: 32,
+        },
+        chipActive: { backgroundColor: colors.ink },
+        chipText: { fontSize: 12, fontFamily: type.semibold, color: colors.inkSoft },
+        chipTextActive: { color: colors.bg },
+      }),
+    [colors, radii, spacing, type]
+  );
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.wrap}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.wrap}
+      accessibilityRole="tablist"
+    >
       {OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
-          <Pressy key={opt.value} onPress={() => onChange(opt.value)} style={[styles.chip, active && styles.chipActive]}>
+          <Pressy
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={[styles.chip, active && styles.chipActive]}
+            accessibilityLabel={`Sort by ${opt.label}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            hitSlop={4}
+          >
             <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
           </Pressy>
         );

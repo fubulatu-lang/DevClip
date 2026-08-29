@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShieldCheck, CircleDot, Bell, ArrowRight } from 'lucide-react-native';
@@ -37,7 +37,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     return () => sub.remove();
   }, []);
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
     scroll: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
     heading: { fontFamily: type.extrabold, fontSize: 22, color: colors.ink, marginBottom: spacing.xs },
@@ -81,7 +81,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       paddingVertical: 14,
     },
     continueText: { fontFamily: type.semibold, fontSize: 14, color: colors.bg },
-  });
+  }), [colors, radii, spacing, type]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -152,7 +152,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View style={styles.footer}>
-        <Pressy onPress={onDone} style={styles.continueBtn}>
+        <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel="Continue">
           <Text style={styles.continueText}>Continue</Text>
           <ArrowRight size={16} strokeWidth={2} color={colors.bg} />
         </Pressy>

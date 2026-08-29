@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Alert, Animated } from 'react-native';
 import { ChevronUp, ChevronDown, Copy } from 'lucide-react-native';
 import { Clip } from '../types/clip';
@@ -29,38 +29,42 @@ export default function ClipListItem({
   const { colors, radii, spacing, shadow, type } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
 
-  const styles = StyleSheet.create({
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: radii.md,
-      marginHorizontal: spacing.md,
-      marginBottom: spacing.sm,
-      padding: spacing.md,
-      ...shadow.card,
-    },
-    row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-    iconWrap: {
-      width: 28,
-      height: 28,
-      borderRadius: radii.sm,
-      backgroundColor: colors.accentSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 2,
-    },
-    title: { fontFamily: type.semibold, fontSize: 14, color: colors.ink, marginBottom: 2 },
-    content: { fontFamily: type.regular, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
-    date: { fontFamily: type.medium, fontSize: 10, color: colors.inkFaint, marginTop: 6 },
-    reorderCol: { alignItems: 'center', gap: 4 },
-    circleBtn: {
-      width: 24,
-      height: 24,
-      borderRadius: radii.pill,
-      backgroundColor: colors.surfaceSunken,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        card: {
+          backgroundColor: colors.surface,
+          borderRadius: radii.md,
+          marginHorizontal: spacing.md,
+          marginBottom: spacing.sm,
+          padding: spacing.md,
+          ...shadow.card,
+        },
+        row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+        iconWrap: {
+          width: 28,
+          height: 28,
+          borderRadius: radii.sm,
+          backgroundColor: colors.accentSoft,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: 2,
+        },
+        title: { fontFamily: type.semibold, fontSize: 14, color: colors.ink, marginBottom: 2 },
+        content: { fontFamily: type.regular, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
+        date: { fontFamily: type.medium, fontSize: 10, color: colors.inkFaint, marginTop: 6 },
+        reorderCol: { alignItems: 'center', gap: 8 },
+        circleBtn: {
+          width: 28,
+          height: 28,
+          borderRadius: radii.pill,
+          backgroundColor: colors.surfaceSunken,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+      }),
+    [colors, radii, spacing, shadow, type]
+  );
 
   const doPaste = async () => {
     const result = await pasteClip(clip.content);
@@ -85,7 +89,13 @@ export default function ClipListItem({
   };
 
   return (
-    <Pressy onPress={handleTap} onLongPress={() => onLongPress(clip)} style={styles.card}>
+    <Pressy
+      onPress={handleTap}
+      onLongPress={() => onLongPress(clip)}
+      style={styles.card}
+      accessibilityLabel={`${clip.title ? clip.title + ': ' : ''}${clip.content}`}
+      accessibilityHint="Double tap to paste. Long press to edit or delete."
+    >
       <View style={styles.row}>
         <View style={styles.iconWrap}>
           <Copy size={14} strokeWidth={1.5} color={colors.accent} />
@@ -101,10 +111,20 @@ export default function ClipListItem({
 
         {isManualSort && (
           <View style={styles.reorderCol}>
-            <CircleButton style={styles.circleBtn} disabled={isFirst} onPress={onMoveUp}>
+            <CircleButton
+              style={styles.circleBtn}
+              disabled={isFirst}
+              onPress={onMoveUp}
+              accessibilityLabel="Move clip up"
+            >
               <ChevronUp size={14} strokeWidth={1.75} color={isFirst ? colors.inkFaint : colors.ink} />
             </CircleButton>
-            <CircleButton style={styles.circleBtn} disabled={isLast} onPress={onMoveDown}>
+            <CircleButton
+              style={styles.circleBtn}
+              disabled={isLast}
+              onPress={onMoveDown}
+              accessibilityLabel="Move clip down"
+            >
               <ChevronDown size={14} strokeWidth={1.75} color={isLast ? colors.inkFaint : colors.ink} />
             </CircleButton>
           </View>
@@ -119,14 +139,22 @@ function CircleButton({
   onPress,
   disabled,
   style,
+  accessibilityLabel,
 }: {
   children: React.ReactNode;
   onPress: () => void;
   disabled?: boolean;
   style: any;
+  accessibilityLabel: string;
 }) {
   return (
-    <Pressy onPress={disabled ? undefined : onPress} style={style}>
+    <Pressy
+      onPress={disabled ? undefined : onPress}
+      style={style}
+      disabled={disabled}
+      accessibilityLabel={accessibilityLabel}
+      hitSlop={10}
+    >
       <Animated.View style={{ opacity: disabled ? 0.4 : 1 }}>{children}</Animated.View>
     </Pressy>
   );

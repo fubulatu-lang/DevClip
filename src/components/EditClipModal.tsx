@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Trash2, Check } from 'lucide-react-native';
 import { Clip } from '../types/clip';
@@ -24,7 +24,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
     }
   }, [clip]);
 
-  const styles = StyleSheet.create({
+  const styles = useMemo(() => StyleSheet.create({
     backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
     shell: {
       backgroundColor: 'rgba(0,0,0,0.03)',
@@ -108,7 +108,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       alignItems: 'center',
       justifyContent: 'center',
     },
-  });
+  }), [colors, radii, spacing, shadow, type]);
 
   if (!clip) return null;
 
@@ -121,12 +121,15 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
 
   return (
     <Modal visible={!!clip} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} />
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} accessibilityLabel="Close edit sheet" />
 
         <View style={styles.shell}>
           <View style={styles.sheet}>
-            <View style={styles.handle} />
+            <View style={styles.handle} importantForAccessibility="no" />
 
             <Text style={styles.eyebrow}>Title</Text>
             <TextInput
@@ -135,6 +138,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
               onChangeText={setTitle}
               placeholder="Untitled"
               placeholderTextColor={colors.inkFaint}
+              accessibilityLabel="Clip title"
             />
 
             <Text style={styles.eyebrow}>Content</Text>
@@ -144,6 +148,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
               onChangeText={setContent}
               multiline
               textAlignVertical="top"
+              accessibilityLabel="Clip content"
             />
 
             <View style={styles.actions}>

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, AppState, Alert, ScrollView } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, AppState, Alert, ScrollView, BackHandler } from 'react-native';
 import {
   ArrowLeft,
   ShieldCheck,
@@ -72,7 +72,18 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     return () => sub.remove();
   }, [refreshStatus]);
 
-  const styles = StyleSheet.create({
+  useEffect(() => {
+    // Without this, the system/gesture Back button exits the popup entirely
+    // instead of returning to the clip list, since Settings is just a
+    // conditionally-rendered view rather than a real navigation stack entry.
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [onBack]);
+
+  const styles = useMemo(() => StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.bg },
     header: {
       flexDirection: 'row',
@@ -83,8 +94,8 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       paddingBottom: spacing.sm,
     },
     backBtn: {
-      width: 32,
-      height: 32,
+      width: 44,
+      height: 44,
       borderRadius: radii.pill,
       backgroundColor: colors.surfaceSunken,
       alignItems: 'center',
@@ -134,7 +145,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     exportText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.accent },
     dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.dangerSoft, paddingVertical: 9, borderRadius: radii.pill, justifyContent: 'center' },
     dangerText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.danger },
-  });
+  }), [colors, radii, spacing, type]);
 
   const handleClearAll = () => {
     Alert.alert('Clear all clips?', 'This deletes everything in your history. This cannot be undone.', [
@@ -157,7 +168,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressy onPress={onBack} style={styles.backBtn}>
+        <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel="Back to clip list">
           <ArrowLeft size={16} strokeWidth={1.75} color={colors.ink} />
         </Pressy>
         <Text style={styles.headerTitle}>Settings</Text>
@@ -346,8 +357,8 @@ function PermissionRow({
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
       <View style={styles.rowLeft}>
-        <View style={[styles.statusDot, { backgroundColor: granted ? '#3FB950' : colors.danger }]} />
-        <Text style={[styles.statusText, { color: granted ? '#3FB950' : colors.danger }]}>
+        <View style={[styles.statusDot, { backgroundColor: granted ? colors.success : colors.danger }]} />
+        <Text style={[styles.statusText, { color: granted ? colors.success : colors.danger }]}>
           {granted ? 'Granted' : 'Off'}
         </Text>
       </View>

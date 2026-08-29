@@ -21,6 +21,8 @@ export interface ThemeColors {
   accentPressed: string;
   danger: string;
   dangerSoft: string;
+  success: string;
+  successSoft: string;
 }
 
 export const lightColors: ThemeColors = {
@@ -37,6 +39,8 @@ export const lightColors: ThemeColors = {
   accentPressed: '#2E3BD1',
   danger: '#E0453F',
   dangerSoft: '#FBEAE9',
+  success: '#2FA84F',
+  successSoft: '#E7F6EA',
 };
 
 export const darkColors: ThemeColors = {
@@ -53,6 +57,8 @@ export const darkColors: ThemeColors = {
   accentPressed: '#9AA3FA',
   danger: '#F17872',
   dangerSoft: '#3A2323',
+  success: '#57C97A',
+  successSoft: '#1C3323',
 };
 
 export const spacing = {
