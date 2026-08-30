@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { Trash2 } from 'lucide-react-native';
 import { Clip } from '../types/clip';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import Pressy from './Pressy';
 import { useReduceMotion } from '../theme/useReduceMotion';
@@ -16,6 +17,7 @@ interface Props {
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
+  const insets = useSafeAreaInsets();
   const reduceMotion = useReduceMotion();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -34,6 +36,9 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       borderTopLeftRadius: radii.container,
       borderTopRightRadius: radii.container,
       padding: spacing.keyline,
+      // A bottom sheet sits on the gesture bar / navigation bar, so its own
+      // padding has to clear it or the actions end up underneath.
+      paddingBottom: spacing.keyline + insets.bottom,
       ...shadow.floating,
     },
     handle: {
@@ -91,7 +96,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       minHeight: 48,
     },
     saveText: { ...text.button, color: colors.onAccent },
-  }), [colors, radii, spacing, shadow, text]);
+  }), [colors, radii, spacing, shadow, text, insets.bottom]);
 
   if (!clip) return null;
 

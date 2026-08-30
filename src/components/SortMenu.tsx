@@ -23,6 +23,7 @@ export default function SortMenu({ value, onChange }: Props) {
   const styles = useMemo(
     () =>
       StyleSheet.create({
+        row: { flexGrow: 0, flexShrink: 0 },
         wrap: {
           paddingHorizontal: spacing.keyline,
           paddingVertical: spacing.sm,
@@ -52,6 +53,11 @@ export default function SortMenu({ value, onChange }: Props) {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
+      // ScrollView's base style is flexGrow: 1. In a column parent a
+      // horizontal one therefore swallows all the leftover height and, with
+      // the chips centred in it, pushed the list into the middle of the
+      // screen. It should be exactly as tall as one row of chips.
+      style={styles.row}
       contentContainerStyle={styles.wrap}
       accessibilityRole="tablist"
     >
