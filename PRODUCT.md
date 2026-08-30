@@ -21,7 +21,8 @@ Most clipboard managers on Android either require the app to be in the foregroun
 ## Operating Context
 
 - Used from a floating bubble overlay that can be tapped from inside any other Android app.
-- Three interchangeable UI sizes — Small (bubble popup), Expanded, Full App — all rendering the same React Native screen/components, just resized.
+- Two distinct surfaces, not one UI at three sizes. The overlay is its own React root: **mini**, tethered to the bubble and paste-only, and **expanded**, a half-height sheet across the bottom with search, sort and editing. The launcher app is the full screen and carries no size controls.
+- Layout is driven by window size class, not device model: below 589dp the 24dp keyline is the margin, from 589dp it is 5% of the width, from 960dp 12.5%, and clip cards go to two columns from 589dp.
 - Settings screen surfaces live permission status (accessibility, overlay, notifications) since Android can silently revoke these later.
 - Onboarding is a one-time first-launch flow: requests notification permission, walks through enabling background capture and the bubble.
 
@@ -39,7 +40,8 @@ Most clipboard managers on Android either require the app to be in the foregroun
 ## Brand Commitments
 
 - Name: DevClip. Package: `com.devclip.app`.
-- Existing visual identity ("Soft Structuralism": near-white silver-grey canvas, airy white cards with diffused shadows, one indigo accent; Manrope typeface; `lucide-react-native` icons at thin stroke width; "double-bezel" nested-card structure; segmented pill tab bar; spring press-scale motion via `Pressy.tsx`) is already implemented and documented in README.md — treat as incumbent, not to be reinvented without the user's direction.
+- Visual identity is **Samsung One UI, in the app icon's colours**, replacing the former "Soft Structuralism" (near-white canvas, indigo accent, Manrope, diffused shadows). The full system is recorded in `ONE-UI.md` and is the contract: role-based colour derived from the icon's slate `#345065` and blue `#3498DB` (both darkened to meet WCAG AA), the system font, a 17sp body, the 24dp keyline, pill buttons, depth by surface tone rather than shadow, and the real One UI easing curves. Treat `ONE-UI.md` as incumbent; do not reinvent it without the user's direction.
+- The accent is pinned rather than derived from the wallpaper. One UI would take it from the system; DevClip fixes it for brand identity and deterministic contrast. Recorded as a deliberate divergence.
 
 ## Evidence on Hand
 
@@ -52,4 +54,6 @@ Most clipboard managers on Android either require the app to be in the foregroun
 - Never steal focus — overlay windows and paste actions must never disrupt the app underneath.
 - Never lose a clip — duplicate suppression and safe trimming, but no silent data loss.
 - Keep the native/JS boundary thin — one shared SQLite file and schema is the entire contract; don't add hidden coupling.
-- Build once, render everywhere — the same list/search/sort/edit UI serves the bubble popup, expanded popup, and full app.
+- Right surface, right depth — mini is for pasting and nothing else, expanded and full carry search, sort and editing. Shared components, not one screen stretched to three sizes.
+- No gesture is the only way to do anything — every action reachable by long press has a visible control too.
+- Never write a literal — colour, type, spacing, radius, icon size and motion all come from the token layer; CI fails the build if a colour escapes it.

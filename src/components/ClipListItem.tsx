@@ -5,6 +5,7 @@ import { Clip } from '../types/clip';
 import { pasteClip } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
+import { useSnackbarStore } from '../store/snackbarStore';
 import Pressy from './Pressy';
 import { strings } from '../strings';
 
@@ -14,8 +15,10 @@ interface Props {
   isFirst: boolean;
   isLast: boolean;
   onLongPress: (clip: Clip) => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
+  /** Index in the list, so the row can ask for its own move. */
+  index: number;
+  /** Stable across renders; the row binds its own index to it. */
+  onMove: (index: number, direction: -1 | 1) => void;
   /**
    * `mini` is the tethered bubble window: paste only. It drops the reorder
    * controls and both routes to edit — the more button and the long press.
@@ -26,18 +29,19 @@ interface Props {
   variant?: 'full' | 'mini';
 }
 
-export default function ClipListItem({
+function ClipListItem({
   clip,
   isManualSort,
   isFirst,
   isLast,
   onLongPress,
-  onMoveUp,
-  onMoveDown,
+  index,
+  onMove,
   variant = 'full',
 }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
+  const showSnackbar = useSnackbarStore((s) => s.show);
 
   const mini = variant === 'mini';
 
@@ -47,8 +51,8 @@ export default function ClipListItem({
         card: {
           backgroundColor: colors.surface,
           borderRadius: radii.md,
-          marginHorizontal: spacing.keyline,
           marginBottom: spacing.sm,
+          flex: 1,
           padding: spacing.lg,
           ...shadow.card,
         },
@@ -88,7 +92,9 @@ export default function ClipListItem({
   const doPaste = async () => {
     const result = await pasteClip(clip.content);
     if (result === 'copiedOnly') {
-      Alert.alert(strings.paste.copiedTitle, strings.paste.copiedBody);
+      // News, not a decision: a dialog here interrupts the paste it just
+      // half-completed. Say what happened and let the user carry on.
+      showSnackbar(strings.paste.copiedBody);
     }
   };
 
@@ -133,7 +139,7 @@ export default function ClipListItem({
             <CircleButton
               style={styles.circleBtn}
               disabled={isFirst}
-              onPress={onMoveUp}
+              onPress={() => onMove(index, -1)}
               accessibilityLabel={strings.clips.moveUp}
             >
               <ChevronUp size={icon.sm} strokeWidth={icon.stroke} color={isFirst ? colors.inkDisabled : colors.ink} />
@@ -141,7 +147,7 @@ export default function ClipListItem({
             <CircleButton
               style={styles.circleBtn}
               disabled={isLast}
-              onPress={onMoveDown}
+              onPress={() => onMove(index, 1)}
               accessibilityLabel={strings.clips.moveDown}
             >
               <ChevronDown size={icon.sm} strokeWidth={icon.stroke} color={isLast ? colors.inkDisabled : colors.ink} />
@@ -195,6 +201,14 @@ function CircleButton({
     </Pressy>
   );
 }
+
+/**
+ * A list of up to 1000 rows re-rendered every one of them whenever anything
+ * in the store moved. Every prop here is either a primitive or a callback
+ * the list keeps stable, so the default shallow comparison is enough: a row
+ * re-renders when its own clip or position changes, and not otherwise.
+ */
+export default React.memo(ClipListItem);
 
 function formatWhen(ts: number): string {
   const diffMs = Date.now() - ts;

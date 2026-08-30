@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShieldCheck, CircleDot, Bell, ArrowRight } from 'lucide-react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
 import {
   isNativeOverlayAvailable,
@@ -17,6 +17,7 @@ import { strings } from '../strings';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const [notifAsked, setNotifAsked] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [accessibilityGranted, setAccessibilityGranted] = useState(false);
@@ -40,7 +41,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const styles = useMemo(() => StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
-    scroll: { flex: 1, paddingHorizontal: spacing.keyline, paddingTop: spacing.xl },
+    scroll: { flex: 1, paddingHorizontal: gutter, paddingTop: spacing.xl },
     heading: { ...text.display, color: colors.ink, marginBottom: spacing.sm },
     sub: { ...text.secondary, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 22 },
     card: {
@@ -73,7 +74,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
     actionBtnDone: { backgroundColor: colors.accentSoft },
     actionText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
     actionTextDone: { color: colors.accent },
-    footer: { padding: spacing.keyline },
+    footer: { paddingHorizontal: gutter, paddingVertical: spacing.keyline },
     continueBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -84,7 +85,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       minHeight: 48,
     },
     continueText: { ...text.button, color: colors.onAccent },
-  }), [colors, radii, spacing, text]);
+  }), [colors, radii, spacing, text, gutter]);
 
   return (
     <SafeAreaView style={styles.safe}>

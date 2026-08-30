@@ -3,6 +3,7 @@ package com.devclip.app
 import android.app.*
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.PixelFormat
@@ -87,6 +88,35 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         addBubble()
+    }
+
+    /**
+     * Rotation, unfolding, and entering multi-window all move the system bars
+     * and change the usable rectangle. Both windows are positioned from that
+     * rectangle, so both have to be re-placed when it changes — otherwise a
+     * window that was correctly inset before the change is left overlapping a
+     * system bar, or off the edge of the new configuration entirely.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        val area = safeArea()
+
+        bubbleView?.let { view ->
+            bubbleParams?.let { params ->
+                params.x = params.x.coerceIn(area.left, area.right - bubbleSizePx)
+                params.y = params.y.coerceIn(area.top, area.bottom - bubbleSizePx)
+                try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+            }
+        }
+
+        if (popupVisible) {
+            applyPopupGeometry()
+            popupRootView?.let { view ->
+                popupParams?.let { params ->
+                    try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

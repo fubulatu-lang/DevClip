@@ -30,7 +30,7 @@ export const strings = {
   clips: {
     capture: 'Capture clipboard',
     captureA11y: 'Capture current clipboard',
-    capturing: 'Loading…',
+    capturing: 'Capturing…',
     emptyTitle: 'No clips yet',
     emptyBody: 'Copy something, then tap Capture below.',
     noMatches: (term: string) => `No clips match “${term}”`,
@@ -48,7 +48,6 @@ export const strings = {
   paste: {
     confirmTitle: 'Paste this clip?',
     confirm: 'Paste',
-    copiedTitle: 'Copied',
     copiedBody: 'Could not paste automatically, so it’s on your clipboard — paste it manually.',
   },
 
@@ -129,7 +128,6 @@ export const strings = {
 
     exportBackup: 'Export backup',
     exporting: 'Exporting…',
-    exportFailedTitle: 'Export failed',
     exportFailedBody: 'Could not create the backup file. Try again.',
 
     clearAll: 'Clear all clips',

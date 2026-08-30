@@ -26,11 +26,20 @@ import {
   stopBubble,
 } from '../native/OverlayModule';
 import { exportBackup } from '../utils/backup';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
+import { useSnackbarStore } from '../store/snackbarStore';
 import Pressy from '../components/Pressy';
 import { strings } from '../strings';
+
+/**
+ * Settings is opened and closed from the clip list rather than pushed onto a
+ * navigation stack, so it unmounts every time and would otherwise reopen at
+ * the top. Remembering the offset for the life of the process restores the
+ * position the user left, which is what returning to a screen should do.
+ */
+let lastScrollOffset = 0;
 
 const MAX_CLIPS_OPTIONS = [
   { value: 100, label: '100' },
@@ -41,6 +50,7 @@ const MAX_CLIPS_OPTIONS = [
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const [accessibilityOn, setAccessibilityOn] = useState(false);
   const [overlayOn, setOverlayOn] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
@@ -58,6 +68,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const maxClips = useSettingsStore((s) => s.maxClips);
   const setMaxClips = useSettingsStore((s) => s.setMaxClips);
   const clearAll = useClipStore((s) => s.clearAll);
+  const showSnackbar = useSnackbarStore((s) => s.show);
 
   const refreshStatus = useCallback(async () => {
     setAccessibilityOn(await isAccessibilityServiceEnabled());
@@ -90,7 +101,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      paddingHorizontal: spacing.keyline,
+      paddingHorizontal: gutter,
       paddingVertical: spacing.xs,
       minHeight: 56,
     },
@@ -103,7 +114,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     },
     headerTitle: { ...text.title, color: colors.ink },
     section: {
-      marginHorizontal: spacing.keyline,
+      marginHorizontal: gutter,
       marginTop: spacing.md,
       backgroundColor: colors.surface,
       borderRadius: radii.md,
@@ -170,7 +181,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       justifyContent: 'center',
     },
     dangerText: { ...text.button, color: colors.danger },
-  }), [colors, radii, spacing, text]);
+  }), [colors, radii, spacing, text, gutter]);
 
   const handleClearAll = () => {
     Alert.alert(strings.settings.clearAllTitle, strings.settings.clearAllBody, [
@@ -184,7 +195,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     try {
       await exportBackup();
     } catch (e) {
-      Alert.alert(strings.settings.exportFailedTitle, strings.settings.exportFailedBody);
+      showSnackbar(strings.settings.exportFailedBody);
     } finally {
       setExporting(false);
     }
@@ -199,7 +210,15 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
         <Text style={styles.headerTitle}>{strings.settings.title}</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
+        contentOffset={{ x: 0, y: lastScrollOffset }}
+        onScroll={(e) => {
+          lastScrollOffset = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+      >
         {/* Permissions status */}
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
@@ -425,7 +444,16 @@ function SettingRow({
         {icon}
         <Text style={styles.rowLabel}>{label}</Text>
       </View>
-      <Pressy onPress={onPress} style={[styles.actionBtn, active && styles.actionBtnActive]}>
+      {/*
+        Sighted users read the button against its row label. A screen reader
+        reaches the button on its own, where "Enable" names no subject — so
+        the button carries the whole phrase.
+      */}
+      <Pressy
+        onPress={onPress}
+        style={[styles.actionBtn, active && styles.actionBtnActive]}
+        accessibilityLabel={`${buttonLabel}: ${label}`}
+      >
         <Text style={[styles.actionBtnText, active && styles.actionBtnTextActive]}>{buttonLabel}</Text>
       </Pressy>
     </View>

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { Search } from 'lucide-react-native';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { strings } from '../strings';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
 
 export default function SearchBar({ value, onChange }: Props) {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -25,12 +26,12 @@ export default function SearchBar({ value, onChange }: Props) {
           // large font scales rather than clip it.
           minHeight: 48,
           paddingVertical: spacing.sm,
-          marginHorizontal: spacing.keyline,
+          marginHorizontal: gutter,
           marginTop: spacing.sm,
         },
         input: { flex: 1, ...text.body, color: colors.ink, padding: 0 },
       }),
-    [colors, radii, spacing, text]
+    [colors, radii, spacing, text, gutter]
   );
 
   return (

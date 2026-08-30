@@ -7,6 +7,7 @@ import ClipListItem from '../components/ClipListItem';
 import SearchBar from '../components/SearchBar';
 import SortMenu from '../components/SortMenu';
 import Pressy from '../components/Pressy';
+import Snackbar from '../components/Snackbar';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { setOverlayMode, hideOverlay, openFullApp, OverlayMode } from '../native/OverlayModule';
@@ -23,13 +24,23 @@ import { strings } from '../strings';
  * bubble sits and where the system bars are — so this screen asks for a
  * shape by name and lays itself out to whatever window it is given.
  */
+/** Mini is paste-only, so the row's edit and reorder hooks go nowhere. */
+const noop = () => {};
+
 export default function OverlayScreen() {
   const { colors, radii, spacing, text, icon } = useTheme();
   const [mode, setMode] = useState<OverlayMode>('mini');
-  const {
-    clips, search, sort, loading, error,
-    init, setSearch, setSort, addClip, trimToMax, dismissError,
-  } = useClipStore();
+  const clips = useClipStore((s) => s.clips);
+  const search = useClipStore((s) => s.search);
+  const sort = useClipStore((s) => s.sort);
+  const loading = useClipStore((s) => s.loading);
+  const error = useClipStore((s) => s.error);
+  const init = useClipStore((s) => s.init);
+  const setSearch = useClipStore((s) => s.setSearch);
+  const setSort = useClipStore((s) => s.setSort);
+  const addClip = useClipStore((s) => s.addClip);
+  const trimToMax = useClipStore((s) => s.trimToMax);
+  const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
 
   useEffect(() => { init(); }, []);
@@ -78,7 +89,12 @@ export default function OverlayScreen() {
           alignItems: 'center',
           justifyContent: 'center',
         },
-        list: { flexGrow: 1, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+        list: {
+          flexGrow: 1,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          paddingHorizontal: spacing.lg,
+        },
         empty: {
           alignItems: 'center',
           justifyContent: 'center',
@@ -104,6 +120,7 @@ export default function OverlayScreen() {
           paddingHorizontal: spacing.lg,
           borderRadius: radii.pill,
         },
+        captureBtnBusy: { opacity: 0.5 },
         captureText: { ...text.button, color: colors.onAccent },
         errorBanner: {
           marginHorizontal: spacing.lg,
@@ -192,9 +209,9 @@ export default function OverlayScreen() {
             isManualSort={!mini && sort === 'manual'}
             isFirst={index === 0}
             isLast={index === clips.length - 1}
-            onLongPress={() => {}}
-            onMoveUp={() => {}}
-            onMoveDown={() => {}}
+            onLongPress={noop}
+            index={index}
+            onMove={noop}
           />
         )}
         ListEmptyComponent={
@@ -210,7 +227,9 @@ export default function OverlayScreen() {
       <View style={styles.actionBar}>
         <Pressy
           onPress={handleCapture}
-          style={styles.captureBtn}
+          // An async action that stays tappable invites a double capture.
+          disabled={loading}
+          style={[styles.captureBtn, loading && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
           <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
@@ -219,6 +238,8 @@ export default function OverlayScreen() {
           </Text>
         </Pressy>
       </View>
+
+      <Snackbar />
     </View>
   );
 }
