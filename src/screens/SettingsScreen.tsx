@@ -29,6 +29,7 @@ import { exportBackup } from '../utils/backup';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
+import { useSnackbarStore } from '../store/snackbarStore';
 import Pressy from '../components/Pressy';
 import { strings } from '../strings';
 
@@ -67,6 +68,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const maxClips = useSettingsStore((s) => s.maxClips);
   const setMaxClips = useSettingsStore((s) => s.setMaxClips);
   const clearAll = useClipStore((s) => s.clearAll);
+  const showSnackbar = useSnackbarStore((s) => s.show);
 
   const refreshStatus = useCallback(async () => {
     setAccessibilityOn(await isAccessibilityServiceEnabled());
@@ -193,7 +195,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     try {
       await exportBackup();
     } catch (e) {
-      Alert.alert(strings.settings.exportFailedTitle, strings.settings.exportFailedBody);
+      showSnackbar(strings.settings.exportFailedBody);
     } finally {
       setExporting(false);
     }
@@ -442,7 +444,16 @@ function SettingRow({
         {icon}
         <Text style={styles.rowLabel}>{label}</Text>
       </View>
-      <Pressy onPress={onPress} style={[styles.actionBtn, active && styles.actionBtnActive]}>
+      {/*
+        Sighted users read the button against its row label. A screen reader
+        reaches the button on its own, where "Enable" names no subject — so
+        the button carries the whole phrase.
+      */}
+      <Pressy
+        onPress={onPress}
+        style={[styles.actionBtn, active && styles.actionBtnActive]}
+        accessibilityLabel={`${buttonLabel}: ${label}`}
+      >
         <Text style={[styles.actionBtnText, active && styles.actionBtnTextActive]}>{buttonLabel}</Text>
       </Pressy>
     </View>

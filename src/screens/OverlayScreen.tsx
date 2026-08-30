@@ -7,6 +7,7 @@ import ClipListItem from '../components/ClipListItem';
 import SearchBar from '../components/SearchBar';
 import SortMenu from '../components/SortMenu';
 import Pressy from '../components/Pressy';
+import Snackbar from '../components/Snackbar';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { setOverlayMode, hideOverlay, openFullApp, OverlayMode } from '../native/OverlayModule';
@@ -224,6 +225,8 @@ export default function OverlayScreen() {
           </Text>
         </Pressy>
       </View>
+
+      <Snackbar />
     </View>
   );
 }

@@ -8,6 +8,7 @@ import SortMenu from '../components/SortMenu';
 import ClipListItem from '../components/ClipListItem';
 import EditClipModal from '../components/EditClipModal';
 import Pressy from '../components/Pressy';
+import Snackbar from '../components/Snackbar';
 import { Clip } from '../types/clip';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
@@ -165,6 +166,8 @@ export default function ClipListView() {
           <Text style={styles.captureText}>{loading ? strings.clips.capturing : strings.clips.capture}</Text>
         </Pressy>
       </View>
+
+      <Snackbar />
 
       <EditClipModal
         clip={editing}

@@ -5,6 +5,7 @@ import { Clip } from '../types/clip';
 import { pasteClip } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
+import { useSnackbarStore } from '../store/snackbarStore';
 import Pressy from './Pressy';
 import { strings } from '../strings';
 
@@ -38,6 +39,7 @@ export default function ClipListItem({
 }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
+  const showSnackbar = useSnackbarStore((s) => s.show);
 
   const mini = variant === 'mini';
 
@@ -88,7 +90,9 @@ export default function ClipListItem({
   const doPaste = async () => {
     const result = await pasteClip(clip.content);
     if (result === 'copiedOnly') {
-      Alert.alert(strings.paste.copiedTitle, strings.paste.copiedBody);
+      // News, not a decision: a dialog here interrupts the paste it just
+      // half-completed. Say what happened and let the user carry on.
+      showSnackbar(strings.paste.copiedBody);
     }
   };
 
