@@ -11,9 +11,10 @@ import Pressy from '../components/Pressy';
 import { Clip } from '../types/clip';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
+import { strings } from '../strings';
 
 export default function ClipListView() {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const {
     clips,
     search,
@@ -53,36 +54,53 @@ export default function ClipListView() {
     () =>
       StyleSheet.create({
         container: { flex: 1 },
+        /**
+         * The One UI interaction area: the primary action sits at the bottom,
+         * within thumb reach, not at the top where the eye lands first.
+         */
+        actionBar: {
+          paddingHorizontal: spacing.keyline,
+          paddingTop: spacing.md,
+          paddingBottom: spacing.lg,
+          borderTopWidth: 1,
+          borderTopColor: colors.divider,
+          backgroundColor: colors.bg,
+        },
         captureBtn: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
-          gap: 8,
-          marginHorizontal: spacing.md,
-          marginTop: spacing.xs,
-          backgroundColor: colors.accentSoft,
-          paddingVertical: 11,
+          gap: spacing.sm,
+          backgroundColor: colors.accent,
+          minHeight: 48,
+          paddingHorizontal: spacing.xl,
           borderRadius: radii.pill,
         },
-        captureText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.accent },
-        empty: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: spacing.sm, paddingHorizontal: spacing.xl },
-        emptyText: { fontFamily: type.medium, fontSize: 12.5, color: colors.inkFaint, textAlign: 'center', lineHeight: 18 },
+        captureText: { ...text.button, color: colors.onAccent },
+        empty: {
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: 60,
+          gap: spacing.md,
+          paddingHorizontal: spacing.keyline,
+        },
+        emptyText: { ...text.secondary, color: colors.inkFaint, textAlign: 'center', lineHeight: 22 },
         errorBanner: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginHorizontal: spacing.md,
-          marginTop: spacing.xs,
+          marginHorizontal: spacing.keyline,
+          marginTop: spacing.sm,
           backgroundColor: colors.dangerSoft,
-          paddingVertical: 8,
-          paddingHorizontal: spacing.md,
-          borderRadius: radii.sm,
-          gap: spacing.sm,
+          paddingVertical: spacing.md,
+          paddingHorizontal: spacing.lg,
+          borderRadius: radii.md,
+          gap: spacing.md,
         },
-        errorText: { flex: 1, fontFamily: type.medium, fontSize: 12, color: colors.danger },
-        errorDismiss: { fontFamily: type.semibold, fontSize: 12, color: colors.danger },
+        errorText: { flex: 1, ...text.secondary, color: colors.danger },
+        errorDismiss: { ...text.secondary, fontWeight: '500', color: colors.danger },
       }),
-    [colors, radii, spacing, type]
+    [colors, radii, spacing, text]
   );
 
   return (
@@ -90,20 +108,11 @@ export default function ClipListView() {
       {error && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressy onPress={dismissError} accessibilityLabel="Dismiss error" hitSlop={8}>
-            <Text style={styles.errorDismiss}>Dismiss</Text>
+          <Pressy onPress={dismissError} accessibilityLabel={strings.common.dismissError} hitSlop={16}>
+            <Text style={styles.errorDismiss}>{strings.common.dismiss}</Text>
           </Pressy>
         </View>
       )}
-
-      <Pressy
-        onPress={handleCapture}
-        style={styles.captureBtn}
-        accessibilityLabel="Capture current clipboard"
-      >
-        <ClipboardPaste size={15} strokeWidth={1.75} color={colors.accent} />
-        <Text style={styles.captureText}>{loading ? 'Loading…' : 'Capture current clipboard'}</Text>
-      </Pressy>
 
       <SearchBar value={search} onChange={setSearch} />
       <SortMenu value={sort} onChange={setSort} />
@@ -125,11 +134,26 @@ export default function ClipListView() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Inbox size={28} strokeWidth={1.25} color={colors.inkFaint} />
-            <Text style={styles.emptyText}>No clips yet{'\n'}Copy something, then tap Capture above.</Text>
+            <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            <Text style={styles.emptyText}>
+              {search
+                ? strings.clips.noMatches(search)
+                : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
+            </Text>
           </View>
         }
       />
+
+      <View style={styles.actionBar}>
+        <Pressy
+          onPress={handleCapture}
+          style={styles.captureBtn}
+          accessibilityLabel={strings.clips.captureA11y}
+        >
+          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
+          <Text style={styles.captureText}>{loading ? strings.clips.capturing : strings.clips.capture}</Text>
+        </Pressy>
+      </View>
 
       <EditClipModal
         clip={editing}

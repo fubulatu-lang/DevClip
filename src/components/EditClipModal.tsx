@@ -4,6 +4,8 @@ import { Trash2 } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { useTheme } from '../theme/ThemeContext';
 import Pressy from './Pressy';
+import { useReduceMotion } from '../theme/useReduceMotion';
+import { strings } from '../strings';
 
 interface Props {
   clip: Clip | null;
@@ -13,7 +15,8 @@ interface Props {
 }
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
-  const { colors, radii, spacing, shadow, text } = useTheme();
+  const { colors, radii, spacing, shadow, text, icon } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -93,55 +96,60 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
   if (!clip) return null;
 
   const handleDelete = () => {
-    Alert.alert('Delete this clip?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => onDelete(clip.id) },
+    Alert.alert(strings.edit.deleteTitle, strings.edit.deleteBody, [
+      { text: strings.common.cancel, style: 'cancel' },
+      { text: strings.edit.delete, style: 'destructive', onPress: () => onDelete(clip.id) },
     ]);
   };
 
   return (
-    <Modal visible={!!clip} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={!!clip}
+      animationType={reduceMotion ? 'none' : 'slide'}
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} accessibilityLabel="Close edit sheet" />
+        <Pressable onPress={onClose} style={StyleSheet.absoluteFill} accessibilityLabel={strings.edit.close} />
 
         <View style={styles.sheet}>
           <View style={styles.handle} importantForAccessibility="no" />
 
-          <Text style={styles.label}>Title</Text>
+          <Text style={styles.label}>{strings.edit.title}</Text>
           <TextInput
             style={styles.titleInput}
             value={title}
             onChangeText={setTitle}
-            placeholder="Untitled"
+            placeholder={strings.edit.titlePlaceholder}
             placeholderTextColor={colors.inkFaint}
-            accessibilityLabel="Clip title"
+            accessibilityLabel={strings.edit.titleA11y}
           />
 
-          <Text style={styles.label}>Content</Text>
+          <Text style={styles.label}>{strings.edit.content}</Text>
           <TextInput
             style={styles.contentInput}
             value={content}
             onChangeText={setContent}
             multiline
             textAlignVertical="top"
-            accessibilityLabel="Clip content"
+            accessibilityLabel={strings.edit.contentA11y}
           />
 
           <View style={styles.actions}>
-            <Pressy onPress={handleDelete} style={styles.deleteBtn} accessibilityLabel="Delete clip">
-              <Trash2 size={18} strokeWidth={1.5} color={colors.danger} />
-              <Text style={styles.deleteText}>Delete</Text>
+            <Pressy onPress={handleDelete} style={styles.deleteBtn} accessibilityLabel={strings.edit.deleteA11y}>
+              <Trash2 size={icon.sm} strokeWidth={icon.stroke} color={colors.danger} />
+              <Text style={styles.deleteText}>{strings.edit.delete}</Text>
             </Pressy>
 
             <Pressy
               onPress={() => onSave(clip.id, content, title.trim() || null)}
               style={styles.saveBtn}
-              accessibilityLabel="Save clip"
+              accessibilityLabel={strings.edit.saveA11y}
             >
-              <Text style={styles.saveText}>Save</Text>
+              <Text style={styles.saveText}>{strings.edit.save}</Text>
             </Pressy>
           </View>
         </View>

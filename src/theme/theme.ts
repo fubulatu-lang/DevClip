@@ -158,6 +158,21 @@ export const weight = {
 } as const;
 
 /**
+ * One UI symbols sit on a consistent optical grid; the default symbol size
+ * is 24dp. Stroke weight is uniform across the whole set — mixing weights
+ * in one product is the most common iconography violation.
+ */
+export const icon = {
+  /** Inside a compact container: a 32dp circle button, an inline chip. */
+  sm: 18,
+  /** The One UI default, and what a standalone symbol should be. */
+  md: 24,
+  /** Empty-state and onboarding illustration. */
+  lg: 48,
+  stroke: 1.5,
+};
+
+/**
  * Real One UI easing curves, from CachedInterpolatorFactory. Tuples are
  * cubic-bezier control points, ready for `Easing.bezier(...)`.
  */

@@ -30,16 +30,17 @@ import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import Pressy from '../components/Pressy';
+import { strings } from '../strings';
 
 const MAX_CLIPS_OPTIONS = [
   { value: 100, label: '100' },
   { value: 500, label: '500' },
   { value: 1000, label: '1000' },
-  { value: 0, label: 'No limit' },
+  { value: 0, label: strings.settings.noLimit },
 ];
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const [accessibilityOn, setAccessibilityOn] = useState(false);
   const [overlayOn, setOverlayOn] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
@@ -88,69 +89,94 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.sm,
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.md,
-      paddingBottom: spacing.sm,
+      gap: spacing.md,
+      paddingHorizontal: spacing.keyline,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.md,
     },
     backBtn: {
-      width: 44,
-      height: 44,
+      width: 48,
+      height: 48,
       borderRadius: radii.pill,
       backgroundColor: colors.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    headerTitle: { fontFamily: type.extrabold, fontSize: 17, color: colors.ink },
+    headerTitle: { ...text.title, color: colors.ink },
     section: {
-      marginHorizontal: spacing.md,
-      marginTop: spacing.sm,
+      marginHorizontal: spacing.keyline,
+      marginTop: spacing.md,
       backgroundColor: colors.surface,
       borderRadius: radii.md,
-      padding: spacing.md,
-      gap: spacing.sm,
+      padding: spacing.lg,
+      gap: spacing.md,
     },
-    sectionTitle: {
-      fontFamily: type.bold,
-      fontSize: 10,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-      color: colors.inkFaint,
-      marginBottom: 2,
-    },
-    note: { fontFamily: type.medium, fontSize: 12, color: colors.inkFaint, lineHeight: 17 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    // One UI section headers are sentence case, not letter-spaced caps.
+    sectionTitle: { ...text.secondary, fontWeight: '500', color: colors.inkSoft, marginBottom: spacing.xs },
+    note: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md },
+    // A label above its control, so segmented groups get the full width and
+    // every segment can reach a 48dp target inside a 300dp popup.
+    stackRow: { gap: spacing.sm },
     rowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1 },
-    rowLabel: { fontFamily: type.semibold, fontSize: 13, color: colors.ink },
+    rowLabel: { ...text.body, color: colors.ink, flexShrink: 1 },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
-    statusText: { fontFamily: type.semibold, fontSize: 11 },
-    pillGroup: { flexDirection: 'row', backgroundColor: colors.surfaceSunken, borderRadius: radii.pill, padding: 3, gap: 2 },
-    pill: { paddingVertical: 5, paddingHorizontal: 10, borderRadius: radii.pill },
+    statusText: { ...text.caption, fontWeight: '500' },
+    pillGroup: {
+      flexDirection: 'row',
+      backgroundColor: colors.surfaceSunken,
+      borderRadius: radii.pill,
+      padding: 4,
+      gap: spacing.xs,
+    },
+    pill: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 40,
+      paddingHorizontal: spacing.sm,
+      borderRadius: radii.pill,
+    },
     pillActive: { backgroundColor: colors.accent },
-    pillText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkSoft },
-    pillTextActive: { color: colors.bg },
-    actionBtn: { backgroundColor: colors.surfaceSunken, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.pill },
+    pillText: { ...text.secondary, color: colors.inkSoft },
+    pillTextActive: { color: colors.onAccent },
+    actionBtn: {
+      backgroundColor: colors.surfaceSunken,
+      paddingHorizontal: spacing.lg,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: radii.pill,
+    },
     actionBtnActive: { backgroundColor: colors.accentSoft },
-    actionBtnText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkSoft },
+    actionBtnText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
     actionBtnTextActive: { color: colors.accent },
     exportBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: spacing.sm,
       backgroundColor: colors.accentSoft,
-      paddingVertical: 9,
+      minHeight: 48,
       borderRadius: radii.pill,
       justifyContent: 'center',
     },
-    exportText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.accent },
-    dangerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.dangerSoft, paddingVertical: 9, borderRadius: radii.pill, justifyContent: 'center' },
-    dangerText: { fontFamily: type.semibold, fontSize: 12.5, color: colors.danger },
-  }), [colors, radii, spacing, type]);
+    exportText: { ...text.button, color: colors.accent },
+    dangerBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.dangerSoft,
+      minHeight: 48,
+      borderRadius: radii.pill,
+      justifyContent: 'center',
+    },
+    dangerText: { ...text.button, color: colors.danger },
+  }), [colors, radii, spacing, text]);
 
   const handleClearAll = () => {
-    Alert.alert('Clear all clips?', 'This deletes everything in your history. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear all', style: 'destructive', onPress: clearAll },
+    Alert.alert(strings.settings.clearAllTitle, strings.settings.clearAllBody, [
+      { text: strings.common.cancel, style: 'cancel' },
+      { text: strings.settings.clearAll, style: 'destructive', onPress: clearAll },
     ]);
   };
 
@@ -159,7 +185,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     try {
       await exportBackup();
     } catch (e) {
-      Alert.alert('Export failed', 'Could not create the backup file. Try again.');
+      Alert.alert(strings.settings.exportFailedTitle, strings.settings.exportFailedBody);
     } finally {
       setExporting(false);
     }
@@ -168,40 +194,41 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel="Back to clip list">
-          <ArrowLeft size={16} strokeWidth={1.75} color={colors.ink} />
+        <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel={strings.settings.back}>
+          <ArrowLeft size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
         </Pressy>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{strings.settings.title}</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         {/* Permissions status */}
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Permissions</Text>
-            <PermissionRow label="Background capture" granted={accessibilityOn} colors={colors} styles={styles} />
-            <PermissionRow label="Floating bubble" granted={overlayOn} colors={colors} styles={styles} />
-            <PermissionRow label="Notifications" granted={notifOn} colors={colors} styles={styles} />
+            <Text style={styles.sectionTitle}>{strings.settings.permissions}</Text>
+            <PermissionRow label={strings.settings.backgroundCapture} granted={accessibilityOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.floatingBubble} granted={overlayOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.notifications} granted={notifOn} colors={colors} styles={styles} />
           </View>
         )}
 
         {/* Appearance */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <View style={styles.row}>
+          <Text style={styles.sectionTitle}>{strings.settings.appearance}</Text>
+          <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
               {themeMode === 'dark' ? (
-                <Moon size={16} strokeWidth={1.5} color={colors.accent} />
+                <Moon size={icon.md} strokeWidth={icon.stroke} color={colors.accent} />
               ) : (
-                <Sun size={16} strokeWidth={1.5} color={colors.accent} />
+                <Sun size={icon.md} strokeWidth={icon.stroke} color={colors.accent} />
               )}
-              <Text style={styles.rowLabel}>Theme</Text>
+              <Text style={styles.rowLabel}>{strings.settings.theme}</Text>
             </View>
             <ThreeWayPill
+              groupLabel={strings.settings.theme}
               options={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-                { value: 'system', label: 'Auto' },
+                { value: 'light', label: strings.settings.themeLight },
+                { value: 'dark', label: strings.settings.themeDark },
+                { value: 'system', label: strings.settings.themeAuto, a11yLabel: strings.settings.themeAutoA11y },
               ]}
               value={themeMode}
               onChange={(v) => setThemeMode(v as ThemeMode)}
@@ -212,36 +239,33 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
         {/* Capture behavior */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Capture</Text>
+          <Text style={styles.sectionTitle}>{strings.settings.capture}</Text>
 
           {!isNativeOverlayAvailable() ? (
-            <Text style={styles.note}>
-              Background capture and the floating bubble need the custom dev client build — see
-              SETUP_GUIDE.md.
-            </Text>
+            <Text style={styles.note}>{strings.settings.devClientNote}</Text>
           ) : (
             <>
               <SettingRow
-                icon={<ShieldCheck size={16} strokeWidth={1.5} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
-                label="Background capture"
+                icon={<ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
+                label={strings.settings.backgroundCapture}
                 active={accessibilityOn}
-                buttonLabel={accessibilityOn ? 'Manage' : 'Enable'}
+                buttonLabel={accessibilityOn ? strings.settings.manage : strings.settings.enable}
                 onPress={requestAccessibilityPermission}
                 styles={styles}
               />
               <SettingRow
-                icon={<Bell size={16} strokeWidth={1.5} color={notifOn ? colors.accent : colors.inkFaint} />}
-                label="Notifications"
+                icon={<Bell size={icon.md} strokeWidth={icon.stroke} color={notifOn ? colors.accent : colors.inkFaint} />}
+                label={strings.settings.notifications}
                 active={notifOn}
-                buttonLabel={notifOn ? 'On' : 'Enable'}
+                buttonLabel={notifOn ? strings.settings.manage : strings.settings.enable}
                 onPress={async () => setNotifOn(await requestNotificationPermission())}
                 styles={styles}
               />
               <SettingRow
-                icon={<CircleDot size={16} strokeWidth={1.5} color={bubbleRunning ? colors.accent : colors.inkFaint} />}
-                label="Floating bubble"
+                icon={<CircleDot size={icon.md} strokeWidth={icon.stroke} color={bubbleRunning ? colors.accent : colors.inkFaint} />}
+                label={strings.settings.floatingBubble}
                 active={bubbleRunning}
-                buttonLabel={bubbleRunning ? 'Stop' : 'Start'}
+                buttonLabel={bubbleRunning ? strings.settings.stop : strings.settings.start}
                 onPress={async () => {
                   if (bubbleRunning) {
                     stopBubble();
@@ -257,16 +281,17 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 styles={styles}
               />
 
-              <View style={styles.row}>
+              <View style={styles.stackRow}>
                 <View style={styles.rowLeft}>
-                  <Layers size={16} strokeWidth={1.5} color={colors.inkFaint} />
-                  <Text style={styles.rowLabel}>Bubble size</Text>
+                  <Layers size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                  <Text style={styles.rowLabel}>{strings.settings.bubbleSize}</Text>
                 </View>
                 <ThreeWayPill
+                  groupLabel={strings.settings.bubbleSize}
                   options={[
-                    { value: 'small', label: 'S' },
-                    { value: 'medium', label: 'M' },
-                    { value: 'large', label: 'L' },
+                    { value: 'small', label: strings.settings.bubbleSmall, a11yLabel: strings.settings.bubbleSmallA11y },
+                    { value: 'medium', label: strings.settings.bubbleMedium, a11yLabel: strings.settings.bubbleMediumA11y },
+                    { value: 'large', label: strings.settings.bubbleLarge, a11yLabel: strings.settings.bubbleLargeA11y },
                   ]}
                   value={bubbleSize}
                   onChange={(v) => setBubbleSize(v as BubbleSize)}
@@ -276,15 +301,18 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
               <View style={styles.row}>
                 <View style={styles.rowLeft}>
-                  <Power size={16} strokeWidth={1.5} color={colors.inkFaint} />
-                  <Text style={styles.rowLabel}>Auto-start after reboot</Text>
+                  <Power size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                  <Text style={styles.rowLabel}>{strings.settings.autoStart}</Text>
                 </View>
                 <Pressy
                   onPress={() => setAutoStartOnBoot(!autoStartOnBoot)}
                   style={[styles.actionBtn, autoStartOnBoot && styles.actionBtnActive]}
+                  accessibilityLabel={strings.settings.autoStart}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: autoStartOnBoot }}
                 >
                   <Text style={[styles.actionBtnText, autoStartOnBoot && styles.actionBtnTextActive]}>
-                    {autoStartOnBoot ? 'On' : 'Off'}
+                    {autoStartOnBoot ? strings.settings.on : strings.settings.off}
                   </Text>
                 </Pressy>
               </View>
@@ -293,15 +321,18 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <MessageSquareWarning size={16} strokeWidth={1.5} color={colors.inkFaint} />
-              <Text style={styles.rowLabel}>Confirm before paste</Text>
+              <MessageSquareWarning size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+              <Text style={styles.rowLabel}>{strings.settings.confirmPaste}</Text>
             </View>
             <Pressy
               onPress={() => setConfirmBeforePaste(!confirmBeforePaste)}
               style={[styles.actionBtn, confirmBeforePaste && styles.actionBtnActive]}
+              accessibilityLabel={strings.settings.confirmPaste}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: confirmBeforePaste }}
             >
               <Text style={[styles.actionBtnText, confirmBeforePaste && styles.actionBtnTextActive]}>
-                {confirmBeforePaste ? 'On' : 'Off'}
+                {confirmBeforePaste ? strings.settings.on : strings.settings.off}
               </Text>
             </Pressy>
           </View>
@@ -309,17 +340,25 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
         {/* Storage */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Storage</Text>
-          <View style={styles.row}>
+          <Text style={styles.sectionTitle}>{strings.settings.storage}</Text>
+          <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
-              <SmartphoneCharging size={16} strokeWidth={1.5} color={colors.inkFaint} />
-              <Text style={styles.rowLabel}>Keep at most</Text>
+              <SmartphoneCharging size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+              <Text style={styles.rowLabel}>{strings.settings.keepAtMost}</Text>
             </View>
             <View style={styles.pillGroup}>
               {MAX_CLIPS_OPTIONS.map((opt) => {
                 const active = maxClips === opt.value;
                 return (
-                  <Pressy key={opt.value} onPress={() => setMaxClips(opt.value)} style={[styles.pill, active && styles.pillActive]}>
+                  <Pressy
+                    key={opt.value}
+                    onPress={() => setMaxClips(opt.value)}
+                    style={[styles.pill, active && styles.pillActive]}
+                    accessibilityLabel={strings.settings.keepAtMostA11y(opt.label)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: active, checked: active }}
+                    hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
+                  >
                     <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
                   </Pressy>
                 );
@@ -327,14 +366,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
 
-          <Pressy onPress={handleExport} style={styles.exportBtn}>
-            <Download size={14} strokeWidth={1.75} color={colors.accent} />
-            <Text style={styles.exportText}>{exporting ? 'Exporting…' : 'Export backup'}</Text>
+          <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel={strings.settings.exportBackup}>
+            <Download size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
+            <Text style={styles.exportText}>{exporting ? strings.settings.exporting : strings.settings.exportBackup}</Text>
           </Pressy>
 
-          <Pressy onPress={handleClearAll} style={styles.dangerBtn}>
-            <Trash2 size={14} strokeWidth={1.75} color={colors.danger} />
-            <Text style={styles.dangerText}>Clear all clips</Text>
+          <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel={strings.settings.clearAll}>
+            <Trash2 size={icon.sm} strokeWidth={icon.stroke} color={colors.danger} />
+            <Text style={styles.dangerText}>{strings.settings.clearAll}</Text>
           </Pressy>
         </View>
       </ScrollView>
@@ -359,7 +398,7 @@ function PermissionRow({
       <View style={styles.rowLeft}>
         <View style={[styles.statusDot, { backgroundColor: granted ? colors.success : colors.danger }]} />
         <Text style={[styles.statusText, { color: granted ? colors.success : colors.danger }]}>
-          {granted ? 'Granted' : 'Off'}
+          {granted ? strings.settings.granted : strings.settings.notGranted}
         </Text>
       </View>
     </View>
@@ -399,18 +438,29 @@ function ThreeWayPill({
   value,
   onChange,
   styles,
+  groupLabel,
 }: {
-  options: { value: string; label: string }[];
+  /** `a11yLabel` carries the full name when `label` is an abbreviation. */
+  options: { value: string; label: string; a11yLabel?: string }[];
   value: string;
   onChange: (v: string) => void;
   styles: any;
+  groupLabel: string;
 }) {
   return (
     <View style={styles.pillGroup}>
       {options.map((opt) => {
         const active = value === opt.value;
         return (
-          <Pressy key={opt.value} onPress={() => onChange(opt.value)} style={[styles.pill, active && styles.pillActive]}>
+          <Pressy
+            key={opt.value}
+            onPress={() => onChange(opt.value)}
+            style={[styles.pill, active && styles.pillActive]}
+            accessibilityLabel={`${groupLabel}: ${opt.a11yLabel ?? opt.label}`}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active, checked: active }}
+            hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
+          >
             <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
           </Pressy>
         );

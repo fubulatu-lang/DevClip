@@ -13,9 +13,10 @@ import {
   isOverlayPermissionGranted,
 } from '../native/OverlayModule';
 import Pressy from '../components/Pressy';
+import { strings } from '../strings';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const [notifAsked, setNotifAsked] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [accessibilityGranted, setAccessibilityGranted] = useState(false);
@@ -39,13 +40,13 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const styles = useMemo(() => StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
-    scroll: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
-    heading: { fontFamily: type.extrabold, fontSize: 22, color: colors.ink, marginBottom: spacing.xs },
-    sub: { fontFamily: type.medium, fontSize: 13, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 19 },
+    scroll: { flex: 1, paddingHorizontal: spacing.keyline, paddingTop: spacing.xl },
+    heading: { ...text.display, color: colors.ink, marginBottom: spacing.sm },
+    sub: { ...text.secondary, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 22 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: radii.md,
-      padding: spacing.md,
+      padding: spacing.lg,
       marginBottom: spacing.md,
       flexDirection: 'row',
       alignItems: 'center',
@@ -55,53 +56,53 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       width: 40,
       height: 40,
       borderRadius: radii.sm,
-      backgroundColor: colors.accentSoft,
+      backgroundColor: colors.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    cardTitle: { fontFamily: type.semibold, fontSize: 14, color: colors.ink, marginBottom: 2 },
-    cardBody: { fontFamily: type.regular, fontSize: 12, color: colors.inkSoft, lineHeight: 16 },
+    cardTitle: { ...text.body, fontWeight: '500', color: colors.ink, marginBottom: 2 },
+    cardBody: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
     actionBtn: {
       backgroundColor: colors.surfaceSunken,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 7,
+      paddingHorizontal: spacing.lg,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: radii.pill,
     },
     actionBtnDone: { backgroundColor: colors.accentSoft },
-    actionText: { fontFamily: type.semibold, fontSize: 12, color: colors.inkSoft },
+    actionText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
     actionTextDone: { color: colors.accent },
-    footer: { padding: spacing.lg },
+    footer: { padding: spacing.keyline },
     continueBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
-      backgroundColor: colors.ink,
+      backgroundColor: colors.accent,
       borderRadius: radii.pill,
-      paddingVertical: 14,
+      minHeight: 48,
     },
-    continueText: { fontFamily: type.semibold, fontSize: 14, color: colors.bg },
-  }), [colors, radii, spacing, type]);
+    continueText: { ...text.button, color: colors.onAccent },
+  }), [colors, radii, spacing, text]);
 
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.scroll}>
-        <Text style={styles.heading}>Set up DevClip</Text>
-        <Text style={styles.sub}>
-          Three quick permissions and you're set. You can always change these later from Settings.
-        </Text>
+        <Text style={styles.heading}>{strings.onboarding.heading}</Text>
+        <Text style={styles.sub}>{strings.onboarding.sub}</Text>
 
         <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <Bell size={18} strokeWidth={1.5} color={colors.accent} />
+          <View style={styles.iconWrap} importantForAccessibility="no">
+            <Bell size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Notifications</Text>
-            <Text style={styles.cardBody}>Shows a quiet, permanent notification while capture is active.</Text>
+            <Text style={styles.cardTitle}>{strings.onboarding.notifications}</Text>
+            <Text style={styles.cardBody}>{strings.onboarding.notificationsBody}</Text>
           </View>
           <View style={[styles.actionBtn, notifAsked && styles.actionBtnDone]}>
             <Text style={[styles.actionText, notifAsked && styles.actionTextDone]}>
-              {notifAsked ? 'Done' : '…'}
+              {notifAsked ? strings.onboarding.done : strings.onboarding.pending}
             </Text>
           </View>
         </View>
@@ -109,41 +110,47 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         {isNativeOverlayAvailable() && (
           <>
             <View style={styles.card}>
-              <View style={styles.iconWrap}>
-                <ShieldCheck size={18} strokeWidth={1.5} color={colors.accent} />
+              <View style={styles.iconWrap} importantForAccessibility="no">
+                <ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Background capture</Text>
-                <Text style={styles.cardBody}>
-                  Lets DevClip save copies made in any app automatically, and paste a saved clip
-                  directly into whatever field you were using. Android will show a broader
-                  permission screen for this — that's expected.
-                </Text>
+                <Text style={styles.cardTitle}>{strings.onboarding.backgroundCapture}</Text>
+                <Text style={styles.cardBody}>{strings.onboarding.backgroundCaptureBody}</Text>
               </View>
               <Pressy
                 onPress={requestAccessibilityPermission}
                 style={[styles.actionBtn, accessibilityGranted && styles.actionBtnDone]}
+                accessibilityLabel={
+                  accessibilityGranted
+                    ? strings.onboarding.enabledA11y(strings.onboarding.backgroundCapture)
+                    : strings.onboarding.enableA11y(strings.onboarding.backgroundCapture)
+                }
               >
                 <Text style={[styles.actionText, accessibilityGranted && styles.actionTextDone]}>
-                  {accessibilityGranted ? 'Done' : 'Enable'}
+                  {accessibilityGranted ? strings.onboarding.done : strings.onboarding.enable}
                 </Text>
               </Pressy>
             </View>
 
             <View style={styles.card}>
-              <View style={styles.iconWrap}>
-                <CircleDot size={18} strokeWidth={1.5} color={colors.accent} />
+              <View style={styles.iconWrap} importantForAccessibility="no">
+                <CircleDot size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Floating bubble</Text>
-                <Text style={styles.cardBody}>Lets DevClip draw the bubble on top of other apps.</Text>
+                <Text style={styles.cardTitle}>{strings.onboarding.floatingBubble}</Text>
+                <Text style={styles.cardBody}>{strings.onboarding.floatingBubbleBody}</Text>
               </View>
               <Pressy
                 onPress={requestOverlayPermission}
                 style={[styles.actionBtn, overlayGranted && styles.actionBtnDone]}
+                accessibilityLabel={
+                  overlayGranted
+                    ? strings.onboarding.enabledA11y(strings.onboarding.floatingBubble)
+                    : strings.onboarding.enableA11y(strings.onboarding.floatingBubble)
+                }
               >
                 <Text style={[styles.actionText, overlayGranted && styles.actionTextDone]}>
-                  {overlayGranted ? 'Done' : 'Enable'}
+                  {overlayGranted ? strings.onboarding.done : strings.onboarding.enable}
                 </Text>
               </Pressy>
             </View>
@@ -152,9 +159,9 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View style={styles.footer}>
-        <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel="Continue">
-          <Text style={styles.continueText}>Continue</Text>
-          <ArrowRight size={16} strokeWidth={2} color={colors.bg} />
+        <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel={strings.onboarding.continue}>
+          <Text style={styles.continueText}>{strings.onboarding.continue}</Text>
+          <ArrowRight size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
         </Pressy>
       </View>
     </SafeAreaView>

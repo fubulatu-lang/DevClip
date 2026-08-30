@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { View, TextInput, StyleSheet } from 'react-native';
 import { Search } from 'lucide-react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { strings } from '../strings';
 
 interface Props {
   value: string;
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function SearchBar({ value, onChange }: Props) {
-  const { colors, radii, spacing, text } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -34,15 +35,15 @@ export default function SearchBar({ value, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Search size={24} strokeWidth={1.5} color={colors.inkFaint} />
+      <Search size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
       <TextInput
         style={styles.input}
-        placeholder="Search title or content"
+        placeholder={strings.search.placeholder}
         placeholderTextColor={colors.inkFaint}
         value={value}
         onChangeText={onChange}
         autoCorrect={false}
-        accessibilityLabel="Search clips"
+        accessibilityLabel={strings.search.a11yLabel}
       />
     </View>
   );

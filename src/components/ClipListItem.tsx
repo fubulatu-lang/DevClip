@@ -6,6 +6,7 @@ import { pasteClip } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
 import Pressy from './Pressy';
+import { strings } from '../strings';
 
 interface Props {
   clip: Clip;
@@ -26,7 +27,7 @@ export default function ClipListItem({
   onMoveUp,
   onMoveDown,
 }: Props) {
-  const { colors, radii, spacing, shadow, text } = useTheme();
+  const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
 
   const styles = useMemo(
@@ -45,7 +46,7 @@ export default function ClipListItem({
           width: 32,
           height: 32,
           borderRadius: radii.sm,
-          backgroundColor: colors.accentSoft,
+          backgroundColor: colors.surfaceSunken,
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: 2,
@@ -76,7 +77,7 @@ export default function ClipListItem({
   const doPaste = async () => {
     const result = await pasteClip(clip.content);
     if (result === 'copiedOnly') {
-      Alert.alert('Copied', 'Could not paste automatically, so it’s on your clipboard — paste it manually.');
+      Alert.alert(strings.paste.copiedTitle, strings.paste.copiedBody);
     }
   };
 
@@ -86,11 +87,11 @@ export default function ClipListItem({
       return;
     }
     Alert.alert(
-      'Paste this clip?',
+      strings.paste.confirmTitle,
       clip.content.length > 120 ? clip.content.slice(0, 120) + '…' : clip.content,
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Paste', onPress: doPaste },
+        { text: strings.common.cancel, style: 'cancel' },
+        { text: strings.paste.confirm, onPress: doPaste },
       ]
     );
   };
@@ -101,11 +102,11 @@ export default function ClipListItem({
       onLongPress={() => onLongPress(clip)}
       style={styles.card}
       accessibilityLabel={`${clip.title ? clip.title + ': ' : ''}${clip.content}`}
-      accessibilityHint="Double tap to paste."
+      accessibilityHint={strings.clips.pasteHint}
     >
       <View style={styles.row}>
         <View style={styles.iconWrap} importantForAccessibility="no">
-          <Copy size={18} strokeWidth={1.5} color={colors.accent} />
+          <Copy size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
         </View>
 
         <View style={{ flex: 1 }}>
@@ -122,17 +123,17 @@ export default function ClipListItem({
               style={styles.circleBtn}
               disabled={isFirst}
               onPress={onMoveUp}
-              accessibilityLabel="Move clip up"
+              accessibilityLabel={strings.clips.moveUp}
             >
-              <ChevronUp size={18} strokeWidth={1.5} color={isFirst ? colors.inkDisabled : colors.ink} />
+              <ChevronUp size={icon.sm} strokeWidth={icon.stroke} color={isFirst ? colors.inkDisabled : colors.ink} />
             </CircleButton>
             <CircleButton
               style={styles.circleBtn}
               disabled={isLast}
               onPress={onMoveDown}
-              accessibilityLabel="Move clip down"
+              accessibilityLabel={strings.clips.moveDown}
             >
-              <ChevronDown size={18} strokeWidth={1.5} color={isLast ? colors.inkDisabled : colors.ink} />
+              <ChevronDown size={icon.sm} strokeWidth={icon.stroke} color={isLast ? colors.inkDisabled : colors.ink} />
             </CircleButton>
           </View>
         )}
@@ -145,11 +146,11 @@ export default function ClipListItem({
         <Pressy
           onPress={() => onLongPress(clip)}
           style={styles.moreBtn}
-          accessibilityLabel={`More options for ${clip.title || 'this clip'}`}
-          accessibilityHint="Opens edit and delete."
+          accessibilityLabel={strings.clips.moreOptions(clip.title || strings.clips.fallbackTitle)}
+          accessibilityHint={strings.clips.moreOptionsHint}
           hitSlop={8}
         >
-          <MoreVertical size={18} strokeWidth={1.5} color={colors.inkFaint} />
+          <MoreVertical size={icon.sm} strokeWidth={icon.stroke} color={colors.inkFaint} />
         </Pressy>
       </View>
     </Pressy>
@@ -185,7 +186,7 @@ function CircleButton({
 function formatWhen(ts: number): string {
   const diffMs = Date.now() - ts;
   const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'just now';
+  if (mins < 1) return strings.clips.when.justNow;
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
