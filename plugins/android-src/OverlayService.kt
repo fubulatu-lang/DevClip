@@ -10,13 +10,16 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.IBinder
+import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.ImageView
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import com.facebook.react.ReactApplication
@@ -224,8 +227,21 @@ class OverlayService : Service() {
         var touchY = 0f
         var moved = false
 
+        // Android's own tap/drag threshold, in pixels for this display.
+        //
+        // This used to be the literal 8, which is 8 *pixels* — about 3dp on a
+        // typical phone, against the 8dp Android itself allows a finger to
+        // wander during a tap. A finger moves 10-20px on an ordinary tap, so
+        // every tap was classified as a drag, `moved` was true at ACTION_UP,
+        // and the branch that opens the popup never ran. The bubble dragged
+        // perfectly and tapping it did nothing whatsoever.
+        val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+
+        // actionMasked, not action: getAction() packs the pointer index into
+        // its high bits, so a second finger landing on the bubble makes the
+        // raw value stop matching ACTION_UP.
         bubble.setOnTouchListener { v, event ->
-            when (event.action) {
+            when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     initialX = params.x
                     initialY = params.y
@@ -237,13 +253,19 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
-                    if (abs(dx) > 8 || abs(dy) > 8) moved = true
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) moved = true
                     val a = safeArea()
                     params.x = clamp(initialX + dx, a.left, a.right - size)
                     params.y = clamp(initialY + dy, a.top, a.bottom - size)
                     windowManager.updateViewLayout(v, params)
                     // The mini window is tethered: it travels with the bubble.
                     if (popupVisible && mode == MODE_MINI) applyPopupGeometry()
+                    true
+                }
+                // The system took the gesture away (a notification shade pull,
+                // another window). Not a tap, and not a drag to finish.
+                MotionEvent.ACTION_CANCEL -> {
+                    moved = true
                     true
                 }
                 MotionEvent.ACTION_UP -> {
@@ -260,7 +282,9 @@ class OverlayService : Service() {
                                 showPopup()
                             }
                         } catch (e: Exception) {
-                            android.util.Log.e("DevClip", "Failed to toggle the popup", e)
+                            // Every failure here used to look identical to a
+                            // tap that was never registered. Say something.
+                            fail("DevClip couldn't open its window.", e)
                         }
                     }
                     true
@@ -293,17 +317,45 @@ class OverlayService : Service() {
     private fun ensurePopupView(): View? {
         popupView?.let { return it }
 
-        val host = (application as? ReactApplication)?.reactHost ?: return null
-        val surface = host.createSurface(
-            ContextThemeWrapper(this, applicationInfo.theme),
-            "DevClipPopup",
-            null
-        )
+        val host = (application as? ReactApplication)?.reactHost
+        if (host == null) {
+            fail("DevClip couldn't reach the app to draw its window.", null)
+            return null
+        }
+
+        val themed = ContextThemeWrapper(this, applicationInfo.theme)
+        val surface = host.createSurface(themed, "DevClipPopup", null)
         surface.start()
 
+        val view = surface.view
+        if (view == null) {
+            fail("DevClip couldn't build its window.", null)
+            return null
+        }
+
+        // React paints asynchronously, and the window is TRANSLUCENT, so until
+        // the first frame lands there is nothing on screen at all — a failure
+        // to render is indistinguishable from a tap that did nothing. An
+        // opaque ground taken from the app's own theme (so it follows
+        // light/dark) means the window is visibly present the moment it is
+        // added.
+        val background = TypedValue()
+        if (themed.theme.resolveAttribute(android.R.attr.colorBackground, background, true) &&
+            background.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
+            background.type <= TypedValue.TYPE_LAST_COLOR_INT
+        ) {
+            view.setBackgroundColor(background.data)
+        }
+
         popupSurface = surface
-        popupView = surface.view
-        return popupView
+        popupView = view
+        return view
+    }
+
+    /** Report a failure the user can see, instead of appearing to do nothing. */
+    private fun fail(message: String, e: Exception?) {
+        android.util.Log.e("DevClip", message, e)
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     private fun showPopup() {
@@ -334,7 +386,7 @@ class OverlayService : Service() {
             windowManager.addView(view, params)
             popupVisible = true
         } catch (e: Exception) {
-            android.util.Log.e("DevClip", "Could not attach the popup window", e)
+            fail("DevClip couldn't place its window on screen.", e)
             popupVisible = false
         }
     }
