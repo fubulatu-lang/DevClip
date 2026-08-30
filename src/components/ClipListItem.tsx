@@ -16,6 +16,14 @@ interface Props {
   onLongPress: (clip: Clip) => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  /**
+   * `mini` is the tethered bubble window: paste only. It drops the reorder
+   * controls and both routes to edit — the more button and the long press.
+   * Dropping them together is deliberate: leaving the long press behind
+   * would make a gesture the only way to reach editing, which is the
+   * accessibility failure the more button was added to fix.
+   */
+  variant?: 'full' | 'mini';
 }
 
 export default function ClipListItem({
@@ -26,9 +34,12 @@ export default function ClipListItem({
   onLongPress,
   onMoveUp,
   onMoveDown,
+  variant = 'full',
 }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
+
+  const mini = variant === 'mini';
 
   const styles = useMemo(
     () =>
@@ -99,7 +110,7 @@ export default function ClipListItem({
   return (
     <Pressy
       onPress={handleTap}
-      onLongPress={() => onLongPress(clip)}
+      onLongPress={mini ? undefined : () => onLongPress(clip)}
       style={styles.card}
       accessibilityLabel={`${clip.title ? clip.title + ': ' : ''}${clip.content}`}
       accessibilityHint={strings.clips.pasteHint}
@@ -117,7 +128,7 @@ export default function ClipListItem({
           <Text style={styles.date}>{formatWhen(clip.createdAt)}</Text>
         </View>
 
-        {isManualSort && (
+        {isManualSort && !mini && (
           <View style={styles.reorderCol}>
             <CircleButton
               style={styles.circleBtn}
@@ -143,6 +154,7 @@ export default function ClipListItem({
           many motor-impairment setups cannot perform one, so edit and delete
           need a control that can simply be activated.
         */}
+        {!mini && (
         <Pressy
           onPress={() => onLongPress(clip)}
           style={styles.moreBtn}
@@ -152,6 +164,7 @@ export default function ClipListItem({
         >
           <MoreVertical size={icon.sm} strokeWidth={icon.stroke} color={colors.inkFaint} />
         </Pressy>
+        )}
       </View>
     </Pressy>
   );

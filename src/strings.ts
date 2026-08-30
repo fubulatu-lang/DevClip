@@ -155,6 +155,13 @@ export const strings = {
     continue: 'Continue',
   },
 
+  overlay: {
+    expand: 'Expand',
+    collapse: 'Shrink back to mini',
+    openFullApp: 'Open the full app',
+    close: 'Close DevClip',
+  },
+
   common: {
     cancel: 'Cancel',
     dismiss: 'Dismiss',
