@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function SearchBar({ value, onChange }: Props) {
-  const { colors, radii, spacing, text } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const styles = useMemo(
     () =>
       StyleSheet.create({
@@ -34,7 +34,7 @@ export default function SearchBar({ value, onChange }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <Search size={24} strokeWidth={1.5} color={colors.inkFaint} />
+      <Search size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
       <TextInput
         style={styles.input}
         placeholder="Search title or content"

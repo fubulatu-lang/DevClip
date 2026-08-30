@@ -15,7 +15,7 @@ import {
 import Pressy from '../components/Pressy';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
-  const { colors, radii, spacing, text } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const [notifAsked, setNotifAsked] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [accessibilityGranted, setAccessibilityGranted] = useState(false);
@@ -55,7 +55,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       width: 40,
       height: 40,
       borderRadius: radii.sm,
-      backgroundColor: colors.accentSoft,
+      backgroundColor: colors.surfaceSunken,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -94,8 +94,8 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         </Text>
 
         <View style={styles.card}>
-          <View style={styles.iconWrap}>
-            <Bell size={18} strokeWidth={1.5} color={colors.accent} />
+          <View style={styles.iconWrap} importantForAccessibility="no">
+            <Bell size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Notifications</Text>
@@ -111,8 +111,8 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
         {isNativeOverlayAvailable() && (
           <>
             <View style={styles.card}>
-              <View style={styles.iconWrap}>
-                <ShieldCheck size={18} strokeWidth={1.5} color={colors.accent} />
+              <View style={styles.iconWrap} importantForAccessibility="no">
+                <ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Background capture</Text>
@@ -134,8 +134,8 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
             </View>
 
             <View style={styles.card}>
-              <View style={styles.iconWrap}>
-                <CircleDot size={18} strokeWidth={1.5} color={colors.accent} />
+              <View style={styles.iconWrap} importantForAccessibility="no">
+                <CircleDot size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.cardTitle}>Floating bubble</Text>
@@ -158,7 +158,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       <View style={styles.footer}>
         <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel="Continue">
           <Text style={styles.continueText}>Continue</Text>
-          <ArrowRight size={18} strokeWidth={1.5} color={colors.onAccent} />
+          <ArrowRight size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
         </Pressy>
       </View>
     </SafeAreaView>

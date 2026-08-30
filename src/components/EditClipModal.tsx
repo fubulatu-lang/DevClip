@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
-  const { colors, radii, spacing, shadow, text } = useTheme();
+  const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -132,7 +132,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
 
           <View style={styles.actions}>
             <Pressy onPress={handleDelete} style={styles.deleteBtn} accessibilityLabel="Delete clip">
-              <Trash2 size={18} strokeWidth={1.5} color={colors.danger} />
+              <Trash2 size={icon.sm} strokeWidth={icon.stroke} color={colors.danger} />
               <Text style={styles.deleteText}>Delete</Text>
             </Pressy>
 

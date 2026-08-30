@@ -13,7 +13,7 @@ import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 
 export default function ClipListView() {
-  const { colors, radii, spacing, text } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const {
     clips,
     search,
@@ -133,7 +133,7 @@ export default function ClipListView() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Inbox size={28} strokeWidth={1.25} color={colors.inkFaint} />
+            <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
             <Text style={styles.emptyText}>
               {search
                 ? `No clips match “${search}”`
@@ -149,7 +149,7 @@ export default function ClipListView() {
           style={styles.captureBtn}
           accessibilityLabel="Capture current clipboard"
         >
-          <ClipboardPaste size={18} strokeWidth={1.5} color={colors.onAccent} />
+          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
           <Text style={styles.captureText}>{loading ? 'Loading…' : 'Capture clipboard'}</Text>
         </Pressy>
       </View>

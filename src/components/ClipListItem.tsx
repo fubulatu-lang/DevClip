@@ -26,7 +26,7 @@ export default function ClipListItem({
   onMoveUp,
   onMoveDown,
 }: Props) {
-  const { colors, radii, spacing, shadow, text } = useTheme();
+  const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
 
   const styles = useMemo(
@@ -45,7 +45,7 @@ export default function ClipListItem({
           width: 32,
           height: 32,
           borderRadius: radii.sm,
-          backgroundColor: colors.accentSoft,
+          backgroundColor: colors.surfaceSunken,
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: 2,
@@ -105,7 +105,7 @@ export default function ClipListItem({
     >
       <View style={styles.row}>
         <View style={styles.iconWrap} importantForAccessibility="no">
-          <Copy size={18} strokeWidth={1.5} color={colors.accent} />
+          <Copy size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
         </View>
 
         <View style={{ flex: 1 }}>
@@ -124,7 +124,7 @@ export default function ClipListItem({
               onPress={onMoveUp}
               accessibilityLabel="Move clip up"
             >
-              <ChevronUp size={18} strokeWidth={1.5} color={isFirst ? colors.inkDisabled : colors.ink} />
+              <ChevronUp size={icon.sm} strokeWidth={icon.stroke} color={isFirst ? colors.inkDisabled : colors.ink} />
             </CircleButton>
             <CircleButton
               style={styles.circleBtn}
@@ -132,7 +132,7 @@ export default function ClipListItem({
               onPress={onMoveDown}
               accessibilityLabel="Move clip down"
             >
-              <ChevronDown size={18} strokeWidth={1.5} color={isLast ? colors.inkDisabled : colors.ink} />
+              <ChevronDown size={icon.sm} strokeWidth={icon.stroke} color={isLast ? colors.inkDisabled : colors.ink} />
             </CircleButton>
           </View>
         )}
@@ -149,7 +149,7 @@ export default function ClipListItem({
           accessibilityHint="Opens edit and delete."
           hitSlop={8}
         >
-          <MoreVertical size={18} strokeWidth={1.5} color={colors.inkFaint} />
+          <MoreVertical size={icon.sm} strokeWidth={icon.stroke} color={colors.inkFaint} />
         </Pressy>
       </View>
     </Pressy>

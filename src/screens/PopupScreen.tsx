@@ -32,7 +32,7 @@ const TABS: { key: PopupState; label: string }[] = [
 ];
 
 export default function PopupScreen() {
-  const { colors, radii, spacing, shadow, text } = useTheme();
+  const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const [state, setState] = useState<PopupState>('small');
   const [showSettings, setShowSettings] = useState(false);
   const [bubbleRunning, setBubbleRunning] = useState(false);
@@ -164,7 +164,7 @@ export default function PopupScreen() {
               style={styles.gearBtn}
               accessibilityLabel="Settings"
             >
-              <SettingsIcon size={24} strokeWidth={1.5} color={colors.ink} />
+              <SettingsIcon size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
             </Pressy>
           </View>
 
@@ -177,7 +177,7 @@ export default function PopupScreen() {
                 accessibilityState={{ checked: bubbleRunning }}
                 accessibilityRole="switch"
               >
-                <CircleDot size={18} strokeWidth={1.5} color={bubbleRunning ? colors.accent : colors.inkFaint} />
+                <CircleDot size={icon.sm} strokeWidth={icon.stroke} color={bubbleRunning ? colors.accent : colors.inkFaint} />
                 <Text style={[styles.bubbleBtnText, bubbleRunning && styles.bubbleBtnTextActive]}>
                   {bubbleRunning ? 'Bubble on' : 'Bubble off'}
                 </Text>

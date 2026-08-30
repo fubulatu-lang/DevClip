@@ -39,7 +39,7 @@ const MAX_CLIPS_OPTIONS = [
 ];
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
-  const { colors, radii, spacing, text } = useTheme();
+  const { colors, radii, spacing, text, icon } = useTheme();
   const [accessibilityOn, setAccessibilityOn] = useState(false);
   const [overlayOn, setOverlayOn] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
@@ -194,7 +194,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     <View style={styles.screen}>
       <View style={styles.header}>
         <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel="Back to clip list">
-          <ArrowLeft size={24} strokeWidth={1.5} color={colors.ink} />
+          <ArrowLeft size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
         </Pressy>
         <Text style={styles.headerTitle}>Settings</Text>
       </View>
@@ -216,9 +216,9 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
               {themeMode === 'dark' ? (
-                <Moon size={16} strokeWidth={1.5} color={colors.accent} />
+                <Moon size={icon.md} strokeWidth={icon.stroke} color={colors.accent} />
               ) : (
-                <Sun size={16} strokeWidth={1.5} color={colors.accent} />
+                <Sun size={icon.md} strokeWidth={icon.stroke} color={colors.accent} />
               )}
               <Text style={styles.rowLabel}>Theme</Text>
             </View>
@@ -248,7 +248,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           ) : (
             <>
               <SettingRow
-                icon={<ShieldCheck size={16} strokeWidth={1.5} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
+                icon={<ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
                 label="Background capture"
                 active={accessibilityOn}
                 buttonLabel={accessibilityOn ? 'Manage' : 'Enable'}
@@ -256,7 +256,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 styles={styles}
               />
               <SettingRow
-                icon={<Bell size={16} strokeWidth={1.5} color={notifOn ? colors.accent : colors.inkFaint} />}
+                icon={<Bell size={icon.md} strokeWidth={icon.stroke} color={notifOn ? colors.accent : colors.inkFaint} />}
                 label="Notifications"
                 active={notifOn}
                 buttonLabel={notifOn ? 'On' : 'Enable'}
@@ -264,7 +264,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 styles={styles}
               />
               <SettingRow
-                icon={<CircleDot size={16} strokeWidth={1.5} color={bubbleRunning ? colors.accent : colors.inkFaint} />}
+                icon={<CircleDot size={icon.md} strokeWidth={icon.stroke} color={bubbleRunning ? colors.accent : colors.inkFaint} />}
                 label="Floating bubble"
                 active={bubbleRunning}
                 buttonLabel={bubbleRunning ? 'Stop' : 'Start'}
@@ -285,7 +285,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
               <View style={styles.stackRow}>
                 <View style={styles.rowLeft}>
-                  <Layers size={16} strokeWidth={1.5} color={colors.inkFaint} />
+                  <Layers size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
                   <Text style={styles.rowLabel}>Bubble size</Text>
                 </View>
                 <ThreeWayPill
@@ -303,7 +303,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
               <View style={styles.row}>
                 <View style={styles.rowLeft}>
-                  <Power size={16} strokeWidth={1.5} color={colors.inkFaint} />
+                  <Power size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
                   <Text style={styles.rowLabel}>Auto-start after reboot</Text>
                 </View>
                 <Pressy
@@ -323,7 +323,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
           <View style={styles.row}>
             <View style={styles.rowLeft}>
-              <MessageSquareWarning size={16} strokeWidth={1.5} color={colors.inkFaint} />
+              <MessageSquareWarning size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
               <Text style={styles.rowLabel}>Confirm before paste</Text>
             </View>
             <Pressy
@@ -345,7 +345,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.sectionTitle}>Storage</Text>
           <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
-              <SmartphoneCharging size={16} strokeWidth={1.5} color={colors.inkFaint} />
+              <SmartphoneCharging size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
               <Text style={styles.rowLabel}>Keep at most</Text>
             </View>
             <View style={styles.pillGroup}>
@@ -369,12 +369,12 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           </View>
 
           <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel="Export backup">
-            <Download size={18} strokeWidth={1.5} color={colors.accent} />
+            <Download size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
             <Text style={styles.exportText}>{exporting ? 'Exporting…' : 'Export backup'}</Text>
           </Pressy>
 
           <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel="Clear all clips">
-            <Trash2 size={18} strokeWidth={1.5} color={colors.danger} />
+            <Trash2 size={icon.sm} strokeWidth={icon.stroke} color={colors.danger} />
             <Text style={styles.dangerText}>Clear all clips</Text>
           </Pressy>
         </View>

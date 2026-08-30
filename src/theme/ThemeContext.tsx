@@ -8,6 +8,7 @@ import {
   radii,
   type,
   text,
+  icon,
   weight,
   easing,
   duration,
@@ -23,6 +24,7 @@ interface ThemeValue {
   radii: typeof radii;
   type: typeof type;
   text: typeof text;
+  icon: typeof icon;
   weight: typeof weight;
   easing: typeof easing;
   duration: typeof duration;
@@ -46,6 +48,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       radii,
       type,
       text,
+      icon,
       weight,
       easing,
       duration,
