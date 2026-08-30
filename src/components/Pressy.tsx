@@ -12,6 +12,15 @@ import {
 import { useTheme } from '../theme/ThemeContext';
 import { useReduceMotion } from '../theme/useReduceMotion';
 
+/**
+ * The touchable is the animated element itself, not a wrapper inside it.
+ * With a plain Pressable around an Animated.View, `style` lands on the inner
+ * view and the Pressable sizes to its content — so layout styles like
+ * `flex: 1` or `width` silently do nothing, and a row of Pressy tabs or
+ * segments collapses to content width instead of sharing the row.
+ */
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 interface Props {
   onPress?: () => void;
   onLongPress?: () => void;
@@ -65,7 +74,8 @@ export default function Pressy({
   };
 
   return (
-    <Pressable
+    <AnimatedPressable
+      style={[style, { transform: [{ scale }] }]}
       disabled={disabled}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -78,7 +88,7 @@ export default function Pressy({
       hitSlop={hitSlop}
       android_ripple={{ color: colors.border, borderless: false }}
     >
-      <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
-    </Pressable>
+      {children}
+    </AnimatedPressable>
   );
 }

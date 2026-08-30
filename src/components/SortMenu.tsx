@@ -27,6 +27,9 @@ export default function SortMenu({ value, onChange }: Props) {
           paddingHorizontal: spacing.keyline,
           paddingVertical: spacing.sm,
           gap: spacing.sm,
+          // A horizontal ScrollView stretches its children on the cross axis
+          // by default, which would pull each pill to the full row height.
+          alignItems: 'center',
         },
         chip: {
           paddingHorizontal: spacing.lg,
