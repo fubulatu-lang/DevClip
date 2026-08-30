@@ -3,13 +3,14 @@ import { StyleSheet, ScrollView, Text } from 'react-native';
 import { SortMode } from '../types/clip';
 import { useTheme } from '../theme/ThemeContext';
 import Pressy from './Pressy';
+import { strings } from '../strings';
 
 const OPTIONS: { value: SortMode; label: string }[] = [
-  { value: 'date-desc', label: 'Newest' },
-  { value: 'date-asc', label: 'Oldest' },
-  { value: 'title-asc', label: 'Title A–Z' },
-  { value: 'title-desc', label: 'Title Z–A' },
-  { value: 'manual', label: 'Manual' },
+  { value: 'date-desc', label: strings.sort.dateDesc },
+  { value: 'date-asc', label: strings.sort.dateAsc },
+  { value: 'title-asc', label: strings.sort.titleAsc },
+  { value: 'title-desc', label: strings.sort.titleDesc },
+  { value: 'manual', label: strings.sort.manual },
 ];
 
 interface Props {
@@ -58,7 +59,7 @@ export default function SortMenu({ value, onChange }: Props) {
             key={opt.value}
             onPress={() => onChange(opt.value)}
             style={[styles.chip, active && styles.chipActive]}
-            accessibilityLabel={`Sort by ${opt.label}`}
+            accessibilityLabel={`${strings.sort.a11yPrefix} ${opt.label}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}

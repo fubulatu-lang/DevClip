@@ -13,6 +13,7 @@ import {
   isOverlayPermissionGranted,
 } from '../native/OverlayModule';
 import Pressy from '../components/Pressy';
+import { strings } from '../strings';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
@@ -88,22 +89,20 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.scroll}>
-        <Text style={styles.heading}>Set up DevClip</Text>
-        <Text style={styles.sub}>
-          Three quick permissions and you're set. You can always change these later from Settings.
-        </Text>
+        <Text style={styles.heading}>{strings.onboarding.heading}</Text>
+        <Text style={styles.sub}>{strings.onboarding.sub}</Text>
 
         <View style={styles.card}>
           <View style={styles.iconWrap} importantForAccessibility="no">
             <Bell size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.cardTitle}>Notifications</Text>
-            <Text style={styles.cardBody}>Shows a quiet, permanent notification while capture is active.</Text>
+            <Text style={styles.cardTitle}>{strings.onboarding.notifications}</Text>
+            <Text style={styles.cardBody}>{strings.onboarding.notificationsBody}</Text>
           </View>
           <View style={[styles.actionBtn, notifAsked && styles.actionBtnDone]}>
             <Text style={[styles.actionText, notifAsked && styles.actionTextDone]}>
-              {notifAsked ? 'Done' : '…'}
+              {notifAsked ? strings.onboarding.done : strings.onboarding.pending}
             </Text>
           </View>
         </View>
@@ -115,20 +114,20 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 <ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Background capture</Text>
-                <Text style={styles.cardBody}>
-                  Lets DevClip save copies made in any app automatically, and paste a saved clip
-                  directly into whatever field you were using. Android will show a broader
-                  permission screen for this — that's expected.
-                </Text>
+                <Text style={styles.cardTitle}>{strings.onboarding.backgroundCapture}</Text>
+                <Text style={styles.cardBody}>{strings.onboarding.backgroundCaptureBody}</Text>
               </View>
               <Pressy
                 onPress={requestAccessibilityPermission}
                 style={[styles.actionBtn, accessibilityGranted && styles.actionBtnDone]}
-                accessibilityLabel={accessibilityGranted ? 'Background capture is enabled' : 'Enable background capture'}
+                accessibilityLabel={
+                  accessibilityGranted
+                    ? strings.onboarding.enabledA11y(strings.onboarding.backgroundCapture)
+                    : strings.onboarding.enableA11y(strings.onboarding.backgroundCapture)
+                }
               >
                 <Text style={[styles.actionText, accessibilityGranted && styles.actionTextDone]}>
-                  {accessibilityGranted ? 'Done' : 'Enable'}
+                  {accessibilityGranted ? strings.onboarding.done : strings.onboarding.enable}
                 </Text>
               </Pressy>
             </View>
@@ -138,16 +137,20 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 <CircleDot size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>Floating bubble</Text>
-                <Text style={styles.cardBody}>Lets DevClip draw the bubble on top of other apps.</Text>
+                <Text style={styles.cardTitle}>{strings.onboarding.floatingBubble}</Text>
+                <Text style={styles.cardBody}>{strings.onboarding.floatingBubbleBody}</Text>
               </View>
               <Pressy
                 onPress={requestOverlayPermission}
                 style={[styles.actionBtn, overlayGranted && styles.actionBtnDone]}
-                accessibilityLabel={overlayGranted ? 'Floating bubble is enabled' : 'Enable floating bubble'}
+                accessibilityLabel={
+                  overlayGranted
+                    ? strings.onboarding.enabledA11y(strings.onboarding.floatingBubble)
+                    : strings.onboarding.enableA11y(strings.onboarding.floatingBubble)
+                }
               >
                 <Text style={[styles.actionText, overlayGranted && styles.actionTextDone]}>
-                  {overlayGranted ? 'Done' : 'Enable'}
+                  {overlayGranted ? strings.onboarding.done : strings.onboarding.enable}
                 </Text>
               </Pressy>
             </View>
@@ -156,8 +159,8 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       </View>
 
       <View style={styles.footer}>
-        <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel="Continue">
-          <Text style={styles.continueText}>Continue</Text>
+        <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel={strings.onboarding.continue}>
+          <Text style={styles.continueText}>{strings.onboarding.continue}</Text>
           <ArrowRight size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
         </Pressy>
       </View>

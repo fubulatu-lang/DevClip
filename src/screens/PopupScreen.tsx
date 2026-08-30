@@ -18,6 +18,7 @@ import {
 } from '../native/OverlayModule';
 import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
+import { strings } from '../strings';
 
 const SIZES: Record<PopupState, { width: number; height: number }> = {
   small: { width: 300, height: 400 },
@@ -26,9 +27,9 @@ const SIZES: Record<PopupState, { width: number; height: number }> = {
 };
 
 const TABS: { key: PopupState; label: string }[] = [
-  { key: 'small', label: 'Small' },
-  { key: 'expanded', label: 'Expanded' },
-  { key: 'full', label: 'Full App' },
+  { key: 'small', label: strings.views.small },
+  { key: 'expanded', label: strings.views.expanded },
+  { key: 'full', label: strings.views.full },
 ];
 
 export default function PopupScreen() {
@@ -157,12 +158,12 @@ export default function PopupScreen() {
           <View style={styles.heroTopRow}>
             <View style={styles.heroLeft}>
               <View style={styles.logoDot} />
-              <Text style={styles.title}>DevClip</Text>
+              <Text style={styles.title}>{strings.app.name}</Text>
             </View>
             <Pressy
               onPress={() => setShowSettings(true)}
               style={styles.gearBtn}
-              accessibilityLabel="Settings"
+              accessibilityLabel={strings.settings.open}
             >
               <SettingsIcon size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
             </Pressy>
@@ -173,13 +174,13 @@ export default function PopupScreen() {
               <Pressy
                 onPress={toggleBubble}
                 style={[styles.bubbleBtn, bubbleRunning && styles.bubbleBtnActive]}
-                accessibilityLabel={bubbleRunning ? 'Turn off floating bubble' : 'Turn on floating bubble'}
+                accessibilityLabel={bubbleRunning ? strings.bubble.turnOff : strings.bubble.turnOn}
                 accessibilityState={{ checked: bubbleRunning }}
                 accessibilityRole="switch"
               >
                 <CircleDot size={icon.sm} strokeWidth={icon.stroke} color={bubbleRunning ? colors.accent : colors.inkFaint} />
                 <Text style={[styles.bubbleBtnText, bubbleRunning && styles.bubbleBtnTextActive]}>
-                  {bubbleRunning ? 'Bubble on' : 'Bubble off'}
+                  {bubbleRunning ? strings.bubble.on : strings.bubble.off}
                 </Text>
               </Pressy>
             )}
@@ -191,7 +192,7 @@ export default function PopupScreen() {
                     key={tab.key}
                     onPress={() => changeState(tab.key)}
                     style={[styles.tab, active && styles.tabActive]}
-                    accessibilityLabel={`${tab.label} view`}
+                    accessibilityLabel={`${tab.label} ${strings.views.a11ySuffix}`}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
                     hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}

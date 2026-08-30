@@ -30,12 +30,13 @@ import { useTheme } from '../theme/ThemeContext';
 import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import Pressy from '../components/Pressy';
+import { strings } from '../strings';
 
 const MAX_CLIPS_OPTIONS = [
   { value: 100, label: '100' },
   { value: 500, label: '500' },
   { value: 1000, label: '1000' },
-  { value: 0, label: 'No limit' },
+  { value: 0, label: strings.settings.noLimit },
 ];
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
@@ -173,9 +174,9 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   }), [colors, radii, spacing, text]);
 
   const handleClearAll = () => {
-    Alert.alert('Clear all clips?', 'This deletes everything in your history. This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear all', style: 'destructive', onPress: clearAll },
+    Alert.alert(strings.settings.clearAllTitle, strings.settings.clearAllBody, [
+      { text: strings.common.cancel, style: 'cancel' },
+      { text: strings.settings.clearAll, style: 'destructive', onPress: clearAll },
     ]);
   };
 
@@ -184,7 +185,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     try {
       await exportBackup();
     } catch (e) {
-      Alert.alert('Export failed', 'Could not create the backup file. Try again.');
+      Alert.alert(strings.settings.exportFailedTitle, strings.settings.exportFailedBody);
     } finally {
       setExporting(false);
     }
@@ -193,26 +194,26 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
-        <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel="Back to clip list">
+        <Pressy onPress={onBack} style={styles.backBtn} accessibilityLabel={strings.settings.back}>
           <ArrowLeft size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
         </Pressy>
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{strings.settings.title}</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
         {/* Permissions status */}
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Permissions</Text>
-            <PermissionRow label="Background capture" granted={accessibilityOn} colors={colors} styles={styles} />
-            <PermissionRow label="Floating bubble" granted={overlayOn} colors={colors} styles={styles} />
-            <PermissionRow label="Notifications" granted={notifOn} colors={colors} styles={styles} />
+            <Text style={styles.sectionTitle}>{strings.settings.permissions}</Text>
+            <PermissionRow label={strings.settings.backgroundCapture} granted={accessibilityOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.floatingBubble} granted={overlayOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.notifications} granted={notifOn} colors={colors} styles={styles} />
           </View>
         )}
 
         {/* Appearance */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
+          <Text style={styles.sectionTitle}>{strings.settings.appearance}</Text>
           <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
               {themeMode === 'dark' ? (
@@ -220,14 +221,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
               ) : (
                 <Sun size={icon.md} strokeWidth={icon.stroke} color={colors.accent} />
               )}
-              <Text style={styles.rowLabel}>Theme</Text>
+              <Text style={styles.rowLabel}>{strings.settings.theme}</Text>
             </View>
             <ThreeWayPill
-              groupLabel="Theme"
+              groupLabel={strings.settings.theme}
               options={[
-                { value: 'light', label: 'Light' },
-                { value: 'dark', label: 'Dark' },
-                { value: 'system', label: 'Auto', a11yLabel: 'Follow system' },
+                { value: 'light', label: strings.settings.themeLight },
+                { value: 'dark', label: strings.settings.themeDark },
+                { value: 'system', label: strings.settings.themeAuto, a11yLabel: strings.settings.themeAutoA11y },
               ]}
               value={themeMode}
               onChange={(v) => setThemeMode(v as ThemeMode)}
@@ -238,36 +239,33 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
         {/* Capture behavior */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Capture</Text>
+          <Text style={styles.sectionTitle}>{strings.settings.capture}</Text>
 
           {!isNativeOverlayAvailable() ? (
-            <Text style={styles.note}>
-              Background capture and the floating bubble need the custom dev client build — see
-              SETUP_GUIDE.md.
-            </Text>
+            <Text style={styles.note}>{strings.settings.devClientNote}</Text>
           ) : (
             <>
               <SettingRow
                 icon={<ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
-                label="Background capture"
+                label={strings.settings.backgroundCapture}
                 active={accessibilityOn}
-                buttonLabel={accessibilityOn ? 'Manage' : 'Enable'}
+                buttonLabel={accessibilityOn ? strings.settings.manage : strings.settings.enable}
                 onPress={requestAccessibilityPermission}
                 styles={styles}
               />
               <SettingRow
                 icon={<Bell size={icon.md} strokeWidth={icon.stroke} color={notifOn ? colors.accent : colors.inkFaint} />}
-                label="Notifications"
+                label={strings.settings.notifications}
                 active={notifOn}
-                buttonLabel={notifOn ? 'On' : 'Enable'}
+                buttonLabel={notifOn ? strings.settings.manage : strings.settings.enable}
                 onPress={async () => setNotifOn(await requestNotificationPermission())}
                 styles={styles}
               />
               <SettingRow
                 icon={<CircleDot size={icon.md} strokeWidth={icon.stroke} color={bubbleRunning ? colors.accent : colors.inkFaint} />}
-                label="Floating bubble"
+                label={strings.settings.floatingBubble}
                 active={bubbleRunning}
-                buttonLabel={bubbleRunning ? 'Stop' : 'Start'}
+                buttonLabel={bubbleRunning ? strings.settings.stop : strings.settings.start}
                 onPress={async () => {
                   if (bubbleRunning) {
                     stopBubble();
@@ -286,14 +284,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
               <View style={styles.stackRow}>
                 <View style={styles.rowLeft}>
                   <Layers size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
-                  <Text style={styles.rowLabel}>Bubble size</Text>
+                  <Text style={styles.rowLabel}>{strings.settings.bubbleSize}</Text>
                 </View>
                 <ThreeWayPill
-                  groupLabel="Bubble size"
+                  groupLabel={strings.settings.bubbleSize}
                   options={[
-                    { value: 'small', label: 'S', a11yLabel: 'Small' },
-                    { value: 'medium', label: 'M', a11yLabel: 'Medium' },
-                    { value: 'large', label: 'L', a11yLabel: 'Large' },
+                    { value: 'small', label: strings.settings.bubbleSmall, a11yLabel: strings.settings.bubbleSmallA11y },
+                    { value: 'medium', label: strings.settings.bubbleMedium, a11yLabel: strings.settings.bubbleMediumA11y },
+                    { value: 'large', label: strings.settings.bubbleLarge, a11yLabel: strings.settings.bubbleLargeA11y },
                   ]}
                   value={bubbleSize}
                   onChange={(v) => setBubbleSize(v as BubbleSize)}
@@ -304,17 +302,17 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
               <View style={styles.row}>
                 <View style={styles.rowLeft}>
                   <Power size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
-                  <Text style={styles.rowLabel}>Auto-start after reboot</Text>
+                  <Text style={styles.rowLabel}>{strings.settings.autoStart}</Text>
                 </View>
                 <Pressy
                   onPress={() => setAutoStartOnBoot(!autoStartOnBoot)}
                   style={[styles.actionBtn, autoStartOnBoot && styles.actionBtnActive]}
-                  accessibilityLabel="Auto-start after reboot"
+                  accessibilityLabel={strings.settings.autoStart}
                   accessibilityRole="switch"
                   accessibilityState={{ checked: autoStartOnBoot }}
                 >
                   <Text style={[styles.actionBtnText, autoStartOnBoot && styles.actionBtnTextActive]}>
-                    {autoStartOnBoot ? 'On' : 'Off'}
+                    {autoStartOnBoot ? strings.settings.on : strings.settings.off}
                   </Text>
                 </Pressy>
               </View>
@@ -324,17 +322,17 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <MessageSquareWarning size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
-              <Text style={styles.rowLabel}>Confirm before paste</Text>
+              <Text style={styles.rowLabel}>{strings.settings.confirmPaste}</Text>
             </View>
             <Pressy
               onPress={() => setConfirmBeforePaste(!confirmBeforePaste)}
               style={[styles.actionBtn, confirmBeforePaste && styles.actionBtnActive]}
-              accessibilityLabel="Confirm before paste"
+              accessibilityLabel={strings.settings.confirmPaste}
               accessibilityRole="switch"
               accessibilityState={{ checked: confirmBeforePaste }}
             >
               <Text style={[styles.actionBtnText, confirmBeforePaste && styles.actionBtnTextActive]}>
-                {confirmBeforePaste ? 'On' : 'Off'}
+                {confirmBeforePaste ? strings.settings.on : strings.settings.off}
               </Text>
             </Pressy>
           </View>
@@ -342,11 +340,11 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
 
         {/* Storage */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Storage</Text>
+          <Text style={styles.sectionTitle}>{strings.settings.storage}</Text>
           <View style={styles.stackRow}>
             <View style={styles.rowLeft}>
               <SmartphoneCharging size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
-              <Text style={styles.rowLabel}>Keep at most</Text>
+              <Text style={styles.rowLabel}>{strings.settings.keepAtMost}</Text>
             </View>
             <View style={styles.pillGroup}>
               {MAX_CLIPS_OPTIONS.map((opt) => {
@@ -356,7 +354,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                     key={opt.value}
                     onPress={() => setMaxClips(opt.value)}
                     style={[styles.pill, active && styles.pillActive]}
-                    accessibilityLabel={`Keep at most ${opt.label === 'No limit' ? 'no limit' : opt.label + ' clips'}`}
+                    accessibilityLabel={strings.settings.keepAtMostA11y(opt.label)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: active, checked: active }}
                     hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
@@ -368,14 +366,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
 
-          <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel="Export backup">
+          <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel={strings.settings.exportBackup}>
             <Download size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
-            <Text style={styles.exportText}>{exporting ? 'Exporting…' : 'Export backup'}</Text>
+            <Text style={styles.exportText}>{exporting ? strings.settings.exporting : strings.settings.exportBackup}</Text>
           </Pressy>
 
-          <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel="Clear all clips">
+          <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel={strings.settings.clearAll}>
             <Trash2 size={icon.sm} strokeWidth={icon.stroke} color={colors.danger} />
-            <Text style={styles.dangerText}>Clear all clips</Text>
+            <Text style={styles.dangerText}>{strings.settings.clearAll}</Text>
           </Pressy>
         </View>
       </ScrollView>
@@ -400,7 +398,7 @@ function PermissionRow({
       <View style={styles.rowLeft}>
         <View style={[styles.statusDot, { backgroundColor: granted ? colors.success : colors.danger }]} />
         <Text style={[styles.statusText, { color: granted ? colors.success : colors.danger }]}>
-          {granted ? 'Granted' : 'Off'}
+          {granted ? strings.settings.granted : strings.settings.notGranted}
         </Text>
       </View>
     </View>

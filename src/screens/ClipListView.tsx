@@ -11,6 +11,7 @@ import Pressy from '../components/Pressy';
 import { Clip } from '../types/clip';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
+import { strings } from '../strings';
 
 export default function ClipListView() {
   const { colors, radii, spacing, text, icon } = useTheme();
@@ -107,8 +108,8 @@ export default function ClipListView() {
       {error && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{error}</Text>
-          <Pressy onPress={dismissError} accessibilityLabel="Dismiss error" hitSlop={16}>
-            <Text style={styles.errorDismiss}>Dismiss</Text>
+          <Pressy onPress={dismissError} accessibilityLabel={strings.common.dismissError} hitSlop={16}>
+            <Text style={styles.errorDismiss}>{strings.common.dismiss}</Text>
           </Pressy>
         </View>
       )}
@@ -136,8 +137,8 @@ export default function ClipListView() {
             <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
             <Text style={styles.emptyText}>
               {search
-                ? `No clips match “${search}”`
-                : 'No clips yet\nCopy something, then tap Capture below.'}
+                ? strings.clips.noMatches(search)
+                : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
             </Text>
           </View>
         }
@@ -147,10 +148,10 @@ export default function ClipListView() {
         <Pressy
           onPress={handleCapture}
           style={styles.captureBtn}
-          accessibilityLabel="Capture current clipboard"
+          accessibilityLabel={strings.clips.captureA11y}
         >
           <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
-          <Text style={styles.captureText}>{loading ? 'Loading…' : 'Capture clipboard'}</Text>
+          <Text style={styles.captureText}>{loading ? strings.clips.capturing : strings.clips.capture}</Text>
         </Pressy>
       </View>
 
