@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { StyleSheet, ScrollView, Text } from 'react-native';
 import { SortMode } from '../types/clip';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import Pressy from './Pressy';
 import { strings } from '../strings';
 
@@ -20,12 +20,13 @@ interface Props {
 
 export default function SortMenu({ value, onChange }: Props) {
   const { colors, radii, spacing, text } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const styles = useMemo(
     () =>
       StyleSheet.create({
         row: { flexGrow: 0, flexShrink: 0 },
         wrap: {
-          paddingHorizontal: spacing.keyline,
+          paddingHorizontal: gutter,
           paddingVertical: spacing.sm,
           gap: spacing.sm,
           // A horizontal ScrollView stretches its children on the cross axis
@@ -46,7 +47,7 @@ export default function SortMenu({ value, onChange }: Props) {
         chipText: { ...text.secondary, color: colors.inkSoft },
         chipTextActive: { color: colors.onAccent },
       }),
-    [colors, radii, spacing, text]
+    [colors, radii, spacing, text, gutter]
   );
 
   return (

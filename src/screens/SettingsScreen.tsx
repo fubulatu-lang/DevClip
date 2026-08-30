@@ -26,7 +26,7 @@ import {
   stopBubble,
 } from '../native/OverlayModule';
 import { exportBackup } from '../utils/backup';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import Pressy from '../components/Pressy';
@@ -49,6 +49,7 @@ const MAX_CLIPS_OPTIONS = [
 
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const [accessibilityOn, setAccessibilityOn] = useState(false);
   const [overlayOn, setOverlayOn] = useState(false);
   const [notifOn, setNotifOn] = useState(false);
@@ -98,7 +99,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: spacing.md,
-      paddingHorizontal: spacing.keyline,
+      paddingHorizontal: gutter,
       paddingVertical: spacing.xs,
       minHeight: 56,
     },
@@ -111,7 +112,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     },
     headerTitle: { ...text.title, color: colors.ink },
     section: {
-      marginHorizontal: spacing.keyline,
+      marginHorizontal: gutter,
       marginTop: spacing.md,
       backgroundColor: colors.surface,
       borderRadius: radii.md,
@@ -178,7 +179,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       justifyContent: 'center',
     },
     dangerText: { ...text.button, color: colors.danger },
-  }), [colors, radii, spacing, text]);
+  }), [colors, radii, spacing, text, gutter]);
 
   const handleClearAll = () => {
     Alert.alert(strings.settings.clearAllTitle, strings.settings.clearAllBody, [

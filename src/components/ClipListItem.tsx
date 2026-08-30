@@ -47,8 +47,8 @@ export default function ClipListItem({
         card: {
           backgroundColor: colors.surface,
           borderRadius: radii.md,
-          marginHorizontal: spacing.keyline,
           marginBottom: spacing.sm,
+          flex: 1,
           padding: spacing.lg,
           ...shadow.card,
         },

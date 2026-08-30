@@ -10,11 +10,12 @@ import EditClipModal from '../components/EditClipModal';
 import Pressy from '../components/Pressy';
 import { Clip } from '../types/clip';
 import { readSystemClipboard } from '../utils/clipboardCapture';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { strings } from '../strings';
 
 export default function ClipListView() {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter, columns } = useAdaptiveLayout();
   const {
     clips,
     search,
@@ -59,7 +60,7 @@ export default function ClipListView() {
          * within thumb reach, not at the top where the eye lands first.
          */
         actionBar: {
-          paddingHorizontal: spacing.keyline,
+          paddingHorizontal: gutter,
           paddingTop: spacing.md,
           paddingBottom: spacing.lg,
           borderTopWidth: 1,
@@ -82,14 +83,14 @@ export default function ClipListView() {
           justifyContent: 'center',
           marginTop: 60,
           gap: spacing.md,
-          paddingHorizontal: spacing.keyline,
+          paddingHorizontal: gutter,
         },
         emptyText: { ...text.secondary, color: colors.inkFaint, textAlign: 'center', lineHeight: 22 },
         errorBanner: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginHorizontal: spacing.keyline,
+          marginHorizontal: gutter,
           marginTop: spacing.sm,
           backgroundColor: colors.dangerSoft,
           paddingVertical: spacing.md,
@@ -100,7 +101,7 @@ export default function ClipListView() {
         errorText: { flex: 1, ...text.secondary, color: colors.danger },
         errorDismiss: { ...text.secondary, fontWeight: '500', color: colors.danger },
       }),
-    [colors, radii, spacing, text]
+    [colors, radii, spacing, text, gutter]
   );
 
   return (
@@ -120,7 +121,17 @@ export default function ClipListView() {
       <FlatList
         data={clips}
         keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={{ paddingTop: spacing.xs, paddingBottom: spacing.lg, flexGrow: 1 }}
+        // numColumns is fixed for the life of a FlatList, so the key changes
+        // with it to force a remount when the window crosses a breakpoint.
+        key={`cols-${columns}`}
+        numColumns={columns}
+        columnWrapperStyle={columns > 1 ? { gap: spacing.md } : undefined}
+        contentContainerStyle={{
+          paddingTop: spacing.xs,
+          paddingBottom: spacing.lg,
+          paddingHorizontal: gutter,
+          flexGrow: 1,
+        }}
         renderItem={({ item, index }) => (
           <ClipListItem
             clip={item}

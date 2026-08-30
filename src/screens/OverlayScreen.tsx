@@ -78,7 +78,12 @@ export default function OverlayScreen() {
           alignItems: 'center',
           justifyContent: 'center',
         },
-        list: { flexGrow: 1, paddingTop: spacing.sm, paddingBottom: spacing.sm },
+        list: {
+          flexGrow: 1,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.sm,
+          paddingHorizontal: spacing.lg,
+        },
         empty: {
           alignItems: 'center',
           justifyContent: 'center',

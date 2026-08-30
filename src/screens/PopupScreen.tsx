@@ -6,7 +6,7 @@ import ClipListView from './ClipListView';
 import SettingsScreen from './SettingsScreen';
 import OnboardingScreen from './OnboardingScreen';
 import Pressy from '../components/Pressy';
-import { useTheme } from '../theme/ThemeContext';
+import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
 import { strings } from '../strings';
 
@@ -20,6 +20,7 @@ import { strings } from '../strings';
  */
 export default function PopupScreen() {
   const { colors, radii, spacing, text, icon } = useTheme();
+  const { gutter } = useAdaptiveLayout();
   const [showSettings, setShowSettings] = useState(false);
   const hasOnboarded = useSettingsStore((s) => s.hasOnboarded);
   const setOnboarded = useSettingsStore((s) => s.setOnboarded);
@@ -29,7 +30,10 @@ export default function PopupScreen() {
       StyleSheet.create({
         screen: { flex: 1, backgroundColor: colors.bg },
         hero: {
-          paddingHorizontal: spacing.keyline,
+          // The bar spans the window, but its content lines up with the
+          // content below it; a title hard against the edge while the list
+          // sits 12.5% in reads as two unrelated layouts.
+          paddingHorizontal: gutter,
           paddingVertical: spacing.xs,
           minHeight: 56,
           backgroundColor: colors.surface,
@@ -50,7 +54,7 @@ export default function PopupScreen() {
           justifyContent: 'center',
         },
       }),
-    [colors, radii, spacing, text]
+    [colors, radii, spacing, text, gutter]
   );
 
   if (!hasOnboarded) {
