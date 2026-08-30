@@ -7,7 +7,6 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true
     },

@@ -10,6 +10,7 @@ import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Build
 import android.os.IBinder
+import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -18,7 +19,8 @@ import android.view.WindowManager
 import android.widget.ImageView
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
-import com.facebook.react.ReactRootView
+import com.facebook.react.ReactApplication
+import com.facebook.react.interfaces.fabric.ReactSurface
 import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler
 import kotlin.math.abs
 import kotlin.math.min
@@ -26,7 +28,7 @@ import kotlin.math.min
 /**
  * Foreground service that owns two overlay windows:
  *  1. A draggable, tappable bubble showing the app icon (always visible).
- *  2. A ReactRootView window rendering "DevClipPopup", in one of two shapes.
+ *  2. A React Native surface rendering "DevClipPopup", in one of two shapes.
  *
  * The popup has two geometries and native owns both, because only this side
  * knows where the bubble is and where the system bars are:
@@ -45,7 +47,8 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleSizePx = 0
-    private var popupRootView: ReactRootView? = null
+    private var popupSurface: ReactSurface? = null
+    private var popupView: View? = null
     private var popupParams: WindowManager.LayoutParams? = null
     private var popupVisible = false
     private var mode = MODE_MINI
@@ -103,19 +106,15 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
 
         bubbleView?.let { view ->
             bubbleParams?.let { params ->
-                params.x = params.x.coerceIn(area.left, area.right - bubbleSizePx)
-                params.y = params.y.coerceIn(area.top, area.bottom - bubbleSizePx)
+                params.x = clamp(params.x, area.left, area.right - bubbleSizePx)
+                params.y = clamp(params.y, area.top, area.bottom - bubbleSizePx)
                 try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
             }
         }
 
         if (popupVisible) {
             applyPopupGeometry()
-            popupRootView?.let { view ->
-                popupParams?.let { params ->
-                    try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
-                }
-            }
+            updatePopupLayout()
         }
     }
 
@@ -149,6 +148,15 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
     // ---- Geometry ----
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    /**
+     * coerceIn throws IllegalArgumentException on an inverted range, and a
+     * window wider than the space left for it produces exactly that. Every
+     * clamp here is against a safe area that a split-screen or freeform window
+     * can shrink below the window being placed, so none of them may throw.
+     */
+    private fun clamp(value: Int, min: Int, max: Int): Int =
+        if (max <= min) min else value.coerceIn(min, max)
 
     private fun safeArea(): SafeArea {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -232,8 +240,8 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
                     val dy = (event.rawY - touchY).toInt()
                     if (abs(dx) > 8 || abs(dy) > 8) moved = true
                     val a = safeArea()
-                    params.x = (initialX + dx).coerceIn(a.left, a.right - size)
-                    params.y = (initialY + dy).coerceIn(a.top, a.bottom - size)
+                    params.x = clamp(initialX + dx, a.left, a.right - size)
+                    params.y = clamp(initialY + dy, a.top, a.bottom - size)
                     windowManager.updateViewLayout(v, params)
                     // The mini window is tethered: it travels with the bubble.
                     if (popupVisible && mode == MODE_MINI) applyPopupGeometry()
@@ -241,10 +249,19 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
                 }
                 MotionEvent.ACTION_UP -> {
                     if (!moved) {
-                        // A tap always opens mini, never the shape it was left in.
-                        if (popupVisible) hidePopup() else {
-                            mode = MODE_MINI
-                            showPopup()
+                        // An exception thrown from here escapes view dispatch and
+                        // takes the whole touch listener down with it — the bubble
+                        // would still be drawn but would stop responding, with no
+                        // visible sign of why. Nothing about opening the popup is
+                        // worth that.
+                        try {
+                            // A tap always opens mini, never the shape it was left in.
+                            if (popupVisible) hidePopup() else {
+                                mode = MODE_MINI
+                                showPopup()
+                            }
+                        } catch (e: Exception) {
+                            android.util.Log.e("DevClip", "Failed to toggle the popup", e)
                         }
                     }
                     true
@@ -260,13 +277,43 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
 
     // ---- Popup (React Native content) ----
 
+    /**
+     * Builds the popup's view once and keeps it for the life of the service.
+     *
+     * There is no bridge left to reach for. `ReactNativeHost` and
+     * `ReactRootView` belong to the architecture React Native 0.86 removed,
+     * and `ReactApplication.reactNativeHost` is now a default getter that
+     * throws outright — so the old code threw on the very first tap, inside
+     * the bubble's touch listener, and the popup never appeared. A surface
+     * created from `reactHost` is the supported equivalent.
+     *
+     * The surface is themed from the application's own theme: a Service has
+     * no theme of its own, and React Native's widgets resolve AppCompat
+     * attributes off whatever context they are inflated with.
+     */
+    private fun ensurePopupView(): View? {
+        popupView?.let { return it }
+
+        val host = (application as? ReactApplication)?.reactHost ?: return null
+        val surface = host.createSurface(
+            ContextThemeWrapper(this, applicationInfo.theme),
+            "DevClipPopup",
+            null
+        )
+        surface.start()
+
+        popupSurface = surface
+        popupView = surface.view
+        return popupView
+    }
+
     private fun showPopup() {
-        if (popupRootView == null) {
-            val rootView = ReactRootView(this)
-            val reactInstanceManager = (application as MainApplication)
-                .reactNativeHost.reactInstanceManager
-            rootView.startReactApplication(reactInstanceManager, "DevClipPopup", null)
-            popupRootView = rootView
+        val view = ensurePopupView() ?: return
+
+        if (popupVisible) {
+            applyPopupGeometry()
+            updatePopupLayout()
+            return
         }
 
         val params = WindowManager.LayoutParams(
@@ -277,12 +324,31 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
 
         popupParams = params
         applyPopupGeometry()
-        windowManager.addView(popupRootView, params)
-        popupVisible = true
+
+        // addView on a view that is still attached throws, and a removal that
+        // failed earlier leaves exactly that. Detaching first makes the add
+        // unconditional rather than dependent on the previous cycle.
+        if (view.parent != null) {
+            try { windowManager.removeView(view) } catch (e: Exception) { }
+        }
+        try {
+            windowManager.addView(view, params)
+            popupVisible = true
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not attach the popup window", e)
+            popupVisible = false
+        }
+    }
+
+    private fun updatePopupLayout() {
+        if (!popupVisible) return
+        val view = popupView ?: return
+        val params = popupParams ?: return
+        try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
     }
 
     private fun hidePopup() {
-        popupRootView?.let {
+        popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) { /* already removed */ }
         }
         popupVisible = false
@@ -292,9 +358,7 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
         mode = next
         if (!popupVisible) { showPopup(); return }
         applyPopupGeometry()
-        val view = popupRootView ?: return
-        val params = popupParams ?: return
-        try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+        updatePopupLayout()
     }
 
     /**
@@ -313,7 +377,9 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
             params.y = area.bottom - params.height
         } else {
             val width = min(dp(MINI_WIDTH_DP), area.width - dp(EDGE_MARGIN_DP) * 2)
+                .coerceAtLeast(1)
             val height = min(dp(MINI_HEIGHT_DP), area.height - dp(EDGE_MARGIN_DP) * 2)
+                .coerceAtLeast(1)
             val bubble = bubbleParams
             val gap = dp(TETHER_GAP_DP)
 
@@ -327,8 +393,8 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
 
             params.width = width
             params.height = height
-            params.x = x.coerceIn(area.left, area.right - width)
-            params.y = y.coerceIn(area.top, area.bottom - height)
+            params.x = clamp(x, area.left, area.right - width)
+            params.y = clamp(y, area.top, area.bottom - height)
         }
     }
 
@@ -347,9 +413,14 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
     override fun onDestroy() {
         super.onDestroy()
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
-        popupRootView?.let {
+        popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) {}
-            it.unmountReactApplication()
         }
+        popupSurface?.let {
+            try { it.stop() } catch (e: Exception) {}
+            try { it.detach() } catch (e: Exception) {}
+        }
+        popupSurface = null
+        popupView = null
     }
 }
