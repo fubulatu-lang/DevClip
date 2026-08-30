@@ -103,6 +103,7 @@ export default function ClipListView() {
           paddingHorizontal: spacing.xl,
           borderRadius: radii.pill,
         },
+        captureBtnBusy: { opacity: 0.5 },
         captureText: { ...text.button, color: colors.onAccent },
         empty: {
           alignItems: 'center',
@@ -174,7 +175,9 @@ export default function ClipListView() {
       <View style={styles.actionBar}>
         <Pressy
           onPress={handleCapture}
-          style={styles.captureBtn}
+          // An async action that stays tappable invites a double capture.
+          disabled={loading}
+          style={[styles.captureBtn, loading && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
           <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />

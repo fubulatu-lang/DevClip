@@ -30,7 +30,7 @@ export const strings = {
   clips: {
     capture: 'Capture clipboard',
     captureA11y: 'Capture current clipboard',
-    capturing: 'Loading…',
+    capturing: 'Capturing…',
     emptyTitle: 'No clips yet',
     emptyBody: 'Copy something, then tap Capture below.',
     noMatches: (term: string) => `No clips match “${term}”`,
