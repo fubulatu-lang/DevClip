@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A second push to the same branch supersedes the first: cancel the older run
+# rather than paying for a result nobody will read.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # Matches the Node the project is developed against; Expo 57 and
+          # React Native 0.86 both require Node 20 or newer.
+          node-version: 22
+          cache: npm
+
+      # ci, not install: install the lockfile exactly, and fail loudly if
+      # package.json and package-lock.json have drifted apart.
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+  one-ui:
+    name: One UI conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      # Advisory only. The scanner covers the mechanically checkable subset of
+      # the One UI rules — hardcoded colours, off-scale spacing, missing
+      # reduced-motion guards. Structure, copy and icon metaphors still need a
+      # human read, so a finding here is a prompt to look, not a gate.
+      - name: Scan src for One UI violations
+        run: python3 .claude/one-ui/scripts/oneui_scan.py src
+        continue-on-error: true

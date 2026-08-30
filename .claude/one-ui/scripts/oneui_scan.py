@@ -104,7 +104,16 @@ MARGIN_RE = re.compile(
 TOKEN_FILE_HINT = re.compile(
     r"(token|theme|palette|colou?rs?|variables|design-system|_vars)", re.I
 )
-REDUCED_MOTION = re.compile(r"prefers-reduced-motion|accessibilityReduceMotion|ANIMATOR_DURATION_SCALE")
+REDUCED_MOTION = re.compile(
+    # Every platform's way of asking "has the user asked for less motion?".
+    # Web/CSS, then React Native (the prop, the AccessibilityInfo query and
+    # its change event), then Android's system settings, then iOS/SwiftUI.
+    r"prefers-reduced-motion"
+    r"|accessibilityReduceMotion"
+    r"|isReduceMotionEnabled|reduceMotionChanged|useReduceMotion"
+    r"|ANIMATOR_DURATION_SCALE|TRANSITION_ANIMATION_SCALE"
+    r"|UIAccessibility\.isReduceMotionEnabled|accessibilityReduceMotionEnabled"
+)
 ANIMATION_HINT = re.compile(r"\b(?:transition|animation|@keyframes|withAnimation|animateTo)\b", re.I)
 
 
