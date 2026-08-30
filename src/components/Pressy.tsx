@@ -1,6 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
+  Easing,
   Pressable,
   ViewStyle,
   StyleProp,
@@ -8,6 +10,7 @@ import {
   AccessibilityState,
   Insets,
 } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   onPress?: () => void;
@@ -25,11 +28,15 @@ interface Props {
 }
 
 /**
- * A button/card that compresses slightly on press with spring physics
- * instead of the default instant opacity flash — a small but deliberate
- * "physical" touch that reads as considered rather than templated. Also
- * carries a subtle Android ripple so touch feedback still reads as native,
- * and forwards accessibility props since every icon-only usage needs them.
+ * A button/card that compresses slightly on press — a small but deliberate
+ * "physical" touch that reads as considered rather than templated. The
+ * compression uses the One UI standard curve at the instant duration rather
+ * than spring physics, so press feedback is choreographed with the rest of
+ * the system instead of bouncing on its own terms.
+ *
+ * Honours the platform reduce-motion setting: when it is on, the scale
+ * transform is skipped entirely and press feedback falls back to the
+ * ripple, which is not motion the setting is meant to suppress.
  */
 export default function Pressy({
   onPress,
@@ -43,14 +50,29 @@ export default function Pressy({
   accessibilityHint,
   hitSlop,
 }: Props) {
+  const { colors, easing, duration } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (!cancelled) setReduceMotion(enabled);
+    });
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, []);
 
   const animateTo = (value: number) => {
-    Animated.spring(scale, {
+    if (reduceMotion) return;
+    Animated.timing(scale, {
       toValue: value,
       useNativeDriver: true,
-      speed: 40,
-      bounciness: 6,
+      duration: duration.instant,
+      easing: Easing.bezier(...easing.standard),
     }).start();
   };
 
@@ -59,14 +81,14 @@ export default function Pressy({
       disabled={disabled}
       onPress={onPress}
       onLongPress={onLongPress}
-      onPressIn={() => animateTo(0.96)}
+      onPressIn={() => animateTo(0.97)}
       onPressOut={() => animateTo(1)}
       accessibilityLabel={accessibilityLabel}
       accessibilityRole={accessibilityRole}
       accessibilityState={{ disabled, ...accessibilityState }}
       accessibilityHint={accessibilityHint}
       hitSlop={hitSlop}
-      android_ripple={{ color: 'rgba(128,128,128,0.15)', borderless: false }}
+      android_ripple={{ color: colors.border, borderless: false }}
     >
       <Animated.View style={[style, { transform: [{ scale }] }]}>{children}</Animated.View>
     </Pressable>
