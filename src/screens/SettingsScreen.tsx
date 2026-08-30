@@ -32,6 +32,14 @@ import { useClipStore } from '../store/clipStore';
 import Pressy from '../components/Pressy';
 import { strings } from '../strings';
 
+/**
+ * Settings is opened and closed from the clip list rather than pushed onto a
+ * navigation stack, so it unmounts every time and would otherwise reopen at
+ * the top. Remembering the offset for the life of the process restores the
+ * position the user left, which is what returning to a screen should do.
+ */
+let lastScrollOffset = 0;
+
 const MAX_CLIPS_OPTIONS = [
   { value: 100, label: '100' },
   { value: 500, label: '500' },
@@ -199,7 +207,15 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
         <Text style={styles.headerTitle}>{strings.settings.title}</Text>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: spacing.xl }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: spacing.xl }}
+        contentOffset={{ x: 0, y: lastScrollOffset }}
+        onScroll={(e) => {
+          lastScrollOffset = e.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+      >
         {/* Permissions status */}
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
