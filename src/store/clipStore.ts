@@ -1,19 +1,24 @@
 import { create } from 'zustand';
 import { Clip, SortMode } from '../types/clip';
 import * as db from '../db/database';
+import { readSystemClipboard } from '../utils/clipboardCapture';
 
 interface ClipStoreState {
   clips: Clip[];
   search: string;
   sort: SortMode;
-  loading: boolean;
+  /**
+   * True only while a capture is in flight — the Capture button's own busy
+   * state, and nothing else's.
+   */
+  capturing: boolean;
   /** Human-readable message for the last failed operation, or null. Cleared on the next successful action. */
   error: string | null;
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   setSearch: (q: string) => void;
   setSort: (s: SortMode) => Promise<void>;
-  addClip: (content: string, title?: string | null) => Promise<void>;
+  capture: () => Promise<void>;
   updateClip: (id: number, content: string, title: string | null) => Promise<void>;
   deleteClip: (id: number) => Promise<void>;
   clearAll: () => Promise<void>;
@@ -49,7 +54,7 @@ async function runOrReport(set: (partial: Partial<ClipStoreState>) => void, fall
     await action();
     set({ error: null });
   } catch (e) {
-    set({ error: fallbackMessage, loading: false });
+    set({ error: fallbackMessage });
   }
 }
 
@@ -57,7 +62,7 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
   clips: [],
   search: '',
   sort: 'date-desc',
-  loading: false,
+  capturing: false,
   error: null,
 
   init: async () => {
@@ -69,14 +74,13 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
 
   refresh: async () => {
     const token = ++refreshToken;
-    set({ loading: true });
     await runOrReport(set, 'Could not load your clips.', async () => {
       const clips = await db.getAllClips(get().sort, get().search);
       // A newer refresh started while this query was running. Its results are
       // the ones the user is waiting for; these are already stale, and
       // publishing them would show results for a query that has moved on.
       if (token !== refreshToken) return;
-      set({ clips, loading: false });
+      set({ clips });
     });
   },
 
@@ -105,11 +109,30 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
     });
   },
 
-  addClip: async (content: string, title: string | null = null) => {
-    await runOrReport(set, 'Could not save that clip. Try capturing again.', async () => {
-      await db.addClip(content, title);
-      await get().refresh();
-    });
+  /**
+   * Read the system clipboard and save whatever is on it.
+   *
+   * Both screens used to carry their own copy of this, and drove the button's
+   * busy state from `loading` — which every refresh set. Deleting a clip or
+   * reordering one therefore flashed "Capturing…" on a button that was doing
+   * nothing of the sort, and disabled it mid-gesture. `capturing` is set here
+   * and nowhere else, and covers the clipboard read as well as the write,
+   * since the read is the half that can actually make the user wait.
+   */
+  capture: async () => {
+    // A second tap while the first is still reading would capture twice.
+    if (get().capturing) return;
+    set({ capturing: true });
+    try {
+      await runOrReport(set, 'Could not save that clip. Try capturing again.', async () => {
+        const text = await readSystemClipboard();
+        if (!text) return;
+        await db.addClip(text, null);
+        await get().refresh();
+      });
+    } finally {
+      set({ capturing: false });
+    }
   },
 
   updateClip: async (id: number, content: string, title: string | null) => {

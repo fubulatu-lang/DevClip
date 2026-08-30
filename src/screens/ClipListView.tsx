@@ -10,7 +10,6 @@ import EditClipModal from '../components/EditClipModal';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
 import { Clip } from '../types/clip';
-import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { strings } from '../strings';
 
@@ -24,12 +23,12 @@ export default function ClipListView() {
   const clips = useClipStore((s) => s.clips);
   const search = useClipStore((s) => s.search);
   const sort = useClipStore((s) => s.sort);
-  const loading = useClipStore((s) => s.loading);
+  const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
   const init = useClipStore((s) => s.init);
   const setSearch = useClipStore((s) => s.setSearch);
   const setSort = useClipStore((s) => s.setSort);
-  const addClip = useClipStore((s) => s.addClip);
+  const capture = useClipStore((s) => s.capture);
   const updateClip = useClipStore((s) => s.updateClip);
   const deleteClip = useClipStore((s) => s.deleteClip);
   const moveUp = useClipStore((s) => s.moveUp);
@@ -69,13 +68,6 @@ export default function ClipListView() {
     ),
     [sort, clips.length, handleMove]
   );
-
-  const handleCapture = async () => {
-    const text = await readSystemClipboard();
-    if (text) {
-      await addClip(text);
-    }
-  };
 
   const styles = useMemo(
     () =>
@@ -174,14 +166,14 @@ export default function ClipListView() {
 
       <View style={styles.actionBar}>
         <Pressy
-          onPress={handleCapture}
+          onPress={capture}
           // An async action that stays tappable invites a double capture.
-          disabled={loading}
-          style={[styles.captureBtn, loading && styles.captureBtnBusy]}
+          disabled={capturing}
+          style={[styles.captureBtn, capturing && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
           <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
-          <Text style={styles.captureText}>{loading ? strings.clips.capturing : strings.clips.capture}</Text>
+          <Text style={styles.captureText}>{capturing ? strings.clips.capturing : strings.clips.capture}</Text>
         </Pressy>
       </View>
 

@@ -13,13 +13,6 @@ export const strings = {
     name: 'DevClip',
   },
 
-  views: {
-    small: 'Small',
-    expanded: 'Expanded',
-    full: 'Full app',
-    a11ySuffix: 'view',
-  },
-
   bubble: {
     on: 'Bubble on',
     off: 'Bubble off',

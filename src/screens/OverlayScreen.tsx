@@ -8,7 +8,6 @@ import SearchBar from '../components/SearchBar';
 import SortMenu from '../components/SortMenu';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
-import { readSystemClipboard } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
 import { setOverlayMode, hideOverlay, openFullApp, OverlayMode } from '../native/OverlayModule';
 import { strings } from '../strings';
@@ -33,12 +32,12 @@ export default function OverlayScreen() {
   const clips = useClipStore((s) => s.clips);
   const search = useClipStore((s) => s.search);
   const sort = useClipStore((s) => s.sort);
-  const loading = useClipStore((s) => s.loading);
+  const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
   const init = useClipStore((s) => s.init);
   const setSearch = useClipStore((s) => s.setSearch);
   const setSort = useClipStore((s) => s.setSort);
-  const addClip = useClipStore((s) => s.addClip);
+  const capture = useClipStore((s) => s.capture);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
@@ -49,11 +48,6 @@ export default function OverlayScreen() {
   const changeMode = (next: OverlayMode) => {
     setMode(next);
     setOverlayMode(next);
-  };
-
-  const handleCapture = async () => {
-    const text = await readSystemClipboard();
-    if (text) await addClip(text);
   };
 
   const mini = mode === 'mini';
@@ -226,15 +220,15 @@ export default function OverlayScreen() {
 
       <View style={styles.actionBar}>
         <Pressy
-          onPress={handleCapture}
+          onPress={capture}
           // An async action that stays tappable invites a double capture.
-          disabled={loading}
-          style={[styles.captureBtn, loading && styles.captureBtnBusy]}
+          disabled={capturing}
+          style={[styles.captureBtn, capturing && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
           <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
           <Text style={styles.captureText}>
-            {loading ? strings.clips.capturing : strings.clips.capture}
+            {capturing ? strings.clips.capturing : strings.clips.capture}
           </Text>
         </Pressy>
       </View>
