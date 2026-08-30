@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, AppState } from 'react-native';
+import { View, Text, StyleSheet, AppState, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShieldCheck, CircleDot, Bell, ArrowRight } from 'lucide-react-native';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
@@ -41,7 +41,11 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const styles = useMemo(() => StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
-    scroll: { flex: 1, paddingHorizontal: gutter, paddingTop: spacing.xl },
+    scroll: { flex: 1 },
+    // The heading, the subtitle and three permission cards fit at the default
+    // text size in portrait, and clip at a large font scale or in landscape —
+    // on the one screen a first-run user cannot skip past. It scrolls now.
+    scrollContent: { paddingHorizontal: gutter, paddingTop: spacing.xl, paddingBottom: spacing.xl },
     heading: { ...text.display, color: colors.ink, marginBottom: spacing.sm },
     sub: { ...text.secondary, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 22 },
     card: {
@@ -89,7 +93,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.scroll}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.heading}>{strings.onboarding.heading}</Text>
         <Text style={styles.sub}>{strings.onboarding.sub}</Text>
 
@@ -157,7 +161,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
             </View>
           </>
         )}
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel={strings.onboarding.continue}>

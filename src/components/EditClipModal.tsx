@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { Modal, View, Text, TextInput, StyleSheet, Alert, Pressable } from 'react-native';
 import { Trash2 } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -114,10 +114,14 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       transparent
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
+      {/*
+        No KeyboardAvoidingView: the activity uses adjustResize, so the window
+        itself shrinks to exclude the IME and this flex-end backdrop puts the
+        sheet — actions included — directly above it. The wrapper that used to
+        be here ran `behavior="height"` against a window that adjustPan never
+        resized, so it measured nothing and did nothing.
+      */}
+      <View style={styles.backdrop}>
         <Pressable onPress={onClose} style={StyleSheet.absoluteFill} accessibilityLabel={strings.edit.close} />
 
         <View style={styles.sheet}>
@@ -158,7 +162,7 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
             </Pressy>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

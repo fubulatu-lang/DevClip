@@ -69,7 +69,11 @@ function ClipListItem({
         title: { ...text.body, fontWeight: '500', color: colors.ink, marginBottom: 2 },
         content: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
         date: { ...text.caption, color: colors.inkFaint, marginTop: spacing.sm },
-        reorderCol: { alignItems: 'center', gap: spacing.sm },
+        // Each chevron is 32dp with an 8dp hitSlop, so each target is a
+        // correct 48dp — but an 8dp gap is exactly what the two slops
+        // consume, leaving the targets flush and a near-miss moving the clip
+        // the wrong way. 16dp keeps 8dp of dead space between them.
+        reorderCol: { alignItems: 'center', gap: spacing.lg },
         circleBtn: {
           width: 32,
           height: 32,
