@@ -21,7 +21,6 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import com.facebook.react.ReactApplication
 import com.facebook.react.interfaces.fabric.ReactSurface
-import com.facebook.react.modules.core.DefaultHardwareBackBtnHandler
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -41,7 +40,7 @@ import kotlin.math.min
  * Every geometry is clamped to the area left over after the status and
  * navigation bars, so neither window is ever placed underneath them.
  */
-class OverlayService : Service(), DefaultHardwareBackBtnHandler {
+class OverlayService : Service() {
 
     private lateinit var windowManager: WindowManager
     private var bubbleView: View? = null
@@ -404,10 +403,6 @@ class OverlayService : Service(), DefaultHardwareBackBtnHandler {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
-    }
-
-    override fun invokeDefaultOnBackPressed() {
-        hidePopup()
     }
 
     override fun onDestroy() {

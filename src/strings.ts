@@ -54,6 +54,7 @@ export const strings = {
   search: {
     placeholder: 'Search title or content',
     a11yLabel: 'Search clips',
+    clearA11yLabel: 'Clear search',
   },
 
   sort: {

@@ -23,6 +23,22 @@ interface ClipStoreState {
   dismissError: () => void;
 }
 
+/**
+ * Every refresh is a race. Two in flight at once — two keystrokes, or a
+ * keystroke and a delete — resolve in whatever order SQLite finishes them,
+ * and the loser overwrites the winner. Each refresh takes a ticket, and only
+ * the newest ticket is allowed to publish its result.
+ */
+let refreshToken = 0;
+
+/**
+ * The field updates on every keystroke; the query does not. Typing "invoice"
+ * used to run seven queries against SQLite, each of which could land out of
+ * order on top of the last.
+ */
+let searchTimer: ReturnType<typeof setTimeout> | null = null;
+const SEARCH_DEBOUNCE_MS = 200;
+
 // Every db.* call below used to run unguarded — a failed write (e.g. the
 // SQLite file briefly locked by the native capture service) would throw an
 // unhandled rejection and the UI would just silently not update, with the
@@ -52,16 +68,27 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
   },
 
   refresh: async () => {
+    const token = ++refreshToken;
     set({ loading: true });
     await runOrReport(set, 'Could not load your clips.', async () => {
       const clips = await db.getAllClips(get().sort, get().search);
+      // A newer refresh started while this query was running. Its results are
+      // the ones the user is waiting for; these are already stale, and
+      // publishing them would show results for a query that has moved on.
+      if (token !== refreshToken) return;
       set({ clips, loading: false });
     });
   },
 
   setSearch: (q: string) => {
+    // Set the text immediately so typing never lags, and query once the user
+    // pauses.
     set({ search: q });
-    get().refresh();
+    if (searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      searchTimer = null;
+      get().refresh();
+    }, SEARCH_DEBOUNCE_MS);
   },
 
   setSort: async (s: SortMode) => {
