@@ -1,0 +1,93 @@
+name: Release APK
+
+# EAS builds the APK in the cloud and keeps it for 30 days behind an
+# expo.dev artifact URL. This attaches that APK to a GitHub Release so it
+# has a permanent home the team can download from without an Expo account.
+#
+# Run it from the Actions tab, or with:
+#   gh workflow run release-apk.yml -f apk_url=<expo artifact url> -f tag=v1.0.0
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'EAS artifact URL (https://expo.dev/artifacts/eas/....apk)'
+        required: true
+        type: string
+      tag:
+        description: 'Release tag, e.g. v1.0.0 or v1.0.0-preview.2'
+        required: true
+        type: string
+      build_id:
+        description: 'EAS build ID, recorded in the release notes'
+        required: false
+        type: string
+      prerelease:
+        description: 'Mark as a pre-release'
+        required: false
+        default: true
+        type: boolean
+
+# The release is created against the commit this workflow runs on, so the
+# tag points at real history rather than floating.
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Attach APK to a release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Download the APK
+        run: |
+          set -euo pipefail
+          # Refuse anything that is not an Expo artifact, so a mistyped input
+          # cannot make the release serve a file from somewhere else.
+          case "${{ inputs.apk_url }}" in
+            https://expo.dev/artifacts/eas/*.apk) ;;
+            *) echo "::error::apk_url must be an https://expo.dev/artifacts/eas/... .apk URL"; exit 1 ;;
+          esac
+          curl -fsSL --retry 3 --retry-delay 5 -o DevClip-${{ inputs.tag }}.apk "${{ inputs.apk_url }}"
+          ls -lh DevClip-${{ inputs.tag }}.apk
+          file DevClip-${{ inputs.tag }}.apk
+
+      - name: Verify it is really an APK
+        run: |
+          set -euo pipefail
+          # An APK is a zip; a truncated download or an HTML error page is not.
+          unzip -l DevClip-${{ inputs.tag }}.apk | grep -q AndroidManifest.xml
+          echo "sha256: $(sha256sum DevClip-${{ inputs.tag }}.apk | cut -d' ' -f1)"
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          SHA256=$(sha256sum DevClip-${{ inputs.tag }}.apk | cut -d' ' -f1)
+          SIZE=$(du -h DevClip-${{ inputs.tag }}.apk | cut -f1)
+          {
+            echo "Android APK built by EAS from \`${GITHUB_SHA}\`."
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Profile | \`preview\` (internal distribution) |"
+            [ -n "${{ inputs.build_id }}" ] && echo "| EAS build | \`${{ inputs.build_id }}\` |"
+            echo "| Size | ${SIZE} |"
+            echo "| SHA-256 | \`${SHA256}\` |"
+            echo
+            echo "Internal-distribution build, so Android will ask you to allow"
+            echo "installs from whichever app you download it with."
+          } > notes.md
+
+          PRERELEASE=""
+          [ "${{ inputs.prerelease }}" = "true" ] && PRERELEASE="--prerelease"
+
+          gh release create "${{ inputs.tag }}" \
+            DevClip-${{ inputs.tag }}.apk \
+            --title "DevClip ${{ inputs.tag }}" \
+            --notes-file notes.md \
+            --target "${GITHUB_SHA}" \
+            $PRERELEASE
+
+          echo "### Released [${{ inputs.tag }}](${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ inputs.tag }})" >> "$GITHUB_STEP_SUMMARY"
