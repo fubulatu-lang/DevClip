@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
@@ -17,23 +17,25 @@ import { strings } from '../strings';
 export default function ClipListView() {
   const { colors, radii, spacing, text, icon } = useTheme();
   const { gutter, columns } = useAdaptiveLayout();
-  const {
-    clips,
-    search,
-    sort,
-    loading,
-    error,
-    init,
-    setSearch,
-    setSort,
-    addClip,
-    updateClip,
-    deleteClip,
-    moveUp,
-    moveDown,
-    trimToMax,
-    dismissError,
-  } = useClipStore();
+  // Zustand subscribes a component to whatever the hook returns. Calling it
+  // with no selector returns the whole store, so every field change — each
+  // keystroke in search included — re-rendered this tree. One selector per
+  // value keeps each render to what actually changed.
+  const clips = useClipStore((s) => s.clips);
+  const search = useClipStore((s) => s.search);
+  const sort = useClipStore((s) => s.sort);
+  const loading = useClipStore((s) => s.loading);
+  const error = useClipStore((s) => s.error);
+  const init = useClipStore((s) => s.init);
+  const setSearch = useClipStore((s) => s.setSearch);
+  const setSort = useClipStore((s) => s.setSort);
+  const addClip = useClipStore((s) => s.addClip);
+  const updateClip = useClipStore((s) => s.updateClip);
+  const deleteClip = useClipStore((s) => s.deleteClip);
+  const moveUp = useClipStore((s) => s.moveUp);
+  const moveDown = useClipStore((s) => s.moveDown);
+  const trimToMax = useClipStore((s) => s.trimToMax);
+  const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
   const [editing, setEditing] = useState<Clip | null>(null);
 
@@ -44,6 +46,29 @@ export default function ClipListView() {
   useEffect(() => {
     trimToMax(maxClips);
   }, [maxClips, clips.length]);
+
+  // Passing a fresh arrow per row would hand React.memo a new prop every
+  // render and defeat it. One stable handler takes the index instead, and
+  // the row binds its own.
+  const handleMove = useCallback(
+    (index: number, direction: -1 | 1) => (direction === -1 ? moveUp(index) : moveDown(index)),
+    [moveUp, moveDown]
+  );
+
+  const renderItem = useCallback(
+    ({ item, index }: { item: Clip; index: number }) => (
+      <ClipListItem
+        clip={item}
+        isManualSort={sort === 'manual'}
+        isFirst={index === 0}
+        isLast={index === clips.length - 1}
+        onLongPress={setEditing}
+        index={index}
+        onMove={handleMove}
+      />
+    ),
+    [sort, clips.length, handleMove]
+  );
 
   const handleCapture = async () => {
     const text = await readSystemClipboard();
@@ -133,17 +158,7 @@ export default function ClipListView() {
           paddingHorizontal: gutter,
           flexGrow: 1,
         }}
-        renderItem={({ item, index }) => (
-          <ClipListItem
-            clip={item}
-            isManualSort={sort === 'manual'}
-            isFirst={index === 0}
-            isLast={index === clips.length - 1}
-            onLongPress={setEditing}
-            onMoveUp={() => moveUp(index)}
-            onMoveDown={() => moveDown(index)}
-          />
-        )}
+        renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />

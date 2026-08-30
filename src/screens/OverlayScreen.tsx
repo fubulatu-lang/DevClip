@@ -24,13 +24,23 @@ import { strings } from '../strings';
  * bubble sits and where the system bars are — so this screen asks for a
  * shape by name and lays itself out to whatever window it is given.
  */
+/** Mini is paste-only, so the row's edit and reorder hooks go nowhere. */
+const noop = () => {};
+
 export default function OverlayScreen() {
   const { colors, radii, spacing, text, icon } = useTheme();
   const [mode, setMode] = useState<OverlayMode>('mini');
-  const {
-    clips, search, sort, loading, error,
-    init, setSearch, setSort, addClip, trimToMax, dismissError,
-  } = useClipStore();
+  const clips = useClipStore((s) => s.clips);
+  const search = useClipStore((s) => s.search);
+  const sort = useClipStore((s) => s.sort);
+  const loading = useClipStore((s) => s.loading);
+  const error = useClipStore((s) => s.error);
+  const init = useClipStore((s) => s.init);
+  const setSearch = useClipStore((s) => s.setSearch);
+  const setSort = useClipStore((s) => s.setSort);
+  const addClip = useClipStore((s) => s.addClip);
+  const trimToMax = useClipStore((s) => s.trimToMax);
+  const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
 
   useEffect(() => { init(); }, []);
@@ -198,9 +208,9 @@ export default function OverlayScreen() {
             isManualSort={!mini && sort === 'manual'}
             isFirst={index === 0}
             isLast={index === clips.length - 1}
-            onLongPress={() => {}}
-            onMoveUp={() => {}}
-            onMoveDown={() => {}}
+            onLongPress={noop}
+            index={index}
+            onMove={noop}
           />
         )}
         ListEmptyComponent={
