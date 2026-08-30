@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
-import { lightColors, darkColors, getShadow, spacing, radii, type, ThemeColors } from './theme';
+import {
+  lightColors,
+  darkColors,
+  getShadow,
+  spacing,
+  radii,
+  type,
+  text,
+  weight,
+  easing,
+  duration,
+  ThemeColors,
+} from './theme';
 import { useSettingsStore } from '../store/settingsStore';
 
 interface ThemeValue {
@@ -10,6 +22,10 @@ interface ThemeValue {
   spacing: typeof spacing;
   radii: typeof radii;
   type: typeof type;
+  text: typeof text;
+  weight: typeof weight;
+  easing: typeof easing;
+  duration: typeof duration;
 }
 
 const ThemeContext = createContext<ThemeValue | null>(null);
@@ -29,6 +45,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       spacing,
       radii,
       type,
+      text,
+      weight,
+      easing,
+      duration,
     }),
     [mode]
   );
