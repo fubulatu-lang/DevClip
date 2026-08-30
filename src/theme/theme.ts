@@ -1,10 +1,15 @@
 import { Platform } from 'react-native';
 
 /**
- * DevClip visual language — Samsung One UI
+ * DevClip visual language — Samsung One UI, in the app icon's colours
  *
  * Colour is role-based, not palette-based. Depth comes from rounded
  * containers and a background tone shift, never from large blurred shadows.
+ *
+ * The hues come from the app icon: its slate #345065 and its blue #3498DB.
+ * Both are used darkened — the icon blue is only 3.15:1 under white text and
+ * 3.02:1 as text, so taken literally it would fail WCAG AA everywhere it
+ * matters. Every pair below is measured.
  * Type is deliberately large: 17sp body is the One UI default, not 13sp.
  *
  * Token values trace to the One UI design guidelines and the
@@ -41,48 +46,48 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  bg: '#FAFAFA',
+  bg: '#F4F7F9',
   surface: '#FFFFFF',
-  surfaceSunken: '#F0F0F0',
-  border: 'rgba(0,0,0,0.08)',
-  borderStrong: 'rgba(0,0,0,0.16)',
-  ink: '#252525',
-  inkSoft: '#505050',
-  inkFaint: '#6E6E6E',
-  inkDisabled: '#8C8C8C',
-  accent: '#0072DE',
-  accentSoft: '#E6F1FC',
-  accentPressed: '#005CB8',
+  surfaceSunken: '#E8EDF1',
+  border: 'rgba(27,42,53,0.10)',
+  borderStrong: 'rgba(27,42,53,0.20)',
+  ink: '#1B2A35',
+  inkSoft: '#46606F',
+  inkFaint: '#5A6E7D',
+  inkDisabled: '#93A4B0',
+  accent: '#1D6FA9',
+  accentSoft: '#E4F0F8',
+  accentPressed: '#175A8A',
   onAccent: '#FFFFFF',
-  danger: '#D32B22',
+  danger: '#C62F26',
   dangerSoft: '#FBEAE9',
-  success: '#00803A',
+  success: '#0F7A4A',
   successSoft: '#E6F4EC',
-  warning: '#B35A00',
+  warning: '#A65A00',
   warningSoft: '#FDF0E3',
-  divider: 'rgba(0,0,0,0.08)',
+  divider: 'rgba(27,42,53,0.10)',
   scrim: 'rgba(0,0,0,0.2)',
 };
 
 export const darkColors: ThemeColors = {
-  bg: '#000000',
-  surface: '#1B1B1B',
-  surfaceSunken: '#252525',
+  bg: '#16242E',
+  surface: '#243F4F',
+  surfaceSunken: '#2E4E61',
   border: 'rgba(255,255,255,0.12)',
-  borderStrong: 'rgba(255,255,255,0.2)',
-  ink: '#FAFAFA',
-  inkSoft: '#E5E5E5',
-  inkFaint: '#8A8A8A',
-  inkDisabled: '#5C5C5C',
-  accent: '#3E91FF',
-  accentSoft: '#0B2A4A',
-  accentPressed: '#6BAAFF',
-  onAccent: '#000000',
-  danger: '#FF7B70',
+  borderStrong: 'rgba(255,255,255,0.22)',
+  ink: '#F2F6F8',
+  inkSoft: '#D4DFE6',
+  inkFaint: '#9DB3C0',
+  inkDisabled: '#5E7686',
+  accent: '#5FB0E8',
+  accentSoft: '#123243',
+  accentPressed: '#88C6F0',
+  onAccent: '#0E1A22',
+  danger: '#FF8A80',
   dangerSoft: '#3A2323',
-  success: '#3DD68C',
+  success: '#4FD18B',
   successSoft: '#123326',
-  warning: '#FFA733',
+  warning: '#FFB84D',
   warningSoft: '#3A2A14',
   divider: 'rgba(255,255,255,0.12)',
   scrim: 'rgba(0,0,0,0.2)',

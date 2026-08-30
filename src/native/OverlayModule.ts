@@ -39,10 +39,32 @@ export function stopBubble(): void {
   NativeOverlay.stopBubble();
 }
 
-// width/height in dp
-export function resizePopupWindow(width: number, height: number): void {
+/**
+ * The overlay window has two shapes.
+ *
+ * `mini` is tethered to the bubble: it hangs off it, moves with it, and is
+ * sized to show two clips. `expanded` detaches and becomes a half-height
+ * sheet across the bottom of the screen. Native owns both geometries,
+ * because only native knows where the bubble is and where the system bars
+ * are; JS only names the shape it wants.
+ */
+export type OverlayMode = 'mini' | 'expanded';
+
+export function setOverlayMode(mode: OverlayMode): void {
   if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.resizePopupWindow(width, height);
+  NativeOverlay.setOverlayMode(mode);
+}
+
+/** Closes the overlay window. The bubble stays. */
+export function hideOverlay(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.hideOverlay();
+}
+
+/** Opens the full-screen app and closes the overlay. */
+export function openFullApp(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.openFullApp();
 }
 
 export function setBubbleSize(size: 'small' | 'medium' | 'large'): void {

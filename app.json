@@ -14,7 +14,7 @@
     "android": {
       "package": "com.devclip.app",
       "adaptiveIcon": {
-        "backgroundColor": "#3B47E0",
+        "backgroundColor": "#345065",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -24,7 +24,9 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["./plugins/withDevClipNative.js"],
+    "plugins": [
+      "./plugins/withDevClipNative.js"
+    ],
     "extra": {
       "eas": {
         "projectId": "fffa0f4f-570a-48f1-993b-733b279cd69b"

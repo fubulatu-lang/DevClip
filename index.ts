@@ -1,18 +1,17 @@
 import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import App from './App';
+import OverlayApp from './src/OverlayApp';
 import appJson from './app.json';
 
 const appName = appJson.expo.name;
 
-// Normal full-screen app entry (MainActivity), used for the "Full App" state
-// and for opening DevClip from the launcher directly.
+// The launcher app: the whole thing, full screen.
 registerRootComponent(App);
 
-// A second, independent root component that OverlayService.kt mounts inside
-// its own small WindowManager window (the floating bubble's popup). It reuses
-// the exact same App -> PopupScreen tree (including the font-loading gate)
-// as the full app, so styling is identical in both places.
-AppRegistry.registerComponent('DevClipPopup', () => App);
+// The floating overlay that OverlayService.kt mounts in its own window.
+// A separate root from App: the overlay is mini or expanded, tethered to the
+// bubble, and paste-only in mini — a different surface, not a resized one.
+AppRegistry.registerComponent('DevClipPopup', () => OverlayApp);
 
 export default appName;

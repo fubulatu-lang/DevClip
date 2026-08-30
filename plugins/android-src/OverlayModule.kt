@@ -81,19 +81,37 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         context.stopService(Intent(context, OverlayService::class.java))
     }
 
-    @ReactMethod
-    fun resizePopupWindow(width: Int, height: Int) {
+    private fun sendToService(action: String, configure: (Intent) -> Unit = {}) {
         val context = reactApplicationContext
         val intent = Intent(context, OverlayService::class.java).apply {
-            action = OverlayService.ACTION_RESIZE
-            putExtra(OverlayService.EXTRA_WIDTH, width)
-            putExtra(OverlayService.EXTRA_HEIGHT, height)
+            this.action = action
+            configure(this)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(intent)
         } else {
             context.startService(intent)
         }
+    }
+
+    /** "mini" (tethered to the bubble) or "expanded" (half-height sheet). */
+    @ReactMethod
+    fun setOverlayMode(mode: String) {
+        sendToService(OverlayService.ACTION_SET_MODE) {
+            it.putExtra(OverlayService.EXTRA_MODE, mode)
+        }
+    }
+
+    /** Closes the overlay window. The bubble stays put. */
+    @ReactMethod
+    fun hideOverlay() {
+        sendToService(OverlayService.ACTION_HIDE)
+    }
+
+    /** Opens the full-screen activity and closes the overlay. */
+    @ReactMethod
+    fun openFullApp() {
+        sendToService(OverlayService.ACTION_OPEN_FULL)
     }
 
     @ReactMethod
