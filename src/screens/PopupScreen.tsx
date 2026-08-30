@@ -30,8 +30,8 @@ export default function PopupScreen() {
         screen: { flex: 1, backgroundColor: colors.bg },
         hero: {
           paddingHorizontal: spacing.keyline,
-          paddingTop: spacing.lg,
-          paddingBottom: spacing.md,
+          paddingVertical: spacing.xs,
+          minHeight: 56,
           backgroundColor: colors.surface,
           borderBottomWidth: 1,
           borderBottomColor: colors.divider,
@@ -46,7 +46,6 @@ export default function PopupScreen() {
           width: 48,
           height: 48,
           borderRadius: radii.pill,
-          backgroundColor: colors.surfaceSunken,
           alignItems: 'center',
           justifyContent: 'center',
         },
@@ -56,6 +55,17 @@ export default function PopupScreen() {
 
   if (!hasOnboarded) {
     return <OnboardingScreen onDone={setOnboarded} />;
+  }
+
+  // Settings is a whole screen with its own back control and title. Keeping
+  // the app bar above it stacked two headers and offered two ways out of one
+  // place, so the app bar belongs to the clip list only.
+  if (showSettings) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <SettingsScreen onBack={() => setShowSettings(false)} />
+      </SafeAreaView>
+    );
   }
 
   return (
@@ -74,7 +84,7 @@ export default function PopupScreen() {
         </Pressy>
       </View>
 
-      {showSettings ? <SettingsScreen onBack={() => setShowSettings(false)} /> : <ClipListView />}
+      <ClipListView />
     </SafeAreaView>
   );
 }
