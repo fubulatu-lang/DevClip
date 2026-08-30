@@ -15,7 +15,7 @@ import {
 import Pressy from '../components/Pressy';
 
 export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text } = useTheme();
   const [notifAsked, setNotifAsked] = useState(false);
   const [overlayGranted, setOverlayGranted] = useState(false);
   const [accessibilityGranted, setAccessibilityGranted] = useState(false);
@@ -39,13 +39,13 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
 
   const styles = useMemo(() => StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.bg },
-    scroll: { flex: 1, paddingHorizontal: spacing.lg, paddingTop: spacing.xl },
-    heading: { fontFamily: type.extrabold, fontSize: 22, color: colors.ink, marginBottom: spacing.xs },
-    sub: { fontFamily: type.medium, fontSize: 13, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 19 },
+    scroll: { flex: 1, paddingHorizontal: spacing.keyline, paddingTop: spacing.xl },
+    heading: { ...text.display, color: colors.ink, marginBottom: spacing.sm },
+    sub: { ...text.secondary, color: colors.inkSoft, marginBottom: spacing.xl, lineHeight: 22 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: radii.md,
-      padding: spacing.md,
+      padding: spacing.lg,
       marginBottom: spacing.md,
       flexDirection: 'row',
       alignItems: 'center',
@@ -59,29 +59,31 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    cardTitle: { fontFamily: type.semibold, fontSize: 14, color: colors.ink, marginBottom: 2 },
-    cardBody: { fontFamily: type.regular, fontSize: 12, color: colors.inkSoft, lineHeight: 16 },
+    cardTitle: { ...text.body, fontWeight: '500', color: colors.ink, marginBottom: 2 },
+    cardBody: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
     actionBtn: {
       backgroundColor: colors.surfaceSunken,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 7,
+      paddingHorizontal: spacing.lg,
+      minHeight: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
       borderRadius: radii.pill,
     },
     actionBtnDone: { backgroundColor: colors.accentSoft },
-    actionText: { fontFamily: type.semibold, fontSize: 12, color: colors.inkSoft },
+    actionText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
     actionTextDone: { color: colors.accent },
-    footer: { padding: spacing.lg },
+    footer: { padding: spacing.keyline },
     continueBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: spacing.sm,
-      backgroundColor: colors.ink,
+      backgroundColor: colors.accent,
       borderRadius: radii.pill,
-      paddingVertical: 14,
+      minHeight: 48,
     },
-    continueText: { fontFamily: type.semibold, fontSize: 14, color: colors.bg },
-  }), [colors, radii, spacing, type]);
+    continueText: { ...text.button, color: colors.onAccent },
+  }), [colors, radii, spacing, text]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -123,6 +125,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
               <Pressy
                 onPress={requestAccessibilityPermission}
                 style={[styles.actionBtn, accessibilityGranted && styles.actionBtnDone]}
+                accessibilityLabel={accessibilityGranted ? 'Background capture is enabled' : 'Enable background capture'}
               >
                 <Text style={[styles.actionText, accessibilityGranted && styles.actionTextDone]}>
                   {accessibilityGranted ? 'Done' : 'Enable'}
@@ -141,6 +144,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
               <Pressy
                 onPress={requestOverlayPermission}
                 style={[styles.actionBtn, overlayGranted && styles.actionBtnDone]}
+                accessibilityLabel={overlayGranted ? 'Floating bubble is enabled' : 'Enable floating bubble'}
               >
                 <Text style={[styles.actionText, overlayGranted && styles.actionTextDone]}>
                   {overlayGranted ? 'Done' : 'Enable'}
@@ -154,7 +158,7 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
       <View style={styles.footer}>
         <Pressy onPress={onDone} style={styles.continueBtn} accessibilityLabel="Continue">
           <Text style={styles.continueText}>Continue</Text>
-          <ArrowRight size={16} strokeWidth={2} color={colors.bg} />
+          <ArrowRight size={18} strokeWidth={1.5} color={colors.onAccent} />
         </Pressy>
       </View>
     </SafeAreaView>

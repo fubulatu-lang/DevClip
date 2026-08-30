@@ -32,7 +32,7 @@ const TABS: { key: PopupState; label: string }[] = [
 ];
 
 export default function PopupScreen() {
-  const { colors, radii, spacing, shadow, type } = useTheme();
+  const { colors, radii, spacing, shadow, text } = useTheme();
   const [state, setState] = useState<PopupState>('small');
   const [showSettings, setShowSettings] = useState(false);
   const [bubbleRunning, setBubbleRunning] = useState(false);
@@ -76,64 +76,71 @@ export default function PopupScreen() {
         outer: { flex: 1, backgroundColor: colors.bg },
         outerFloating: {
           padding: 5,
-          borderRadius: radii.lg + 6,
-          backgroundColor: 'rgba(128,128,128,0.08)',
+          borderRadius: radii.container + 5,
+          backgroundColor: colors.divider,
           ...shadow.floating,
         },
         inner: { flex: 1, backgroundColor: colors.bg },
-        innerFloating: { borderRadius: radii.lg, overflow: 'hidden' },
+        innerFloating: { borderRadius: radii.container, overflow: 'hidden' },
         hero: {
-          paddingHorizontal: spacing.md,
-          paddingTop: spacing.md,
-          paddingBottom: spacing.sm,
+          paddingHorizontal: spacing.keyline,
+          paddingTop: spacing.lg,
+          paddingBottom: spacing.md,
           backgroundColor: colors.surface,
           borderBottomWidth: 1,
-          borderBottomColor: colors.border,
+          borderBottomColor: colors.divider,
         },
         heroTopRow: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: spacing.sm,
+          marginBottom: spacing.md,
         },
-        heroLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+        heroLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
         logoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
-        title: { fontFamily: type.extrabold, fontSize: 17, color: colors.ink, letterSpacing: -0.3 },
+        title: { ...text.title, color: colors.ink },
         gearBtn: {
-          width: 44,
-          height: 44,
+          width: 48,
+          height: 48,
           borderRadius: radii.pill,
           backgroundColor: colors.surfaceSunken,
           alignItems: 'center',
           justifyContent: 'center',
         },
-        switcherRow: { flexDirection: 'row', gap: spacing.xs, alignItems: 'center' },
+        switcherRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
         bubbleBtn: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 5,
-          paddingHorizontal: spacing.sm,
-          paddingVertical: 7,
+          justifyContent: 'center',
+          gap: spacing.xs,
+          paddingHorizontal: spacing.md,
           borderRadius: radii.pill,
           backgroundColor: colors.surfaceSunken,
-          minHeight: 44,
+          minHeight: 48,
         },
         bubbleBtnActive: { backgroundColor: colors.accentSoft },
-        bubbleBtnText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkSoft },
+        bubbleBtnText: { ...text.micro, color: colors.inkSoft },
         bubbleBtnTextActive: { color: colors.accent },
         tabBar: {
           flex: 1,
           flexDirection: 'row',
           backgroundColor: colors.surfaceSunken,
           borderRadius: radii.pill,
-          padding: 3,
+          padding: 4,
         },
-        tab: { flex: 1, paddingVertical: 6, borderRadius: radii.pill, alignItems: 'center', minHeight: 38 },
-        tabActive: { backgroundColor: colors.surface, ...shadow.card },
-        tabText: { fontFamily: type.semibold, fontSize: 11, color: colors.inkFaint },
-        tabTextActive: { color: colors.ink },
+        tab: {
+          flex: 1,
+          justifyContent: 'center',
+          borderRadius: radii.pill,
+          alignItems: 'center',
+          minHeight: 40,
+          paddingVertical: spacing.xs,
+        },
+        tabActive: { backgroundColor: colors.surface },
+        tabText: { ...text.micro, color: colors.inkFaint },
+        tabTextActive: { color: colors.ink, fontWeight: '500' },
       }),
-    [colors, radii, spacing, shadow, type]
+    [colors, radii, spacing, shadow, text]
   );
 
   if (!hasOnboarded) {
@@ -156,9 +163,8 @@ export default function PopupScreen() {
               onPress={() => setShowSettings(true)}
               style={styles.gearBtn}
               accessibilityLabel="Settings"
-              hitSlop={4}
             >
-              <SettingsIcon size={16} strokeWidth={1.5} color={colors.ink} />
+              <SettingsIcon size={24} strokeWidth={1.5} color={colors.ink} />
             </Pressy>
           </View>
 
@@ -171,7 +177,7 @@ export default function PopupScreen() {
                 accessibilityState={{ checked: bubbleRunning }}
                 accessibilityRole="switch"
               >
-                <CircleDot size={13} strokeWidth={2} color={bubbleRunning ? colors.accent : colors.inkFaint} />
+                <CircleDot size={18} strokeWidth={1.5} color={bubbleRunning ? colors.accent : colors.inkFaint} />
                 <Text style={[styles.bubbleBtnText, bubbleRunning && styles.bubbleBtnTextActive]}>
                   {bubbleRunning ? 'Bubble on' : 'Bubble off'}
                 </Text>
@@ -188,6 +194,7 @@ export default function PopupScreen() {
                     accessibilityLabel={`${tab.label} view`}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: active }}
+                    hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
                   >
                     <Text style={[styles.tabText, active && styles.tabTextActive]}>{tab.label}</Text>
                   </Pressy>
