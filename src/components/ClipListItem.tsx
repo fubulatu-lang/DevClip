@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Alert, Animated } from 'react-native';
-import { ChevronUp, ChevronDown, Copy } from 'lucide-react-native';
+import { ChevronUp, ChevronDown, Copy, MoreVertical } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { pasteClip } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
@@ -26,7 +26,7 @@ export default function ClipListItem({
   onMoveUp,
   onMoveDown,
 }: Props) {
-  const { colors, radii, spacing, shadow, type } = useTheme();
+  const { colors, radii, spacing, shadow, text } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
 
   const styles = useMemo(
@@ -35,41 +35,48 @@ export default function ClipListItem({
         card: {
           backgroundColor: colors.surface,
           borderRadius: radii.md,
-          marginHorizontal: spacing.md,
+          marginHorizontal: spacing.keyline,
           marginBottom: spacing.sm,
-          padding: spacing.md,
+          padding: spacing.lg,
           ...shadow.card,
         },
-        row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+        row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
         iconWrap: {
-          width: 28,
-          height: 28,
+          width: 32,
+          height: 32,
           borderRadius: radii.sm,
           backgroundColor: colors.accentSoft,
           alignItems: 'center',
           justifyContent: 'center',
           marginTop: 2,
         },
-        title: { fontFamily: type.semibold, fontSize: 14, color: colors.ink, marginBottom: 2 },
-        content: { fontFamily: type.regular, fontSize: 13, color: colors.inkSoft, lineHeight: 18 },
-        date: { fontFamily: type.medium, fontSize: 10, color: colors.inkFaint, marginTop: 6 },
-        reorderCol: { alignItems: 'center', gap: 8 },
+        title: { ...text.body, fontWeight: '500', color: colors.ink, marginBottom: 2 },
+        content: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
+        date: { ...text.caption, color: colors.inkFaint, marginTop: spacing.sm },
+        reorderCol: { alignItems: 'center', gap: spacing.sm },
         circleBtn: {
-          width: 28,
-          height: 28,
+          width: 32,
+          height: 32,
           borderRadius: radii.pill,
           backgroundColor: colors.surfaceSunken,
           alignItems: 'center',
           justifyContent: 'center',
         },
+        moreBtn: {
+          width: 32,
+          height: 32,
+          borderRadius: radii.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
       }),
-    [colors, radii, spacing, shadow, type]
+    [colors, radii, spacing, shadow, text]
   );
 
   const doPaste = async () => {
     const result = await pasteClip(clip.content);
     if (result === 'copiedOnly') {
-      Alert.alert('Copied', 'Could not paste automatically, so it\u2019s on your clipboard \u2014 paste it manually.');
+      Alert.alert('Copied', 'Could not paste automatically, so it’s on your clipboard — paste it manually.');
     }
   };
 
@@ -94,11 +101,11 @@ export default function ClipListItem({
       onLongPress={() => onLongPress(clip)}
       style={styles.card}
       accessibilityLabel={`${clip.title ? clip.title + ': ' : ''}${clip.content}`}
-      accessibilityHint="Double tap to paste. Long press to edit or delete."
+      accessibilityHint="Double tap to paste."
     >
       <View style={styles.row}>
-        <View style={styles.iconWrap}>
-          <Copy size={14} strokeWidth={1.5} color={colors.accent} />
+        <View style={styles.iconWrap} importantForAccessibility="no">
+          <Copy size={18} strokeWidth={1.5} color={colors.accent} />
         </View>
 
         <View style={{ flex: 1 }}>
@@ -117,7 +124,7 @@ export default function ClipListItem({
               onPress={onMoveUp}
               accessibilityLabel="Move clip up"
             >
-              <ChevronUp size={14} strokeWidth={1.75} color={isFirst ? colors.inkFaint : colors.ink} />
+              <ChevronUp size={18} strokeWidth={1.5} color={isFirst ? colors.inkDisabled : colors.ink} />
             </CircleButton>
             <CircleButton
               style={styles.circleBtn}
@@ -125,10 +132,25 @@ export default function ClipListItem({
               onPress={onMoveDown}
               accessibilityLabel="Move clip down"
             >
-              <ChevronDown size={14} strokeWidth={1.75} color={isLast ? colors.inkFaint : colors.ink} />
+              <ChevronDown size={18} strokeWidth={1.5} color={isLast ? colors.inkDisabled : colors.ink} />
             </CircleButton>
           </View>
         )}
+
+        {/*
+          Long press is a shortcut, not the only route: switch control and
+          many motor-impairment setups cannot perform one, so edit and delete
+          need a control that can simply be activated.
+        */}
+        <Pressy
+          onPress={() => onLongPress(clip)}
+          style={styles.moreBtn}
+          accessibilityLabel={`More options for ${clip.title || 'this clip'}`}
+          accessibilityHint="Opens edit and delete."
+          hitSlop={8}
+        >
+          <MoreVertical size={18} strokeWidth={1.5} color={colors.inkFaint} />
+        </Pressy>
       </View>
     </Pressy>
   );
@@ -153,7 +175,7 @@ function CircleButton({
       style={style}
       disabled={disabled}
       accessibilityLabel={accessibilityLabel}
-      hitSlop={10}
+      hitSlop={8}
     >
       <Animated.View style={{ opacity: disabled ? 0.4 : 1 }}>{children}</Animated.View>
     </Pressy>

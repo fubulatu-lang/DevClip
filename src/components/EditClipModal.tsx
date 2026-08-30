@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TextInput, StyleSheet, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
-import { Trash2, Check } from 'lucide-react-native';
+import { Trash2 } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { useTheme } from '../theme/ThemeContext';
 import Pressy from './Pressy';
@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
-  const { colors, radii, spacing, shadow, type } = useTheme();
+  const { colors, radii, spacing, shadow, text } = useTheme();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -25,19 +25,12 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
   }, [clip]);
 
   const styles = useMemo(() => StyleSheet.create({
-    backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
-    shell: {
-      backgroundColor: 'rgba(0,0,0,0.03)',
-      padding: 6,
-      borderTopLeftRadius: radii.lg + 6,
-      borderTopRightRadius: radii.lg + 6,
-    },
+    backdrop: { flex: 1, backgroundColor: colors.scrim, justifyContent: 'flex-end' },
     sheet: {
       backgroundColor: colors.surface,
-      borderTopLeftRadius: radii.lg,
-      borderTopRightRadius: radii.lg,
-      borderRadius: radii.sm,
-      padding: spacing.lg,
+      borderTopLeftRadius: radii.container,
+      borderTopRightRadius: radii.container,
+      padding: spacing.keyline,
       ...shadow.floating,
     },
     handle: {
@@ -46,69 +39,56 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       borderRadius: radii.pill,
       backgroundColor: colors.borderStrong,
       alignSelf: 'center',
-      marginBottom: spacing.md,
+      marginBottom: spacing.lg,
     },
-    eyebrow: {
-      fontFamily: type.bold,
-      fontSize: 10,
-      letterSpacing: 1.2,
-      textTransform: 'uppercase',
-      color: colors.inkFaint,
-      marginTop: spacing.sm,
-      marginBottom: spacing.xs,
+    label: {
+      ...text.secondary,
+      color: colors.inkSoft,
+      marginTop: spacing.lg,
+      marginBottom: spacing.sm,
     },
     titleInput: {
-      fontFamily: type.semibold,
-      fontSize: 15,
+      ...text.body,
       color: colors.ink,
       backgroundColor: colors.surfaceSunken,
-      borderRadius: radii.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      minHeight: 48,
     },
     contentInput: {
-      fontFamily: type.regular,
-      fontSize: 14,
+      ...text.body,
       color: colors.ink,
       backgroundColor: colors.surfaceSunken,
-      borderRadius: radii.sm,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 10,
+      borderRadius: radii.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
       minHeight: 120,
-      lineHeight: 20,
+      lineHeight: 24,
     },
-    actions: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg, gap: spacing.sm },
+    actions: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.xl, gap: spacing.md },
     deleteBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingVertical: 10,
-      paddingHorizontal: spacing.md,
+      justifyContent: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.xl,
       borderRadius: radii.pill,
       backgroundColor: colors.dangerSoft,
       marginRight: 'auto',
+      minHeight: 48,
     },
-    deleteText: { fontFamily: type.semibold, fontSize: 13, color: colors.danger },
+    deleteText: { ...text.button, color: colors.danger },
     saveBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.sm,
-      backgroundColor: colors.ink,
-      borderRadius: radii.pill,
-      paddingLeft: spacing.lg,
-      paddingRight: 6,
-      paddingVertical: 6,
-    },
-    saveText: { fontFamily: type.semibold, fontSize: 13, color: colors.bg },
-    saveIconWrap: {
-      width: 26,
-      height: 26,
-      borderRadius: radii.pill,
-      backgroundColor: 'rgba(128,128,128,0.25)',
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: colors.accent,
+      borderRadius: radii.pill,
+      paddingHorizontal: spacing.xl,
+      minHeight: 48,
     },
-  }), [colors, radii, spacing, shadow, type]);
+    saveText: { ...text.button, color: colors.onAccent },
+  }), [colors, radii, spacing, shadow, text]);
 
   if (!clip) return null;
 
@@ -127,43 +107,42 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
       >
         <Pressable onPress={onClose} style={StyleSheet.absoluteFill} accessibilityLabel="Close edit sheet" />
 
-        <View style={styles.shell}>
-          <View style={styles.sheet}>
-            <View style={styles.handle} importantForAccessibility="no" />
+        <View style={styles.sheet}>
+          <View style={styles.handle} importantForAccessibility="no" />
 
-            <Text style={styles.eyebrow}>Title</Text>
-            <TextInput
-              style={styles.titleInput}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="Untitled"
-              placeholderTextColor={colors.inkFaint}
-              accessibilityLabel="Clip title"
-            />
+          <Text style={styles.label}>Title</Text>
+          <TextInput
+            style={styles.titleInput}
+            value={title}
+            onChangeText={setTitle}
+            placeholder="Untitled"
+            placeholderTextColor={colors.inkFaint}
+            accessibilityLabel="Clip title"
+          />
 
-            <Text style={styles.eyebrow}>Content</Text>
-            <TextInput
-              style={styles.contentInput}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              textAlignVertical="top"
-              accessibilityLabel="Clip content"
-            />
+          <Text style={styles.label}>Content</Text>
+          <TextInput
+            style={styles.contentInput}
+            value={content}
+            onChangeText={setContent}
+            multiline
+            textAlignVertical="top"
+            accessibilityLabel="Clip content"
+          />
 
-            <View style={styles.actions}>
-              <Pressy onPress={handleDelete} style={styles.deleteBtn}>
-                <Trash2 size={15} strokeWidth={1.75} color={colors.danger} />
-                <Text style={styles.deleteText}>Delete</Text>
-              </Pressy>
+          <View style={styles.actions}>
+            <Pressy onPress={handleDelete} style={styles.deleteBtn} accessibilityLabel="Delete clip">
+              <Trash2 size={18} strokeWidth={1.5} color={colors.danger} />
+              <Text style={styles.deleteText}>Delete</Text>
+            </Pressy>
 
-              <Pressy onPress={() => onSave(clip.id, content, title.trim() || null)} style={styles.saveBtn}>
-                <Text style={styles.saveText}>Save</Text>
-                <View style={styles.saveIconWrap}>
-                  <Check size={13} strokeWidth={2} color={colors.bg} />
-                </View>
-              </Pressy>
-            </View>
+            <Pressy
+              onPress={() => onSave(clip.id, content, title.trim() || null)}
+              style={styles.saveBtn}
+              accessibilityLabel="Save clip"
+            >
+              <Text style={styles.saveText}>Save</Text>
+            </Pressy>
           </View>
         </View>
       </KeyboardAvoidingView>

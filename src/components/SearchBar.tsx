@@ -9,29 +9,32 @@ interface Props {
 }
 
 export default function SearchBar({ value, onChange }: Props) {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text } = useTheme();
   const styles = useMemo(
     () =>
       StyleSheet.create({
         wrap: {
           flexDirection: 'row',
           alignItems: 'center',
-          gap: spacing.sm,
+          gap: spacing.md,
           backgroundColor: colors.surfaceSunken,
           borderRadius: radii.pill,
-          paddingHorizontal: spacing.md,
-          height: 40,
-          marginHorizontal: spacing.md,
+          paddingHorizontal: spacing.lg,
+          // minHeight, never height: the field has to grow with the text at
+          // large font scales rather than clip it.
+          minHeight: 48,
+          paddingVertical: spacing.sm,
+          marginHorizontal: spacing.keyline,
           marginTop: spacing.sm,
         },
-        input: { flex: 1, fontSize: 14, fontFamily: type.medium, color: colors.ink, padding: 0 },
+        input: { flex: 1, ...text.body, color: colors.ink, padding: 0 },
       }),
-    [colors, radii, spacing, type]
+    [colors, radii, spacing, text]
   );
 
   return (
     <View style={styles.wrap}>
-      <Search size={16} strokeWidth={1.5} color={colors.inkFaint} />
+      <Search size={24} strokeWidth={1.5} color={colors.inkFaint} />
       <TextInput
         style={styles.input}
         placeholder="Search title or content"

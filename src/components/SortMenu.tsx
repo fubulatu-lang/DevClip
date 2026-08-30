@@ -18,24 +18,30 @@ interface Props {
 }
 
 export default function SortMenu({ value, onChange }: Props) {
-  const { colors, radii, spacing, type } = useTheme();
+  const { colors, radii, spacing, text } = useTheme();
   const styles = useMemo(
     () =>
       StyleSheet.create({
-        wrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, gap: spacing.xs },
+        wrap: {
+          paddingHorizontal: spacing.keyline,
+          paddingVertical: spacing.sm,
+          gap: spacing.sm,
+        },
         chip: {
-          paddingHorizontal: spacing.md,
-          paddingVertical: 7,
+          paddingHorizontal: spacing.lg,
+          justifyContent: 'center',
           borderRadius: radii.pill,
           backgroundColor: colors.surfaceSunken,
-          marginRight: spacing.xs,
-          minHeight: 32,
+          marginRight: spacing.sm,
+          // 40dp visual + 4dp hitSlop top and bottom = a 48dp touch target.
+          minHeight: 40,
+          paddingVertical: spacing.sm,
         },
-        chipActive: { backgroundColor: colors.ink },
-        chipText: { fontSize: 12, fontFamily: type.semibold, color: colors.inkSoft },
-        chipTextActive: { color: colors.bg },
+        chipActive: { backgroundColor: colors.accent },
+        chipText: { ...text.secondary, color: colors.inkSoft },
+        chipTextActive: { color: colors.onAccent },
       }),
-    [colors, radii, spacing, type]
+    [colors, radii, spacing, text]
   );
 
   return (
@@ -55,7 +61,7 @@ export default function SortMenu({ value, onChange }: Props) {
             accessibilityLabel={`Sort by ${opt.label}`}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            hitSlop={4}
+            hitSlop={{ top: 4, bottom: 4, left: 0, right: 0 }}
           >
             <Text style={[styles.chipText, active && styles.chipTextActive]}>{opt.label}</Text>
           </Pressy>
