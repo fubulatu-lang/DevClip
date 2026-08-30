@@ -4,6 +4,7 @@ import { Trash2 } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { useTheme } from '../theme/ThemeContext';
 import Pressy from './Pressy';
+import { useReduceMotion } from '../theme/useReduceMotion';
 import { strings } from '../strings';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
+  const reduceMotion = useReduceMotion();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
 
@@ -101,7 +103,12 @@ export default function EditClipModal({ clip, onClose, onSave, onDelete }: Props
   };
 
   return (
-    <Modal visible={!!clip} animationType="slide" transparent onRequestClose={onClose}>
+    <Modal
+      visible={!!clip}
+      animationType={reduceMotion ? 'none' : 'slide'}
+      transparent
+      onRequestClose={onClose}
+    >
       <KeyboardAvoidingView
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

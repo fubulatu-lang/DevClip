@@ -1,6 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
-  AccessibilityInfo,
   Animated,
   Easing,
   Pressable,
@@ -11,6 +10,7 @@ import {
   Insets,
 } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
+import { useReduceMotion } from '../theme/useReduceMotion';
 
 interface Props {
   onPress?: () => void;
@@ -52,19 +52,7 @@ export default function Pressy({
 }: Props) {
   const { colors, easing, duration } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
-  const [reduceMotion, setReduceMotion] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (!cancelled) setReduceMotion(enabled);
-    });
-    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
-    return () => {
-      cancelled = true;
-      sub.remove();
-    };
-  }, []);
+  const reduceMotion = useReduceMotion();
 
   const animateTo = (value: number) => {
     if (reduceMotion) return;
