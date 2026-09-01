@@ -32,6 +32,7 @@ function withDevClipNativeFiles(config) {
 
       const ktFiles = [
         'ClipboardAccessibilityService.kt',
+        'DevClipEvents.kt',
         'DevClipDatabaseHelper.kt',
         'OverlayService.kt',
         'OverlayModule.kt',

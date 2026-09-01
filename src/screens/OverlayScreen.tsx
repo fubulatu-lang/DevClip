@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { Inbox, X, Expand } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
+import { useClipSync } from '../hooks/useClipSync';
 import { useSettingsStore } from '../store/settingsStore';
 import ClipListItem from '../components/ClipListItem';
 import Pressy from '../components/Pressy';
@@ -36,14 +37,11 @@ export default function OverlayScreen() {
   const clips = useClipStore((s) => s.clips);
   const initialised = useClipStore((s) => s.initialised);
   const error = useClipStore((s) => s.error);
-  const init = useClipStore((s) => s.init);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
 
-  useEffect(() => {
-    init();
-  }, [init]);
+  useClipSync();
 
   useEffect(() => {
     trimToMax(maxClips);

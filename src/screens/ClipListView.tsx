@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
+import { useClipSync } from '../hooks/useClipSync';
 import { useSettingsStore } from '../store/settingsStore';
 import SearchBar from '../components/SearchBar';
 import ClipListItem from '../components/ClipListItem';
@@ -24,7 +25,6 @@ export default function ClipListView() {
   const search = useClipStore((s) => s.search);
   const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
-  const init = useClipStore((s) => s.init);
   const setSearch = useClipStore((s) => s.setSearch);
   const capture = useClipStore((s) => s.capture);
   const trimToMax = useClipStore((s) => s.trimToMax);
@@ -34,9 +34,7 @@ export default function ClipListView() {
   // list; the row only says which clip to open.
   const openEditor = useEditStore((s) => s.open);
 
-  useEffect(() => {
-    init();
-  }, []);
+  useClipSync();
 
   useEffect(() => {
     trimToMax(maxClips);

@@ -12,7 +12,33 @@ import com.facebook.react.bridge.*
 class OverlayModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
+    init {
+        // The only place a ReactApplicationContext is handed to us. Everything
+        // that emits — the foreground service, the accessibility service —
+        // lives outside React and has no other way to reach it.
+        DevClipEvents.reactContext = reactContext
+    }
+
     override fun getName() = "DevClipOverlay"
+
+    override fun invalidate() {
+        if (DevClipEvents.reactContext === reactApplicationContext) {
+            DevClipEvents.reactContext = null
+        }
+        super.invalidate()
+    }
+
+    /**
+     * NativeEventEmitter warns on iOS when a module emits without these, and
+     * the warning is noisy enough that people add listeners to silence it
+     * rather than to use them. There is nothing to count here: emits come from
+     * native components that run whether or not JS is listening.
+     */
+    @ReactMethod
+    fun addListener(eventName: String) = Unit
+
+    @ReactMethod
+    fun removeListeners(count: Double) = Unit
 
     private fun prefs() =
         reactApplicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
