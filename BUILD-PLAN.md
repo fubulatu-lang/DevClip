@@ -1,18 +1,14 @@
 # DevClip — Build Plan (handoff)
 
-**Status:** planning complete, nothing built yet.
-
-**Before writing any code, refresh the branch.** This document was merged to
-`main` by its own PR, which is now closed and cannot carry the implementation
-work. `claude/copy-direct-to-app-n6sk25` is a snapshot from before that merge, so
-starting from it means building on a stale picture of the repo:
-
-```
-git fetch origin main
-git checkout -B claude/copy-direct-to-app-n6sk25 origin/main
-```
-
-The implementation goes in a **new** pull request.
+> **Status: built.** Everything in sections 2–11 has been implemented. This is
+> now the record of *why* the app is the way it is, not a list of work to do —
+> and section 6, the rejected approaches, is the part worth keeping. Do not
+> re-explore those without new information.
+>
+> Section 12's testing expectations still stand in full: none of this has been
+> run on a device. The two things to check first are still the two named
+> there — that tapping the bubble does not clear the text selection, and how
+> selection reading behaves across the apps actually used every day.
 
 This document is a complete handoff from a planning session. It is written so a
 fresh Claude Code session can pick up the work with no prior context and lose

@@ -74,11 +74,32 @@ Edit files directly on github.com (or re-upload updated files) and push to
 
 ## 7. Turning on the real features
 
-Open the installed DevClip app → **Full App** tab → **Settings**:
-1. **Enable** next to "Background capture" → turn on DevClip in the
-   Accessibility settings screen that opens → come back to the app.
-2. **Start** next to "Floating bubble" → grant "display over other apps"
-   when asked → tap **Start** again.
+The app walks you through this on first launch, on a setup screen you can
+also skip past and come back to. If you skipped it, everything below is in
+**Settings**.
+
+1. **Text capture** → turn DevClip on in the Accessibility settings screen
+   that opens → come back to the app. Android shows a broad warning screen
+   for this; that is expected, and it is what lets DevClip read the text you
+   have highlighted.
+2. **Floating bubble** → grant "display over other apps" when asked → tap
+   **Start**.
+3. **Notifications** → say yes. Android only offers this once, and the
+   notification is one of the ways to bring the bubble back after you hide it.
+
+## 8. Using it
+
+- **Highlight text anywhere, then tap the bubble.** It is saved, and it goes
+  on your clipboard too, so the bubble replaces the Copy button rather than
+  sitting beside it. The bubble grows a ring when it can see a selection.
+- **Tap the bubble with nothing highlighted** to open your clips.
+- **Long press the bubble** to open your clips even when text is highlighted.
+- **Drag the bubble** up and down either edge. Drop it in the middle and it
+  snaps back to the nearer edge.
+- **Drag it into the circle at the bottom centre** to hide it. DevClip keeps
+  running — bring it back from the notification, or from Settings.
+- **Tap a clip once to arm it, again to paste it** into whatever field you
+  were last using. Turn "Confirm before paste" off to paste on one tap.
 
 ---
 

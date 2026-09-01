@@ -16,17 +16,20 @@ The palette is derived from the app icon rather than chosen beside it: its slate
 
 **Operate.** The visitor completes a task: find a clip, paste it, get out. Scanability, consistency and native expectations outrank expression. Brand lives in precise details — the accent on a single primary action, the icon on the bubble, the easing on a press — not in decoration.
 
-The one exception is onboarding, which is the only screen a user reads rather than operates, and is the only place the 34sp display size appears.
+The one exception is the setup wall, which is the only screen a user reads rather than operates, and is the only place the 34sp display size appears.
 
 ## Surfaces
 
 | Surface | Root | Shape | Depth of function |
 |---|---|---|---|
-| **Mini** | `OverlayApp` | Tethered to the bubble, ~300×344dp | **Paste only.** No search, no sort, no edit, and no long press either — a gesture is never the only route to anything |
-| **Expanded** | `OverlayApp` | Half-height sheet, bottom, full width | Search, sort, editing |
-| **Full app** | `App` | Whole screen from the launcher | Everything, plus settings |
+| **Floating list** | `OverlayApp` | Tethered to the bubble, 320×460dp | **Paste only.** No search, no editing, and no long press either — a gesture is never the only route to anything |
+| **Full app** | `App` | Whole screen from the launcher | Search, editing, settings, backup |
 
-Mini and full are not one screen at two sizes. They are separate React roots with different jobs, and `index.ts` registers them separately.
+They are not one screen at two sizes. They are separate React roots with different jobs, and `index.ts` registers them separately.
+
+**A third shape used to exist** — "expanded", a half-height sheet across the bottom carrying search and sort. It is gone. It duplicated the full app in a worse window and owned the hardest geometry in `OverlayService`; cutting it left the tethered list as the only floating surface, which is why that is now sized to be worth opening on its own rather than to be the smaller of two options.
+
+The floating list runs its type 15% below the full app's tokens — *relative* to the user's font scale, not a fixed small number, so someone running large text still gets large text here, proportionally more compact.
 
 ## Adaptivity
 
@@ -34,12 +37,13 @@ Layout is driven by **window size class**, never a device model, so a phone in l
 
 ## What this world refuses
 
-- **Colour literals.** Nothing outside `src/theme/theme.ts`. CI fails on a stray hex.
+- **Colour literals.** Nothing outside `src/theme/theme.ts`. CI's One UI scan reports a stray hex; it is advisory, so a finding is a prompt to look rather than a gate. One file is a standing exception: `ErrorBoundary.tsx` renders when the theme may be the thing that threw, so it cannot read a token.
 - **Hand-picked sizes.** Type, spacing, radius and icon size come from roles, not per-screen judgement.
 - **Shadow as depth.** Cards carry none; only genuinely floating surfaces get elevation, and little of it.
 - **Uppercase micro-labels**, letter-spaced eyebrows, and any type below 12sp.
-- **Dialogs for news.** A dialog interrupts a decision; a snackbar reports what happened.
-- **Gesture-only functions.** Long press is a shortcut, never the only way.
+- **Dialogs for news.** A dialog interrupts a decision; a snackbar reports what happened. And no dialog at all in the floating window — an Android dialog needs a foreground Activity, which that window has none of by design, so one there is not merely cramped, it never appears.
+- **Gesture-only functions.** Long press is a shortcut, never the only way. Drag-to-hide has the notification's Hide action and a switch in Settings; the slider has increment and decrement actions.
+- **Silence as an outcome.** The empty overlay, the dead Capture button, the dialog that never appeared: every one looked identical to a tap that was never registered. Something visible always says what happened.
 
 ## Deliberate divergences
 
