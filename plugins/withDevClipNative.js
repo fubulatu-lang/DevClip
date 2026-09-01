@@ -36,6 +36,7 @@ function withDevClipNativeFiles(config) {
         'ClipboardAccessibilityService.kt',
         'DevClipDatabaseHelper.kt',
         'DevClipEvents.kt',
+        'ImeWatcher.kt',
         'OverlayModule.kt',
         'OverlayPackage.kt',
         'OverlayService.kt',

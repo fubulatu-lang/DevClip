@@ -1,5 +1,6 @@
 package com.devclip.app
 
+import android.animation.ValueAnimator
 import android.app.*
 import android.content.Context
 import android.content.Intent
@@ -61,6 +62,22 @@ class OverlayService : Service() {
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleSizePx = 0
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /**
+     * Where the user put the bubble.
+     *
+     * Two positions, not one. `parkedY` is this, and it survives the keyboard.
+     * `params.y` is where the bubble actually is, which the keyboard is
+     * allowed to push upward. Folding the two together looks like it works
+     * and then loses the user's position the first time a keyboard appears:
+     * the bubble slides up, the keyboard goes away, and it stays wherever the
+     * keyboard left it. Displacement is never written down anywhere.
+     *
+     * A drag is the one thing that changes it, keyboard up or not.
+     */
+    private var parkedY = 0
+
+    private var bubbleAnimator: ValueAnimator? = null
     private var popupSurface: ReactSurface? = null
     private var popupView: View? = null
     private var popupParams: WindowManager.LayoutParams? = null
@@ -127,6 +144,11 @@ class OverlayService : Service() {
         SelectionCapture.listener = { live ->
             mainHandler.post { showSelectionRing(live) }
         }
+
+        // Arrives on the accessibility service's thread.
+        ImeWatcher.listener = {
+            mainHandler.post { applyKeyboardAvoidance() }
+        }
     }
 
     /**
@@ -143,7 +165,11 @@ class OverlayService : Service() {
         bubbleView?.let { view ->
             bubbleParams?.let { params ->
                 params.x = clamp(params.x, area.left, area.right - bubbleSizePx)
-                params.y = clamp(params.y, area.top, area.bottom - bubbleSizePx)
+                // Re-resolved rather than re-clamped: the parked position is
+                // what the user chose, and the new configuration may have room
+                // for it again even if the old one did not.
+                parkedY = clamp(parkedY, area.top, area.bottom - bubbleSizePx)
+                params.y = resolvedY(area)
                 try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
             }
         }
@@ -329,6 +355,77 @@ class OverlayService : Service() {
         }
     }
 
+    // ---- Parked vs displaced ----
+
+    /**
+     * The lowest the bubble may sit right now.
+     *
+     * With a keyboard up that is above the keys, not above the navigation bar:
+     * TYPE_APPLICATION_OVERLAY draws *over* the IME, so a bubble parked low
+     * lands on top of the keys rather than behind them.
+     */
+    private fun bubbleMaxY(area: SafeArea): Int {
+        val floor = area.bottom - bubbleSizePx
+        val imeTop = ImeWatcher.imeTopPx
+        if (imeTop <= 0) return floor
+        return min(floor, imeTop - bubbleSizePx - dp(EDGE_MARGIN_DP))
+    }
+
+    /** Where the bubble should be, given where it is parked and the keyboard. */
+    private fun resolvedY(area: SafeArea): Int =
+        clamp(parkedY, area.top, bubbleMaxY(area))
+
+    /**
+     * Moves the bubble out of the keyboard's way, and back again afterwards.
+     *
+     * The parked position is not touched. When the keyboard goes, the bubble
+     * returns to exactly where the user left it — which is the entire reason
+     * there are two positions rather than one.
+     */
+    private fun applyKeyboardAvoidance() {
+        val params = bubbleParams ?: return
+        val area = safeArea()
+        val target = resolvedY(area)
+        if (params.y == target) return
+        animateBubbleY(target)
+    }
+
+    private fun animateBubbleY(target: Int) {
+        val view = bubbleView ?: return
+        val params = bubbleParams ?: return
+
+        bubbleAnimator?.cancel()
+
+        if (animationsDisabled()) {
+            params.y = target
+            pushBubbleLayout(view, params)
+            return
+        }
+
+        bubbleAnimator = ValueAnimator.ofInt(params.y, target).apply {
+            duration = 200
+            addUpdateListener { animation ->
+                params.y = animation.animatedValue as Int
+                pushBubbleLayout(view, params)
+            }
+            start()
+        }
+    }
+
+    /** Moves the bubble, and the list hanging off it, in one step. */
+    private fun pushBubbleLayout(view: View, params: WindowManager.LayoutParams) {
+        try {
+            windowManager.updateViewLayout(view, params)
+        } catch (e: Exception) {
+            // The window is gone; the animation will finish harmlessly.
+            return
+        }
+        if (popupVisible) {
+            applyPopupGeometry()
+            updatePopupLayout()
+        }
+    }
+
     private fun addBubble() {
         val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         val sizeDp = when (prefs.getString(Prefs.KEY_BUBBLE_SIZE, "medium")) {
@@ -351,6 +448,8 @@ class OverlayService : Service() {
             x = area.left + dp(EDGE_MARGIN_DP)
             y = area.top + dp(96)
         }
+        parkedY = params.y
+        params.y = resolvedY(area)
 
         var initialX = 0
         var initialY = 0
@@ -407,7 +506,10 @@ class OverlayService : Service() {
                     }
                     val a = safeArea()
                     params.x = clamp(initialX + dx, a.left, a.right - size)
-                    params.y = clamp(initialY + dy, a.top, a.bottom - size)
+                    // Clamped to the band the user can actually see. Dragging
+                    // the bubble under a raised keyboard would put it
+                    // somewhere they cannot reach it again.
+                    params.y = clamp(initialY + dy, a.top, bubbleMaxY(a))
                     windowManager.updateViewLayout(v, params)
                     // The list window is tethered: it travels with the bubble.
                     //
@@ -432,6 +534,13 @@ class OverlayService : Service() {
                 }
                 MotionEvent.ACTION_UP -> {
                     mainHandler.removeCallbacks(longPress)
+                    if (moved) {
+                        // Dropping the bubble sets where it lives. Doing this
+                        // with the keyboard up means the keyboard can bias the
+                        // parked position upward over time; the alternative is
+                        // a drag that silently does not take, which is worse.
+                        parkedY = params.y
+                    }
                     if (!moved && !longPressFired) {
                         // An exception thrown from here escapes view dispatch and
                         // takes the whole touch listener down with it — the bubble
@@ -658,6 +767,8 @@ class OverlayService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         SelectionCapture.listener = null
+        ImeWatcher.listener = null
+        bubbleAnimator?.cancel()
         mainHandler.removeCallbacksAndMessages(null)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         popupView?.let {

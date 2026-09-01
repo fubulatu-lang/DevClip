@@ -21,6 +21,10 @@ import android.view.accessibility.AccessibilityNodeInfo
  * windows are non-focusable, so "the focused field" is correctly the one
  * underneath them.
  *
+ * It also reports where the keyboard is, via [ImeWatcher], because nothing
+ * else can: a non-focusable overlay window gets no IME insets, so the bubble
+ * cannot measure the keyboard on its own.
+ *
  * There used to be an `OnPrimaryClipChangedListener` here, on the belief that
  * accessibility services can read the clipboard in the background. They
  * cannot. Since Android 10, `ClipboardService.clipboardAccessAllowed` returns
@@ -59,6 +63,15 @@ class ClipboardAccessibilityService : AccessibilityService() {
             when (event.eventType) {
                 AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED ->
                     SelectionCapture.onSelectionEvent(event)
+
+                // Both, deliberately. A keyboard appearing reliably changes
+                // the window list; a keyboard *going away* does not always,
+                // and the window-state change that follows it does. Missing
+                // the second one leaves the bubble parked where the keyboard
+                // used to be.
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ->
+                    ImeWatcher.refresh(this)
             }
         } catch (e: Exception) {
             // Never crash the accessibility service. Losing one event costs a
@@ -74,6 +87,9 @@ class ClipboardAccessibilityService : AccessibilityService() {
         super.onDestroy()
         if (instance === this) instance = null
         SelectionCapture.forget()
+        // Without this the bubble would stay parked above a keyboard that
+        // nothing is left to report has gone.
+        ImeWatcher.forget()
     }
 
     /**
