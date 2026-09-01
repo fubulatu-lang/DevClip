@@ -167,6 +167,26 @@ class OverlayService : Service() {
         private const val EDGE_MARGIN_DP = 8
 
         /**
+         * Thickness of the ring that says "a selection is live, tapping will
+         * capture it".
+         *
+         * The icon is always inset by this much, ring or no ring, so the ring
+         * appearing does not make the icon jump smaller.
+         */
+        private const val SELECTION_RING_DP = 3
+
+        /** How long the bubble takes to settle onto its edge. */
+        private const val SETTLE_DURATION_MS = 220L
+
+        /**
+         * How long after a drag the parked position is written.
+         *
+         * A few quick drags in a row are one decision, and each write here is
+         * a disk write.
+         */
+        private const val POSITION_WRITE_DELAY_MS = 400L
+
+        /**
          * Used when the app theme has no colorAccent to resolve. Matches the
          * dark-theme accent in src/theme/theme.ts, which is the lighter of the
          * two and therefore the one that survives a dark background.
