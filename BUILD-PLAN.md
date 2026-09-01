@@ -1,6 +1,18 @@
 # DevClip — Build Plan (handoff)
 
-**Status:** planning complete, nothing built yet. Branch: `claude/copy-direct-to-app-n6sk25`.
+**Status:** planning complete, nothing built yet.
+
+**Before writing any code, refresh the branch.** This document was merged to
+`main` by its own PR, which is now closed and cannot carry the implementation
+work. `claude/copy-direct-to-app-n6sk25` is a snapshot from before that merge, so
+starting from it means building on a stale picture of the repo:
+
+```
+git fetch origin main
+git checkout -B claude/copy-direct-to-app-n6sk25 origin/main
+```
+
+The implementation goes in a **new** pull request.
 
 This document is a complete handoff from a planning session. It is written so a
 fresh Claude Code session can pick up the work with no prior context and lose
@@ -548,8 +560,9 @@ then add this tier for oversized selections only.
 
 ## 11. Build order
 
-One pull request on `claude/copy-direct-to-app-n6sk25`, **commits split by area**
-so it is reviewable in pieces and a single bad part can be reverted.
+One pull request on a **freshly reset** `claude/copy-direct-to-app-n6sk25` (see
+the top of this document), **commits split by area** so it is reviewable in
+pieces and a single bad part can be reverted.
 
 1. **Bug fixes + naming cleanup** — bug 1 (one line), bug 2 defences, bug 4
    (inline edit sheet), the `ACTION_HIDE` rename. Gets the user a working app early.
@@ -590,6 +603,38 @@ so it is reviewable in pieces and a single bad part can be reverted.
 - **Bug 2 may need a logcat from the user** if the defences do not fix it.
 - First two things to check on device: the selection surviving the bubble tap,
   and how selection reading behaves across the user's most-used apps.
+
+### CI — what runs on every PR
+
+`.github/workflows/ci.yml` has two jobs. **Run both locally before pushing**;
+they are quick and a red PR costs a cycle.
+
+| Job | Command | Gate? |
+| --- | --- | --- |
+| Typecheck | `npm ci` then `npx tsc --noEmit` | **Yes — this one fails the build.** |
+| One UI conformance | `python3 .claude/one-ui/scripts/oneui_scan.py src` | No — `continue-on-error: true`. |
+
+Two things to know:
+
+- **`npm ci`, not `npm install`.** It installs the lockfile exactly and fails
+  loudly if `package.json` and `package-lock.json` have drifted apart. If a
+  dependency changes, commit the updated lockfile.
+- **The One UI scan is advisory and cannot fail the build.** It covers the
+  mechanically checkable subset of the One UI rules — hardcoded colours,
+  off-scale spacing, missing reduced-motion guards. A finding is a prompt to
+  look, not a gate.
+
+  That said, **run it anyway on this work.** It will be quiet on the native
+  Kotlin (it only scans `src`), but this change touches a lot of the interface —
+  mini-list font sizing, numbered rows, notification actions, the tap-to-arm
+  paste state, the size slider, the permissions wall — and that is exactly the
+  surface it has opinions about. Cheaper to read its output than to have a human
+  find the same things.
+
+The repo also has `.claude/skills/one-ui-*` skills covering the areas the scanner
+cannot check mechanically (structure, copy, icon metaphors, motion curves). Worth
+invoking for the new UI rather than guessing at the conventions this codebase
+already follows.
 
 ---
 
