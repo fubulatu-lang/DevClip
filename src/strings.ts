@@ -29,11 +29,11 @@ export const strings = {
     moreOptionsHint: 'Opens edit and delete.',
     fallbackTitle: 'this clip',
     pasteHint: 'Double tap to paste.',
+    pasteArmedHint: 'Double tap again to paste this clip.',
   },
 
   paste: {
-    confirmTitle: 'Paste this clip?',
-    confirm: 'Paste',
+    armed: 'Tap again to paste',
     copiedBody: 'Could not paste automatically, so it’s on your clipboard — paste it manually.',
   },
 

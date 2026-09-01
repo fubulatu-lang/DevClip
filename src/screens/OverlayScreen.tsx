@@ -19,8 +19,12 @@ import { strings } from '../strings';
  * service and left this as the only floating surface, which is why it is now
  * sized to be worth opening rather than to be the smaller of two options.
  *
- * Paste only. No search — that lives in the full app, where there is room for
- * a keyboard and a result list. No capture button either: the overlay window
+ * Paste only, at a smaller type scale — smaller relative to whatever font
+ * size the user has set, not a fixed small number, so it stays compact
+ * without becoming unreadable for someone running large text.
+ *
+ * No search — that lives in the full app, where there is room for a keyboard
+ * and a result list. No capture button either: the overlay window
  * is deliberately non-focusable, and since Android 10 an app without focus
  * cannot read the clipboard, so the button here could only ever have saved
  * nothing. Capture happens by tapping the bubble with text selected.
@@ -33,7 +37,7 @@ import { strings } from '../strings';
 const noop = () => {};
 
 export default function OverlayScreen() {
-  const { colors, radii, spacing, text, icon } = useTheme();
+  const { colors, radii, spacing, miniText, icon } = useTheme();
   const clips = useClipStore((s) => s.clips);
   const initialised = useClipStore((s) => s.initialised);
   const error = useClipStore((s) => s.error);
@@ -70,7 +74,7 @@ export default function OverlayScreen() {
           borderBottomColor: colors.divider,
         },
         logoDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent },
-        title: { ...text.body, fontWeight: '500', color: colors.ink, flex: 1 },
+        title: { ...miniText.body, fontWeight: '500', color: colors.ink, flex: 1 },
         headerBtn: {
           width: 40,
           height: 40,
@@ -91,7 +95,7 @@ export default function OverlayScreen() {
           gap: spacing.sm,
           paddingHorizontal: spacing.lg,
         },
-        emptyText: { ...text.caption, color: colors.inkFaint, textAlign: 'center' },
+        emptyText: { ...miniText.caption, color: colors.inkFaint, textAlign: 'center' },
         errorBanner: {
           marginHorizontal: spacing.lg,
           marginTop: spacing.sm,
@@ -103,9 +107,9 @@ export default function OverlayScreen() {
           alignItems: 'center',
           gap: spacing.sm,
         },
-        errorText: { flex: 1, ...text.caption, color: colors.danger },
+        errorText: { flex: 1, ...miniText.caption, color: colors.danger },
       }),
-    [colors, radii, spacing, text]
+    [colors, radii, spacing, miniText]
   );
 
   return (
@@ -150,7 +154,9 @@ export default function OverlayScreen() {
         data={clips}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
-        renderItem={({ item }) => <ClipListItem clip={item} variant="mini" onLongPress={noop} />}
+        renderItem={({ item, index }) => (
+          <ClipListItem clip={item} position={index + 1} variant="mini" onLongPress={noop} />
+        )}
         ListEmptyComponent={
           <View style={styles.empty}>
             {initialised && (

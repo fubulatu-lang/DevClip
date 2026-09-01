@@ -41,7 +41,11 @@ export default function ClipListView() {
   }, [maxClips, clips.length]);
 
   const renderItem = useCallback(
-    ({ item }: { item: Clip }) => <ClipListItem clip={item} onLongPress={openEditor} />,
+    // Newest is 1. Positional, not an identity — the numbers renumber as
+    // clips arrive and are deleted, which is what makes them useful.
+    ({ item, index }: { item: Clip; index: number }) => (
+      <ClipListItem clip={item} position={index + 1} onLongPress={openEditor} />
+    ),
     [openEditor]
   );
 
@@ -50,10 +54,12 @@ export default function ClipListView() {
       StyleSheet.create({
         container: { flex: 1 },
         /**
-         * The One UI interaction area: the primary action sits at the bottom,
-         * within thumb reach, not at the top where the eye lands first.
+         * The One UI interaction area: actions sit at the bottom, within
+         * thumb reach, not at the top where the eye lands first.
          */
         actionBar: {
+          flexDirection: 'row',
+          justifyContent: 'center',
           paddingHorizontal: gutter,
           paddingTop: spacing.md,
           paddingBottom: spacing.lg,
@@ -61,18 +67,27 @@ export default function ClipListView() {
           borderTopColor: colors.divider,
           backgroundColor: colors.bg,
         },
+        /**
+         * A secondary control now, not the primary one.
+         *
+         * Capture used to be the only way to save anything, so it was a full
+         * width filled button. Tapping the bubble is how clips get saved now;
+         * this button is the fallback for something copied with Android's own
+         * Copy button, which is a real case but not the main one. Still a
+         * 48dp target, just no longer the loudest thing on the screen.
+         */
         captureBtn: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: spacing.sm,
-          backgroundColor: colors.accent,
+          backgroundColor: colors.surfaceSunken,
           minHeight: 48,
           paddingHorizontal: spacing.xl,
           borderRadius: radii.pill,
         },
         captureBtnBusy: { opacity: 0.5 },
-        captureText: { ...text.button, color: colors.onAccent },
+        captureText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
         empty: {
           alignItems: 'center',
           justifyContent: 'center',
@@ -151,7 +166,7 @@ export default function ClipListView() {
           style={[styles.captureBtn, capturing && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
-          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
+          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
           <Text style={styles.captureText}>{capturing ? strings.clips.capturing : strings.clips.capture}</Text>
         </Pressy>
       </View>

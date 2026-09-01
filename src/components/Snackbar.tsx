@@ -13,7 +13,7 @@ import { strings } from '../strings';
  * Confirming a paste, or reporting that an export failed, is news — not a
  * decision. Delivering it through a dialog stops the task to demand a
  * dismissal at the exact moment the user was mid-flow. Dialogs are kept for
- * choices that must interrupt: paste confirmation, delete, clear all.
+ * choices that must interrupt and are hard to undo: delete, clear all.
  *
  * Announced politely so a screen reader reads it without stealing focus.
  */
