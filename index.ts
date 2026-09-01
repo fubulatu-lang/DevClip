@@ -9,9 +9,9 @@ const appName = appJson.expo.name;
 // The launcher app: the whole thing, full screen.
 registerRootComponent(App);
 
-// The floating overlay that OverlayService.kt mounts in its own window.
-// A separate root from App: the overlay is mini or expanded, tethered to the
-// bubble, and paste-only in mini — a different surface, not a resized one.
+// The floating list that OverlayService.kt mounts in its own window.
+// A separate root from App: it is tethered to the bubble and paste-only — a
+// different surface, not a resized one.
 AppRegistry.registerComponent('DevClipPopup', () => OverlayApp);
 
 export default appName;

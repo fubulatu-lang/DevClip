@@ -143,6 +143,33 @@ export const text = {
 } as const;
 
 /**
+ * How much the floating list shrinks its type.
+ *
+ * The floating window is small and shows a handful of clips, so the full
+ * 17sp body wastes it. What it must not do is pick a fixed small number:
+ * these sizes are in dp and React Native multiplies them by the user's font
+ * scale, so 0.85 of the token stays 0.85 of whatever the user has asked for.
+ * Someone running large text gets large text here too, just proportionally
+ * more compact — which is the point. Nothing in the list passes
+ * allowFontScaling={false}, and nothing should.
+ */
+const MINI_SCALE = 0.85;
+
+/** Never shrink below the readable floor, whatever the scale factor. */
+const MINI_FLOOR = text.micro.fontSize;
+
+function shrink<T extends { fontSize: number }>(token: T): T {
+  return { ...token, fontSize: Math.max(MINI_FLOOR, Math.round(token.fontSize * MINI_SCALE)) };
+}
+
+/** The type scale for the floating list. Same roles, proportionally smaller. */
+export const miniText = {
+  body: shrink(text.body),
+  secondary: shrink(text.secondary),
+  caption: shrink(text.caption),
+} as const;
+
+/**
  * The system font resolves to SamsungOne / One UI Sans on Samsung devices,
  * and to the platform default elsewhere. `undefined` is how React Native
  * asks for it; weight is carried by `fontWeight`, not by a family name.

@@ -13,19 +13,14 @@ export const strings = {
     name: 'DevClip',
   },
 
-  bubble: {
-    on: 'Bubble on',
-    off: 'Bubble off',
-    turnOn: 'Turn on floating bubble',
-    turnOff: 'Turn off floating bubble',
-  },
 
   clips: {
     capture: 'Capture clipboard',
     captureA11y: 'Capture current clipboard',
     capturing: 'Capturing…',
+    loading: 'Opening your clips…',
     emptyTitle: 'No clips yet',
-    emptyBody: 'Copy something, then tap Capture below.',
+    emptyBody: 'Highlight text anywhere, then tap the bubble.',
     noMatches: (term: string) => `No clips match “${term}”`,
     when: {
       justNow: 'just now',
@@ -34,13 +29,11 @@ export const strings = {
     moreOptionsHint: 'Opens edit and delete.',
     fallbackTitle: 'this clip',
     pasteHint: 'Double tap to paste.',
-    moveUp: 'Move clip up',
-    moveDown: 'Move clip down',
+    pasteArmedHint: 'Double tap again to paste this clip.',
   },
 
   paste: {
-    confirmTitle: 'Paste this clip?',
-    confirm: 'Paste',
+    armed: 'Tap again to paste',
     copiedBody: 'Could not paste automatically, so it’s on your clipboard — paste it manually.',
   },
 
@@ -50,14 +43,6 @@ export const strings = {
     clearA11yLabel: 'Clear search',
   },
 
-  sort: {
-    dateDesc: 'Newest',
-    dateAsc: 'Oldest',
-    titleAsc: 'Title A–Z',
-    titleDesc: 'Title Z–A',
-    manual: 'Manual',
-    a11yPrefix: 'Sort by',
-  },
 
   edit: {
     title: 'Title',
@@ -92,8 +77,8 @@ export const strings = {
 
     capture: 'Capture',
     devClientNote:
-      'Background capture and the floating bubble need the custom dev client build — see SETUP_GUIDE.md.',
-    backgroundCapture: 'Background capture',
+      'Text capture and the floating bubble need the custom dev client build — see SETUP_GUIDE.md.',
+    textCapture: 'Text capture',
     notifications: 'Notifications',
     floatingBubble: 'Floating bubble',
     enable: 'Enable',
@@ -102,12 +87,14 @@ export const strings = {
     stop: 'Stop',
 
     bubbleSize: 'Bubble size',
-    bubbleSmall: 'S',
-    bubbleMedium: 'M',
-    bubbleLarge: 'L',
-    bubbleSmallA11y: 'Small',
-    bubbleMediumA11y: 'Medium',
-    bubbleLargeA11y: 'Large',
+    bubbleSizeValue: (dp: number) => `${dp}dp`,
+    bubbleSizeA11y: (dp: number) => `${dp} density pixels across`,
+
+    bubbleVisibility: 'Show the bubble',
+    hideBubble: 'Hide',
+    showBubble: 'Show',
+    bubbleHiddenNote:
+      'The bubble is hidden. DevClip is still running — bring it back here or from the notification.',
 
     autoStart: 'Auto-start after reboot',
     confirmPaste: 'Confirm before paste',
@@ -124,32 +111,53 @@ export const strings = {
     exporting: 'Exporting…',
     exportFailedBody: 'Could not create the backup file. Try again.',
 
+    importBackup: 'Import backup',
+    importing: 'Importing…',
+    importFailedBody: 'Could not read that backup. Try again.',
+    imported: (added: number, skipped: number) => {
+      if (added === 0 && skipped === 0) return 'Nothing to import from that file.';
+      if (added === 0) return `Already had all ${skipped} of those clips.`;
+      if (skipped === 0) return `Added ${added} ${added === 1 ? 'clip' : 'clips'}.`;
+      return `Added ${added} ${added === 1 ? 'clip' : 'clips'}, skipped ${skipped} you already had.`;
+    },
+
     clearAll: 'Clear all clips',
     clearAllTitle: 'Clear all clips?',
     clearAllBody: 'This deletes everything in your history. You can’t undo this.',
   },
 
-  onboarding: {
+  setup: {
     heading: 'Set up DevClip',
-    sub: 'Grant these permissions to finish setup. You can change them later in Settings.',
-    notifications: 'Notifications',
-    notificationsBody: 'Shows a quiet, permanent notification while capture is active.',
-    backgroundCapture: 'Background capture',
-    backgroundCaptureBody:
-      'Lets DevClip save copies made in any app automatically, and paste a saved clip directly into whatever field you were using. Android will show a broader permission screen for this — that’s expected.',
+    sub: 'DevClip needs all three to do its job. You can carry on without them and turn them on later in Settings.',
+    expoGoSub:
+      'This build can’t use the bubble or text capture — those need the custom dev client. Everything else works. See SETUP_GUIDE.md.',
+    textCapture: 'Text capture',
+    textCaptureBody:
+      'Lets DevClip read the text you have highlighted, so tapping the bubble saves it, and paste a saved clip back into the field you were using. Android will show a broader permission screen for this — that’s expected.',
     floatingBubble: 'Floating bubble',
-    floatingBubbleBody: 'Lets DevClip draw the bubble on top of other apps.',
+    floatingBubbleBody: 'Lets DevClip draw its bubble on top of other apps.',
+    notifications: 'Notifications',
+    notificationsBody:
+      'Shows a silent, ongoing notification while the bubble is running. It’s also how you get a hidden bubble back.',
+    notificationsDenied:
+      'Android only offers this once. Turn notifications on for DevClip in Android Settings if you change your mind.',
     enable: 'Enable',
     done: 'Done',
-    pending: '…',
     enableA11y: (feature: string) => `Enable ${feature.toLowerCase()}`,
     enabledA11y: (feature: string) => `${feature} is enabled`,
     continue: 'Continue',
+    skip: 'Continue without these',
+    skipHint: 'Opens DevClip with the features these permissions provide turned off.',
+
+    /** Shown in the app itself while something is missing. */
+    crippled: (missing: string) => `DevClip can’t ${missing} until you finish setup.`,
+    crippledAction: 'Finish setup',
+    missingCapture: 'save what you highlight',
+    missingBubble: 'show its bubble',
+    missingNotification: 'bring a hidden bubble back',
   },
 
   overlay: {
-    expand: 'Expand',
-    collapse: 'Shrink back to mini',
     openFullApp: 'Open the full app',
     close: 'Close DevClip',
   },

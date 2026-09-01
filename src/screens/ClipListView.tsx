@@ -1,14 +1,14 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
+import { useClipSync } from '../hooks/useClipSync';
 import { useSettingsStore } from '../store/settingsStore';
 import SearchBar from '../components/SearchBar';
-import SortMenu from '../components/SortMenu';
 import ClipListItem from '../components/ClipListItem';
-import EditClipModal from '../components/EditClipModal';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
+import { useEditStore } from '../store/editStore';
 import { Clip } from '../types/clip';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { strings } from '../strings';
@@ -21,52 +21,32 @@ export default function ClipListView() {
   // keystroke in search included — re-rendered this tree. One selector per
   // value keeps each render to what actually changed.
   const clips = useClipStore((s) => s.clips);
+  const initialised = useClipStore((s) => s.initialised);
   const search = useClipStore((s) => s.search);
-  const sort = useClipStore((s) => s.sort);
   const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
-  const init = useClipStore((s) => s.init);
   const setSearch = useClipStore((s) => s.setSearch);
-  const setSort = useClipStore((s) => s.setSort);
   const capture = useClipStore((s) => s.capture);
-  const updateClip = useClipStore((s) => s.updateClip);
-  const deleteClip = useClipStore((s) => s.deleteClip);
-  const moveUp = useClipStore((s) => s.moveUp);
-  const moveDown = useClipStore((s) => s.moveDown);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
-  const [editing, setEditing] = useState<Clip | null>(null);
+  // The sheet itself is rendered a level up, over the app bar as well as the
+  // list; the row only says which clip to open.
+  const openEditor = useEditStore((s) => s.open);
 
-  useEffect(() => {
-    init();
-  }, []);
+  useClipSync();
 
   useEffect(() => {
     trimToMax(maxClips);
   }, [maxClips, clips.length]);
 
-  // Passing a fresh arrow per row would hand React.memo a new prop every
-  // render and defeat it. One stable handler takes the index instead, and
-  // the row binds its own.
-  const handleMove = useCallback(
-    (index: number, direction: -1 | 1) => (direction === -1 ? moveUp(index) : moveDown(index)),
-    [moveUp, moveDown]
-  );
-
   const renderItem = useCallback(
+    // Newest is 1. Positional, not an identity — the numbers renumber as
+    // clips arrive and are deleted, which is what makes them useful.
     ({ item, index }: { item: Clip; index: number }) => (
-      <ClipListItem
-        clip={item}
-        isManualSort={sort === 'manual'}
-        isFirst={index === 0}
-        isLast={index === clips.length - 1}
-        onLongPress={setEditing}
-        index={index}
-        onMove={handleMove}
-      />
+      <ClipListItem clip={item} position={index + 1} onLongPress={openEditor} />
     ),
-    [sort, clips.length, handleMove]
+    [openEditor]
   );
 
   const styles = useMemo(
@@ -74,10 +54,12 @@ export default function ClipListView() {
       StyleSheet.create({
         container: { flex: 1 },
         /**
-         * The One UI interaction area: the primary action sits at the bottom,
-         * within thumb reach, not at the top where the eye lands first.
+         * The One UI interaction area: actions sit at the bottom, within
+         * thumb reach, not at the top where the eye lands first.
          */
         actionBar: {
+          flexDirection: 'row',
+          justifyContent: 'center',
           paddingHorizontal: gutter,
           paddingTop: spacing.md,
           paddingBottom: spacing.lg,
@@ -85,18 +67,27 @@ export default function ClipListView() {
           borderTopColor: colors.divider,
           backgroundColor: colors.bg,
         },
+        /**
+         * A secondary control now, not the primary one.
+         *
+         * Capture used to be the only way to save anything, so it was a full
+         * width filled button. Tapping the bubble is how clips get saved now;
+         * this button is the fallback for something copied with Android's own
+         * Copy button, which is a real case but not the main one. Still a
+         * 48dp target, just no longer the loudest thing on the screen.
+         */
         captureBtn: {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'center',
           gap: spacing.sm,
-          backgroundColor: colors.accent,
+          backgroundColor: colors.surfaceSunken,
           minHeight: 48,
           paddingHorizontal: spacing.xl,
           borderRadius: radii.pill,
         },
         captureBtnBusy: { opacity: 0.5 },
-        captureText: { ...text.button, color: colors.onAccent },
+        captureText: { ...text.secondary, fontWeight: '500', color: colors.inkSoft },
         empty: {
           alignItems: 'center',
           justifyContent: 'center',
@@ -135,7 +126,6 @@ export default function ClipListView() {
       )}
 
       <SearchBar value={search} onChange={setSearch} />
-      <SortMenu value={sort} onChange={setSort} />
 
       <FlatList
         data={clips}
@@ -154,11 +144,15 @@ export default function ClipListView() {
         renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            {initialised && (
+              <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            )}
             <Text style={styles.emptyText}>
-              {search
-                ? strings.clips.noMatches(search)
-                : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
+              {!initialised
+                ? strings.clips.loading
+                : search
+                  ? strings.clips.noMatches(search)
+                  : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
             </Text>
           </View>
         }
@@ -172,25 +166,12 @@ export default function ClipListView() {
           style={[styles.captureBtn, capturing && styles.captureBtnBusy]}
           accessibilityLabel={strings.clips.captureA11y}
         >
-          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
+          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
           <Text style={styles.captureText}>{capturing ? strings.clips.capturing : strings.clips.capture}</Text>
         </Pressy>
       </View>
 
       <Snackbar />
-
-      <EditClipModal
-        clip={editing}
-        onClose={() => setEditing(null)}
-        onSave={async (id, content, title) => {
-          await updateClip(id, content, title);
-          setEditing(null);
-        }}
-        onDelete={async (id) => {
-          await deleteClip(id);
-          setEditing(null);
-        }}
-      />
     </View>
   );
 }

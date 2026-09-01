@@ -13,24 +13,33 @@ import {
   Power,
   Layers,
   Download,
+  Upload,
 } from 'lucide-react-native';
 import {
   isNativeOverlayAvailable,
   requestOverlayPermission,
   requestAccessibilityPermission,
   requestNotificationPermission,
-  isAccessibilityServiceEnabled,
-  isOverlayPermissionGranted,
-  isNotificationPermissionGranted,
+  isBubbleRunning,
   startBubble,
   stopBubble,
+  restBubble,
+  wakeBubble,
 } from '../native/OverlayModule';
-import { exportBackup } from '../utils/backup';
+import { onBubbleState } from '../native/events';
+import { usePermissions } from '../hooks/usePermissions';
+import { exportBackup, importBackup } from '../utils/backup';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
-import { useSettingsStore, ThemeMode, BubbleSize } from '../store/settingsStore';
+import {
+  useSettingsStore,
+  ThemeMode,
+  MIN_BUBBLE_SIZE,
+  MAX_BUBBLE_SIZE,
+} from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import { useSnackbarStore } from '../store/snackbarStore';
 import Pressy from '../components/Pressy';
+import Slider from '../components/Slider';
 import { strings } from '../strings';
 
 /**
@@ -51,11 +60,21 @@ const MAX_CLIPS_OPTIONS = [
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
   const { gutter } = useAdaptiveLayout();
-  const [accessibilityOn, setAccessibilityOn] = useState(false);
-  const [overlayOn, setOverlayOn] = useState(false);
-  const [notifOn, setNotifOn] = useState(false);
+  // One source for the three permissions, shared with the setup wall. Two of
+  // them can only be changed by leaving for system Settings, so the hook
+  // re-checks whenever the app comes back rather than trusting a stale
+  // answer.
+  const { permissions, refresh: refreshPermissions } = usePermissions();
+  const accessibilityOn = permissions.accessibility;
+  const overlayOn = permissions.overlay;
+  const notifOn = permissions.notifications;
   const [bubbleRunning, setBubbleRunning] = useState(false);
+  // Hidden but still running. Native owns this — the bubble can be hidden by
+  // dragging it into the target or from the notification, neither of which
+  // this screen is present for — so it is listened to, not tracked here.
+  const [bubbleResting, setBubbleResting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
@@ -68,20 +87,26 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const maxClips = useSettingsStore((s) => s.maxClips);
   const setMaxClips = useSettingsStore((s) => s.setMaxClips);
   const clearAll = useClipStore((s) => s.clearAll);
+  const refreshClips = useClipStore((s) => s.refresh);
   const showSnackbar = useSnackbarStore((s) => s.show);
 
   const refreshStatus = useCallback(async () => {
-    setAccessibilityOn(await isAccessibilityServiceEnabled());
-    setOverlayOn(await isOverlayPermissionGranted());
-    setNotifOn(await isNotificationPermissionGranted());
+    // This was never read from native at all: the screen assumed the bubble
+    // was off every time it opened, so the button offered to start a bubble
+    // that was already running.
+    setBubbleRunning(await isBubbleRunning());
   }, []);
 
   useEffect(() => {
     refreshStatus();
-    const sub = AppState.addEventListener('change', (state) => {
+    const appState = AppState.addEventListener('change', (state) => {
       if (state === 'active') refreshStatus();
     });
-    return () => sub.remove();
+    const bubble = onBubbleState(({ resting }) => setBubbleResting(resting));
+    return () => {
+      appState.remove();
+      bubble.remove();
+    };
   }, [refreshStatus]);
 
   useEffect(() => {
@@ -132,6 +157,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     rowLabel: { ...text.body, color: colors.ink, flexShrink: 1 },
     statusDot: { width: 8, height: 8, borderRadius: 4 },
     statusText: { ...text.caption, fontWeight: '500' },
+    valueLabel: { ...text.secondary, color: colors.inkSoft },
     pillGroup: {
       flexDirection: 'row',
       backgroundColor: colors.surfaceSunken,
@@ -201,6 +227,27 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     }
   };
 
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const result = await importBackup();
+      // Closing the picker is not an outcome to report. Saying "nothing was
+      // imported" to somebody who just decided not to import anything is
+      // noise pretending to be feedback.
+      if (result.cancelled) return;
+      await refreshClips();
+      showSnackbar(strings.settings.imported(result.added, result.skipped));
+    } catch (e) {
+      // parseBackup throws with copy meant for the user — it knows whether
+      // the file was unreadable or simply had nothing in it.
+      showSnackbar(
+        e instanceof Error && e.message ? e.message : strings.settings.importFailedBody
+      );
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <View style={styles.screen}>
       <View style={styles.header}>
@@ -223,7 +270,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{strings.settings.permissions}</Text>
-            <PermissionRow label={strings.settings.backgroundCapture} granted={accessibilityOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.textCapture} granted={accessibilityOn} colors={colors} styles={styles} />
             <PermissionRow label={strings.settings.floatingBubble} granted={overlayOn} colors={colors} styles={styles} />
             <PermissionRow label={strings.settings.notifications} granted={notifOn} colors={colors} styles={styles} />
           </View>
@@ -265,7 +312,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             <>
               <SettingRow
                 icon={<ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
-                label={strings.settings.backgroundCapture}
+                label={strings.settings.textCapture}
                 active={accessibilityOn}
                 buttonLabel={accessibilityOn ? strings.settings.manage : strings.settings.enable}
                 onPress={requestAccessibilityPermission}
@@ -276,7 +323,10 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 label={strings.settings.notifications}
                 active={notifOn}
                 buttonLabel={notifOn ? strings.settings.manage : strings.settings.enable}
-                onPress={async () => setNotifOn(await requestNotificationPermission())}
+                onPress={async () => {
+                  await requestNotificationPermission();
+                  refreshPermissions();
+                }}
                 styles={styles}
               />
               <SettingRow
@@ -288,32 +338,82 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                   if (bubbleRunning) {
                     stopBubble();
                     setBubbleRunning(false);
+                    setBubbleResting(false);
                   } else {
                     const granted = overlayOn || (await requestOverlayPermission());
                     if (granted) {
                       startBubble();
                       setBubbleRunning(true);
+                      setBubbleResting(false);
                     }
                   }
                 }}
                 styles={styles}
               />
 
-              <View style={styles.stackRow}>
-                <View style={styles.rowLeft}>
-                  <Layers size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
-                  <Text style={styles.rowLabel}>{strings.settings.bubbleSize}</Text>
+              {/*
+                Hiding the bubble is a gesture — drag it into the target at the
+                bottom — and the notification carries the same action. Neither
+                is guaranteed to be available: a gesture excludes switch
+                control, and Android 13 lets the notification be swiped away
+                (or blocked outright). So the route back lives in the app too,
+                as a first-class control rather than a fallback.
+              */}
+              {bubbleRunning && (
+                <View style={styles.row}>
+                  <View style={styles.rowLeft}>
+                    <CircleDot
+                      size={icon.md}
+                      strokeWidth={icon.stroke}
+                      color={bubbleResting ? colors.inkFaint : colors.accent}
+                    />
+                    <Text style={styles.rowLabel}>{strings.settings.bubbleVisibility}</Text>
+                  </View>
+                  <Pressy
+                    onPress={() => {
+                      if (bubbleResting) {
+                        wakeBubble();
+                        setBubbleResting(false);
+                      } else {
+                        restBubble();
+                        setBubbleResting(true);
+                      }
+                    }}
+                    style={[styles.actionBtn, !bubbleResting && styles.actionBtnActive]}
+                    accessibilityLabel={strings.settings.bubbleVisibility}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: !bubbleResting }}
+                  >
+                    <Text
+                      style={[styles.actionBtnText, !bubbleResting && styles.actionBtnTextActive]}
+                    >
+                      {bubbleResting ? strings.settings.showBubble : strings.settings.hideBubble}
+                    </Text>
+                  </Pressy>
                 </View>
-                <ThreeWayPill
-                  groupLabel={strings.settings.bubbleSize}
-                  options={[
-                    { value: 'small', label: strings.settings.bubbleSmall, a11yLabel: strings.settings.bubbleSmallA11y },
-                    { value: 'medium', label: strings.settings.bubbleMedium, a11yLabel: strings.settings.bubbleMediumA11y },
-                    { value: 'large', label: strings.settings.bubbleLarge, a11yLabel: strings.settings.bubbleLargeA11y },
-                  ]}
+              )}
+
+              {bubbleRunning && bubbleResting && (
+                <Text style={styles.note}>{strings.settings.bubbleHiddenNote}</Text>
+              )}
+
+              <View style={styles.stackRow}>
+                <View style={styles.row}>
+                  <View style={styles.rowLeft}>
+                    <Layers size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                    <Text style={styles.rowLabel}>{strings.settings.bubbleSize}</Text>
+                  </View>
+                  <Text style={styles.valueLabel}>
+                    {strings.settings.bubbleSizeValue(bubbleSize)}
+                  </Text>
+                </View>
+                <Slider
                   value={bubbleSize}
-                  onChange={(v) => setBubbleSize(v as BubbleSize)}
-                  styles={styles}
+                  min={MIN_BUBBLE_SIZE}
+                  max={MAX_BUBBLE_SIZE}
+                  onChange={setBubbleSize}
+                  accessibilityLabel={strings.settings.bubbleSize}
+                  formatValue={strings.settings.bubbleSizeA11y}
                 />
               </View>
 
@@ -384,9 +484,33 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
 
-          <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel={strings.settings.exportBackup}>
+          <Pressy
+            onPress={handleExport}
+            disabled={exporting}
+            style={styles.exportBtn}
+            accessibilityLabel={strings.settings.exportBackup}
+          >
             <Download size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
-            <Text style={styles.exportText}>{exporting ? strings.settings.exporting : strings.settings.exportBackup}</Text>
+            <Text style={styles.exportText}>
+              {exporting ? strings.settings.exporting : strings.settings.exportBackup}
+            </Text>
+          </Pressy>
+
+          {/*
+            Import merges and skips anything already stored, so it is not a
+            destructive action and does not need a confirmation. Importing the
+            same file twice does nothing the second time.
+          */}
+          <Pressy
+            onPress={handleImport}
+            disabled={importing}
+            style={styles.exportBtn}
+            accessibilityLabel={strings.settings.importBackup}
+          >
+            <Upload size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
+            <Text style={styles.exportText}>
+              {importing ? strings.settings.importing : strings.settings.importBackup}
+            </Text>
           </Pressy>
 
           <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel={strings.settings.clearAll}>

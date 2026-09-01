@@ -1,5 +1,15 @@
 # One UI Conformance Report
 
+> **Historical.** This is a point-in-time report from 2026-08-30. Its seven
+> Blockers were closed at the time, and the interface it describes has since
+> changed substantially: the expanded overlay sheet, the sort chips, the
+> reorder arrows and the `<Modal>` edit sheet it audits no longer exist, and
+> the floating list, numbered rows, size slider, permissions wall and
+> drag-to-hide target it does not mention are new. Read it as a record of what
+> was found and fixed, not as a description of the current UI. `PRODUCT.md`,
+> `DESIGN.md` and `ONE-UI.md` are the live documents; re-run `/one-ui:audit`
+> for a current score.
+
 | | |
 |---|---|
 | **Project** | DevClip |

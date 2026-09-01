@@ -12,7 +12,33 @@ import com.facebook.react.bridge.*
 class OverlayModule(reactContext: ReactApplicationContext) :
     ReactContextBaseJavaModule(reactContext) {
 
+    init {
+        // The only place a ReactApplicationContext is handed to us. Everything
+        // that emits — the foreground service, the accessibility service —
+        // lives outside React and has no other way to reach it.
+        DevClipEvents.reactContext = reactContext
+    }
+
     override fun getName() = "DevClipOverlay"
+
+    override fun invalidate() {
+        if (DevClipEvents.reactContext === reactApplicationContext) {
+            DevClipEvents.reactContext = null
+        }
+        super.invalidate()
+    }
+
+    /**
+     * NativeEventEmitter warns on iOS when a module emits without these, and
+     * the warning is noisy enough that people add listeners to silence it
+     * rather than to use them. There is nothing to count here: emits come from
+     * native components that run whether or not JS is listening.
+     */
+    @ReactMethod
+    fun addListener(eventName: String) = Unit
+
+    @ReactMethod
+    fun removeListeners(count: Double) = Unit
 
     private fun prefs() =
         reactApplicationContext.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
@@ -62,16 +88,19 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         promise.resolve(isEnabled)
     }
 
+    /**
+     * Starts the service, and shows the bubble if it is already running but
+     * hidden.
+     *
+     * Sent as ACTION_WAKE rather than a bare start: a plain start on a service
+     * that is already up reaches onStartCommand with nothing to act on, so
+     * pressing Start while the bubble was hidden did nothing visible. wake()
+     * is a no-op when the bubble is already showing.
+     */
     @ReactMethod
     fun startBubble() {
-        val context = reactApplicationContext
         prefs().edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, true).apply()
-        val intent = Intent(context, OverlayService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
+        sendToService(OverlayService.ACTION_WAKE)
     }
 
     @ReactMethod
@@ -94,18 +123,10 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    /** "mini" (tethered to the bubble) or "expanded" (half-height sheet). */
+    /** Closes the floating list. The bubble stays put. */
     @ReactMethod
-    fun setOverlayMode(mode: String) {
-        sendToService(OverlayService.ACTION_SET_MODE) {
-            it.putExtra(OverlayService.EXTRA_MODE, mode)
-        }
-    }
-
-    /** Closes the overlay window. The bubble stays put. */
-    @ReactMethod
-    fun hideOverlay() {
-        sendToService(OverlayService.ACTION_HIDE)
+    fun hidePopup() {
+        sendToService(OverlayService.ACTION_HIDE_POPUP)
     }
 
     /** Opens the full-screen activity and closes the overlay. */
@@ -114,13 +135,39 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         sendToService(OverlayService.ACTION_OPEN_FULL)
     }
 
+    /**
+     * Resizes the bubble in place.
+     *
+     * This used to restart the service, which was survivable for three fixed
+     * choices and would be a flicker on every pixel of a slider drag.
+     */
     @ReactMethod
-    fun setBubbleSize(size: String) {
-        prefs().edit().putString(Prefs.KEY_BUBBLE_SIZE, size).apply()
-        // If the bubble is currently showing, restart it so the new size takes effect immediately.
+    fun setBubbleSize(sizeDp: Double) {
+        val clamped = sizeDp.toInt()
+            .coerceIn(Prefs.MIN_BUBBLE_SIZE_DP, Prefs.MAX_BUBBLE_SIZE_DP)
+        prefs().edit().putInt(Prefs.KEY_BUBBLE_SIZE_DP, clamped).apply()
         if (prefs().getBoolean(Prefs.KEY_BUBBLE_RUNNING, false)) {
-            startBubble()
+            sendToService(OverlayService.ACTION_SET_BUBBLE_SIZE) {
+                it.putExtra(OverlayService.EXTRA_SIZE_DP, clamped)
+            }
         }
+    }
+
+    /** Hides the bubble. The service keeps running; the notification brings it back. */
+    @ReactMethod
+    fun restBubble() {
+        sendToService(OverlayService.ACTION_REST)
+    }
+
+    /** Brings a hidden bubble back, at the position the user left it. */
+    @ReactMethod
+    fun wakeBubble() {
+        sendToService(OverlayService.ACTION_WAKE)
+    }
+
+    @ReactMethod
+    fun setMaxClips(max: Double) {
+        prefs().edit().putInt(Prefs.KEY_MAX_CLIPS, max.toInt()).apply()
     }
 
     @ReactMethod
@@ -144,12 +191,60 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     }
 }
 
-/** Shared preferences keys used to pass simple settings from JS into native
- *  components (OverlayService, BootReceiver) that can run independently of
- *  the JS thread. */
+/**
+ * Settings passed from JS into native components that can run with no JS
+ * thread at all — OverlayService, BootReceiver, the accessibility service.
+ *
+ * SharedPreferences rather than a store read over the bridge, because these
+ * are needed at moments when there is no bridge: the service can be started
+ * by BootReceiver long before any React context exists.
+ */
 object Prefs {
     const val NAME = "devclip_prefs"
     const val KEY_BUBBLE_RUNNING = "bubble_running"
-    const val KEY_BUBBLE_SIZE = "bubble_size" // "small" | "medium" | "large"
     const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
+
+    /**
+     * Bubble diameter in dp.
+     *
+     * A number, not one of three names, because the size is a slider now. The
+     * floor is Android's comfortable touch target: below 48dp a bubble gets
+     * missed, and it gets missed most over a keyboard, which is exactly where
+     * it matters. The ceiling is 1.5x that — past it the bubble stops being a
+     * bubble and starts being an obstruction.
+     *
+     * A new key rather than a reused one: the old value was a String, and
+     * reading a String key as an Int throws.
+     */
+    const val KEY_BUBBLE_SIZE_DP = "bubble_size_dp"
+    const val MIN_BUBBLE_SIZE_DP = 48
+    const val MAX_BUBBLE_SIZE_DP = 72
+    const val DEFAULT_BUBBLE_SIZE_DP = 56
+
+    /**
+     * Where the bubble is docked, as an edge and a fraction of the way down.
+     *
+     * Never pixels. A pixel position is meaningless the moment the window
+     * changes shape — rotation, split-screen, a foldable opening — and this
+     * has to survive all three plus a reboot.
+     *
+     * There is deliberately no setting for either. Dragging the bubble is the
+     * only way to move it, which is why these are read by the service and
+     * never written by it from JS.
+     */
+    const val KEY_BUBBLE_EDGE = "bubble_edge"
+    const val KEY_BUBBLE_Y_FRACTION = "bubble_y_fraction"
+    const val EDGE_LEFT = "left"
+    const val EDGE_RIGHT = "right"
+    const val DEFAULT_Y_FRACTION = 0.28f
+
+    /**
+     * The user's clip limit, mirrored here so capture can enforce it.
+     *
+     * Trimming used to happen only while the app was open. Capture happens
+     * with the app closed — that is the point of it — so the limit was not a
+     * limit until DevClip was next opened.
+     */
+    const val KEY_MAX_CLIPS = "max_clips"
+    const val DEFAULT_MAX_CLIPS = 500
 }

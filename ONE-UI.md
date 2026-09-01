@@ -146,8 +146,9 @@ real device yet.**
    the card's own `Pressy`. Confirm tapping ⋮ does not also paste.
 2. **Vertical fit at 300×400dp** — header + search + chips + a pinned bottom
    bar leaves little room for cards. If it is too tight, hide the bubble
-   toggle or the sort chips at that size.
-3. **200% font scale** on every screen, especially the tab bar and sort chips.
+   toggle at that size.
+3. **200% font scale** on every screen, especially the floating list, which
+   runs its type 15% below the full app's tokens.
 4. **TalkBack pass** — card announcements, the segmented groups, the error
    banner's live region.
 5. **Dark mode on AMOLED** — the ground is now true black.

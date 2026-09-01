@@ -39,26 +39,10 @@ export function stopBubble(): void {
   NativeOverlay.stopBubble();
 }
 
-/**
- * The overlay window has two shapes.
- *
- * `mini` is tethered to the bubble: it hangs off it, moves with it, and is
- * sized to show two clips. `expanded` detaches and becomes a half-height
- * sheet across the bottom of the screen. Native owns both geometries,
- * because only native knows where the bubble is and where the system bars
- * are; JS only names the shape it wants.
- */
-export type OverlayMode = 'mini' | 'expanded';
-
-export function setOverlayMode(mode: OverlayMode): void {
+/** Closes the floating list. The bubble stays. */
+export function hidePopup(): void {
   if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.setOverlayMode(mode);
-}
-
-/** Closes the overlay window. The bubble stays. */
-export function hideOverlay(): void {
-  if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.hideOverlay();
+  NativeOverlay.hidePopup();
 }
 
 /** Opens the full-screen app and closes the overlay. */
@@ -67,9 +51,39 @@ export function openFullApp(): void {
   NativeOverlay.openFullApp();
 }
 
-export function setBubbleSize(size: 'small' | 'medium' | 'large'): void {
+/**
+ * Bubble diameter in dp, applied live.
+ *
+ * Native clamps to the same floor and ceiling this side does, because native
+ * is the one that has to be right when the value came from SharedPreferences
+ * rather than from here.
+ */
+export function setBubbleSize(sizeDp: number): void {
   if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.setBubbleSize(size);
+  NativeOverlay.setBubbleSize(sizeDp);
+}
+
+/** Hides the bubble. The service keeps running; the notification brings it back. */
+export function restBubble(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.restBubble();
+}
+
+/** Brings a hidden bubble back, at the position the user left it. */
+export function wakeBubble(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.wakeBubble();
+}
+
+/**
+ * Mirrors the clip limit into native.
+ *
+ * Capture happens with the app closed, so trimming has to happen there too —
+ * a limit only applied while DevClip is open is not a limit.
+ */
+export function setMaxClips(max: number): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setMaxClips(max);
 }
 
 export function setAutoStartOnBoot(enabled: boolean): void {

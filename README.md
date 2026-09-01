@@ -1,222 +1,261 @@
 # DevClip
 
-A clipboard manager for Android: a floating bubble you can tap from any app,
-showing your clipboard history with search, sort, manual reorder, and inline
-editing.
+Highlight text anywhere on your phone, tap the floating bubble, and it is
+saved. No switching apps, no pressing a Capture button, no clipboard involved.
 
 **Start here:** [SETUP_GUIDE.md](./SETUP_GUIDE.md) — step-by-step, phone +
 GitHub + cloud only, no computer required.
 
-## 1. System architecture
+## 1. The one thing to understand
+
+**DevClip never reads the clipboard to capture.** It reads the text you have
+*highlighted*, straight out of Android's accessibility node tree.
+
+This is not a preference. Since Android 10, `ClipboardManager.getPrimaryClip()`
+returns null unless the calling app has window focus or is the default
+keyboard, and an accessibility service gets no exemption from that. DevClip's
+overlay windows are deliberately non-focusable — that is what lets them paste
+into the app underneath without disturbing it — so DevClip is never "in front"
+and never will be.
+
+Everything else follows from that:
+
+- Tapping the bubble with text selected **captures the selection**, saves it,
+  and *then* puts it on the system clipboard, so the bubble is a full
+  replacement for Android's own Copy button.
+- Tapping the bubble with nothing selected **opens the list** instead.
+- Long-pressing the bubble **always** opens the list.
+
+Three approaches were investigated and rejected before this one: background
+clipboard reads (impossible), shipping a keyboard (months of work to replace
+Gboard), and Shizuku (dies on every reboot, needs a second app). The reasoning
+is preserved in [BUILD-PLAN.md](./BUILD-PLAN.md) §6 so it does not get
+re-derived.
+
+## 2. System architecture
 
 ```
-┌─────────────────────────────┐        ┌───────────────────────────────┐
-│  ClipboardAccessibilityService│  ---->│         devclip.db            │
-│  (native Kotlin, always on   │ writes │   (SQLite file, shared by     │
-│   once user enables it)      │        │    native + JS)                │
-└─────────────────────────────┘        └───────────────┬───────────────┘
-                                                          │ reads/writes
-                                                          ▼
-┌─────────────────────────────┐        ┌───────────────────────────────┐
-│  OverlayService (native)     │  hosts │   PopupScreen (React Native)  │
-│  - draggable bubble           │◄──────│   - ClipListView               │
-│  - WindowManager popup window │        │   - search / sort / reorder   │
-└─────────────────────────────┘        │   - edit / delete modal        │
-                                         └───────────────────────────────┘
+┌────────────────────────────────┐        ┌──────────────────────────────┐
+│ ClipboardAccessibilityService  │        │         devclip.db           │
+│  · reads the live selection    │        │  SQLite file, opened by both │
+│  · reports where the keyboard  │        │  native and JS at the same   │
+│    is                          │        │  path, same schema           │
+│  · pastes into a focused field │        └──────────────┬───────────────┘
+└──────────────┬─────────────────┘                       │
+               │ SelectionCapture                        │ reads / writes
+               ▼                                         ▼
+┌────────────────────────────────┐        ┌──────────────────────────────┐
+│ OverlayService                 │        │  React Native, two roots     │
+│  · the bubble (edge-docked)    │ hosts  │   · OverlayApp — the         │
+│  · the floating list's window  │───────▶│     floating list            │
+│  · the drag-to-hide target     │        │   · App — the full screen    │
+│  · the notification            │        └──────────────────────────────┘
+└────────────────────────────────┘                       ▲
+               │ DevClipEvents                           │
+               └─────────────────────────────────────────┘
+                 "something changed, go and look"
 ```
 
-- The **Accessibility Service** is a small, always-running native component
-  that Android grants clipboard-read access to even in the background (a
-  privilege normal apps lost on Android 10+). It writes new clips straight
-  into a local SQLite file — it does not need the JS/React Native side to be
-  running at all.
-- The **JS app** (this is 95% of the code you'll actually edit) opens that
-  *same* SQLite file via `expo-sqlite` to display, search, sort, edit, and
-  delete clips. Because both sides agree on the exact file path and table
-  schema, they always see the same data without needing to talk to each
-  other directly.
-- The **Overlay Service** draws the draggable bubble and, when tapped, adds
-  a second small window that mounts your actual React Native `PopupScreen`
-  component — so the "native" popup is really just your RN UI, sized
-  smaller and drawn in a floating window instead of a normal full screen.
-- **Full App mode** simply launches the normal `MainActivity` (a regular,
-  full-screen Activity) instead of resizing the floating window.
+- The **accessibility service** does three jobs: it feeds the most recent text
+  selection to `SelectionCapture`, it reports where the on-screen keyboard is
+  (a non-focusable overlay window receives no IME insets, so the bubble cannot
+  measure the keyboard itself), and it performs the paste.
+- **`OverlayService`** owns every floating window and the state machine behind
+  them. It is also where a capture actually happens, on a bubble tap.
+- The **JS app** is two React roots in one process — the full-screen app and
+  the floating list. They share the zustand stores and the database and
+  nothing else.
+- **`DevClipEvents`** is the only channel from native into JS. It carries
+  prompts, never data: native can emit when there is no React instance in the
+  process at all (after a reboot, or once Android has trimmed everything but
+  the service), so JS re-reads the database rather than trusting an event to
+  have arrived.
 
-This means you only write your list/search/sort/edit UI **once**
-(`src/screens`, `src/components`) — it's reused for the small bubble popup,
-the expanded popup, and the full app screen.
+Nothing under `android/` is committed — `eas build` regenerates it from
+`app.json` + `plugins/` on every build via `expo prebuild`, which is what
+makes the native sources safe to edit by hand.
 
-## 2. File structure
+## 3. File structure
 
 ```
 DevClip/
-├── App.tsx                     # Root component for the full-screen app
-├── index.ts                    # Registers BOTH the full app and the
-│                                #   floating-popup entry points
-├── app.json                    # Expo config: package name, plugin list
-├── eas.json                    # Cloud build profiles (dev / preview / prod)
+├── App.tsx                       # Root of the full-screen app
+├── index.ts                      # Registers BOTH roots: App and DevClipPopup
+├── app.json                      # Expo config: package name, plugin list
+├── eas.json                      # Cloud build profiles
 ├── src/
-│   ├── types/clip.ts            # Clip, SortMode, PopupState types
+│   ├── types/clip.ts
 │   ├── theme/
-│   │   ├── theme.ts             # Colors, spacing, radii, shadows, font names
-│   │   └── fonts.ts             # Loads the Manrope font family
-│   ├── db/database.ts           # All SQLite queries (JS side)
-│   ├── store/clipStore.ts       # Zustand store — UI state + DB calls
-│   ├── native/OverlayModule.ts  # JS bridge to the native overlay module
-│   ├── utils/clipboardCapture.ts# Phase-1 manual clipboard read/write
+│   │   ├── theme.ts              # Colour, spacing, radii, type, easing tokens
+│   │   ├── ThemeContext.tsx
+│   │   ├── useAdaptiveLayout.ts  # Window-size-class layout, not device model
+│   │   └── useReduceMotion.ts
+│   ├── db/database.ts            # Every SQLite query on the JS side
+│   ├── store/
+│   │   ├── clipStore.ts          # The clip list and every write to it
+│   │   ├── settingsStore.ts      # Persisted settings, mirrored into native
+│   │   ├── editStore.ts          # Which clip the edit sheet is showing
+│   │   ├── pasteArmStore.ts      # Which row is one tap from pasting
+│   │   └── snackbarStore.ts
+│   ├── hooks/
+│   │   ├── useClipSync.ts        # Keeps a list showing what is in the database
+│   │   └── usePermissions.ts     # The three permissions, re-checked on resume
+│   ├── native/
+│   │   ├── OverlayModule.ts      # JS side of the native module
+│   │   └── events.ts             # JS side of the native event channel
+│   ├── utils/
+│   │   ├── clipboardCapture.ts   # Manual clipboard read, and paste
+│   │   └── backup.ts             # Export and merging import
 │   ├── screens/
-│   │   ├── PopupScreen.tsx      # Small/Expanded/Full toggle + header
-│   │   └── ClipListView.tsx     # The actual list (search, sort, capture)
+│   │   ├── PopupScreen.tsx       # The full app: gate, app bar, list, sheet
+│   │   ├── ClipListView.tsx      # The full list: search, capture button
+│   │   ├── OverlayScreen.tsx     # The floating list
+│   │   ├── SettingsScreen.tsx
+│   │   └── SetupScreen.tsx       # The permissions wall
 │   └── components/
-│       ├── Pressy.tsx           # Spring press-scale wrapper for buttons/cards
+│       ├── Pressy.tsx            # Press-scale wrapper, reduce-motion aware
 │       ├── SearchBar.tsx
-│       ├── SortMenu.tsx
-│       ├── ClipListItem.tsx     # Tap-to-copy, long-press, reorder arrows
-│       ├── EditClipModal.tsx    # Edit title/content, delete
-│       └── SettingsPanel.tsx    # Enable background capture / start bubble
+│       ├── Slider.tsx            # Bubble size
+│       ├── ClipListItem.tsx      # Numbered row, tap-to-arm paste
+│       ├── EditClipSheet.tsx     # Inline sheet, NOT a Modal — see §5
+│       ├── PermissionBanner.tsx  # What DevClip currently cannot do
+│       ├── ErrorBoundary.tsx
+│       └── Snackbar.tsx
 └── plugins/
-    ├── withDevClipNative.js     # Config plugin: wires everything below
-    │                            #   into the Android project automatically
+    ├── withDevClipNative.js      # Copies the Kotlin in, writes the manifest
+    │                             #   and every native-facing string resource
     └── android-src/
+        ├── BootReceiver.kt
+        ├── Capture.kt                     # What a bubble tap actually does
         ├── ClipboardAccessibilityService.kt
-        ├── DevClipDatabaseHelper.kt
-        ├── OverlayService.kt
-        ├── OverlayModule.kt
+        ├── DevClipDatabaseHelper.kt       # Native side of the shared db
+        ├── DevClipEvents.kt               # Native → JS channel
+        ├── DismissTargetView.kt           # The drag-to-hide target
+        ├── ImeWatcher.kt                  # Where the keyboard is
+        ├── OverlayModule.kt               # Native module + the Prefs contract
         ├── OverlayPackage.kt
+        ├── OverlayService.kt              # Every floating window
+        ├── SelectionCapture.kt            # Reading the live selection
         └── accessibility_service_config.xml
 ```
 
-Nothing under `android/` is committed to git — `eas build` regenerates it
-fresh from `app.json` + `plugins/` every time, via `expo prebuild`. That's
-what makes the native pieces safe to keep editing without ever touching a
-generated folder by hand.
+## 4. Database schema
 
-## 3. Database schema
+One table, `clips`, at `<app files dir>/SQLite/devclip.db` — the exact path
+`expo-sqlite` uses, matched by `DevClipDatabaseHelper.kt`. **If you change the
+schema, change both sides.**
 
-Single table, `clips`, in a SQLite file at `<app files dir>/SQLite/devclip.db`
-(the exact path `expo-sqlite` uses, matched byte-for-byte by the native
-`DevClipDatabaseHelper.kt`):
+| column      | type    | notes                                              |
+|-------------|---------|----------------------------------------------------|
+| id          | INTEGER | primary key, autoincrement                         |
+| title       | TEXT    | nullable — user-set label                          |
+| content     | TEXT    | the captured text                                  |
+| created_at  | INTEGER | unix ms timestamp; the only ordering key           |
+| sort_order  | INTEGER | **unused** — left in place, see below              |
 
-| column      | type    | notes                                   |
-|-------------|---------|------------------------------------------|
-| id          | INTEGER | primary key, autoincrement               |
-| title       | TEXT    | nullable — user-set label                |
-| content     | TEXT    | the copied text                          |
-| created_at  | INTEGER | unix ms timestamp                        |
-| sort_order  | INTEGER | used only when sort mode = "Manual"      |
+`sort_order` is a leftover from manual reordering, which is gone. Dropping a
+column in SQLite means rebuilding the table, which is not worth putting a
+user's history through for a column nobody reads. Inserts still fill it so
+both sides keep agreeing on the schema.
 
-This is intentionally a single flat table for the MVP. Adding cloud sync
-later (see below) would mean adding a `synced_at` / `remote_id` column and a
-sync service — it would not require restructuring this table.
+## 5. Decisions worth knowing about
 
-## 4. UI architecture & state management
+- **The bubble must never take input focus.** `FLAG_NOT_FOCUSABLE` on every
+  overlay window is load-bearing for both capture and paste. Anything that
+  would take focus breaks both.
+- **Position in fractions, never pixels.** The bubble's position is an edge
+  (left/right) plus a fraction of the way down, in SharedPreferences — so it
+  survives rotation, split screen, a foldable opening, and a reboot, and is
+  available to `OverlayService` at startup when there is no React context to
+  ask. There is deliberately no setting for it: dragging is the only way.
+- **Native owns geometry.** Only native knows where the bubble and the system
+  bars are. JS lays itself out to whatever window it is given.
+- **The edit sheet is not a `<Modal>`.** A Modal renders into its own Android
+  window, and that window does not inherit the activity's `adjustResize` — so
+  the keyboard covered it, and a `KeyboardAvoidingView` could not fix it
+  because nothing was wrong with the measurement. It is an ordinary view in
+  the main window, with the back button and z-order handled explicitly.
+- **Sizes relative to the user's settings, not absolute.** The floating list's
+  type is 85% of the full app's *token*, which React Native then multiplies by
+  the system font scale; the bubble's floor is 48dp because that is Android's
+  comfortable touch target. Nothing passes `allowFontScaling={false}`.
+- **Every gesture has a non-gesture equivalent.** Drag-to-hide is also the
+  notification's Hide button and a switch in Settings; long-press-to-edit is
+  also the more button on each row.
+- **Say what actually happened.** Silent failure has bitten this codebase
+  repeatedly — the empty overlay, the dead Capture button, the dialog that
+  never appeared. Prefer a visible message over a no-op.
 
-- **Zustand** (`src/store/clipStore.ts`) holds the current clip list, search
-  text, and sort mode, and wraps every database operation. Components never
-  talk to `db/database.ts` directly — they call store actions
-  (`addClip`, `updateClip`, `deleteClip`, `moveUp`, `moveDown`).
-- **No navigation library** is used — `PopupScreen` just conditionally
-  renders based on a `small | expanded | full` state variable, since the
-  three states are really "the same screen, different container size,"
-  not different pages.
-- **expo-router** is installed for future growth (e.g. if you later add a
-  settings page, onboarding flow, etc.) but isn't required by the current
-  three-state UI.
+## 6. Interface
 
-## 5. Design decisions worth knowing about
+**The bubble.** Docked to the left or right edge, dragged up and down it, and
+snapping back to the nearer edge if dropped in the middle. It wears a ring
+when a selection is live, so tap-to-capture is advertised rather than hidden.
+Dragging it into the circle at the bottom **centre** hides it — the target is
+centred rather than a full-width strip precisely so that dragging down the
+rail to park it low never triggers it. Hidden is not off: the service keeps
+running, and the notification, or Settings, brings the bubble back. A reboot
+brings it back too, because hiding means "get out of my way now", not a
+preference.
 
-- **New Architecture (Fabric) is disabled** (`newArchEnabled: false` in
-  `app.json`). Rendering React Native content inside a raw Android overlay
-  window (`OverlayService.kt`) uses the classic `ReactRootView` API, which
-  is dramatically simpler under the old architecture. This can be revisited
-  later once your bubble UI is stable.
-- **Accessibility Service, not a background poller.** Android 10+ blocks
-  ordinary background clipboard reads outright; a `setInterval`-style poller
-  from a foreground service would simply receive empty results while your
-  app isn't in the foreground. The Accessibility Service is the standard,
-  documented way real clipboard-manager apps (Clipper, ClipStack, etc.) get
-  around this.
-- **Duplicate suppression**: the native side skips inserting a clip if it's
-  identical to the most recently saved one, so re-copying the same text
-  repeatedly doesn't spam the list.
+**The lists.** Newest first, everywhere, with rows numbered from 1. The number
+is positional, not an identity — it renumbers as clips arrive and are deleted,
+which is what makes it useful. Rows show a preview; the full text lives in the
+database and comes out whole on paste.
 
-## 6. Visual design
+**Pasting.** Tap once to arm, tap again to paste. DevClip sets the clipboard
+*and* asks the accessibility service to paste directly into whatever field was
+last focused in the app underneath, falling back to "it's on your clipboard"
+when there is no field to paste into. The arm step is what
+`confirmBeforePaste` controls; it replaced an `Alert.alert` that could not
+work in a floating window at all, because an Android dialog needs a foreground
+Activity and the floating window has none by design.
 
-DevClip uses a **"Soft Structuralism"** look: a near-white silver-grey
-canvas, airy floating white cards with diffused (never harsh) shadows, and
-one restrained indigo accent color — chosen because this is a utility
-people glance at dozens of times a day from a small overlay window, so it
-needs to read instantly in bright daylight rather than compete for
-attention like a marketing site would.
-
-- **Typography** — Manrope (loaded via `@expo-google-fonts/manrope`,
-  `src/theme/fonts.ts`), a geometric grotesk with real weight range
-  (400–800), instead of the platform default system font.
-- **Icons** — `lucide-react-native`, always drawn with `strokeWidth={1.5}`
-  or thinner instead of the default heavy 2px stroke, for a lighter,
-  precise line quality.
-- **Design tokens** — centralized in `src/theme/theme.ts` (colors, spacing
-  scale, radii, shadows) so every screen pulls from the same palette
-  instead of hardcoding hex values inline.
-- **"Double-bezel" cards** — the floating popup (`PopupScreen.tsx`) and the
-  edit sheet (`EditClipModal.tsx`) both use a nested outer-shell / inner-core
-  structure (a faint outer tint + radius, containing a distinct white card
-  with its own smaller radius) rather than sitting flat on the background.
-- **Segmented pill tab bar** for Small / Expanded / Full App, with the
-  active tab riding on its own white pill + soft shadow, instead of
-  underline-style tabs.
-- **Motion** — buttons and cards use `src/components/Pressy.tsx`, a spring-
-  physics press-scale (compresses to 96% on touch) instead of the default
-  instant opacity flash, for a more physical feel.
-
-To change the palette or scale, only `src/theme/theme.ts` needs editing —
-every component reads from it rather than hardcoding values.
-
-## 7. Interface & Settings
-
-**Hero bar** (top of every screen, in any of the 3 states): app name, a
-**Bubble on/off** pill, the **Small / Expanded / Full App** switcher, and a
-gear icon that opens Settings as its own screen — reachable from any state,
-not just Full App.
-
-**Tap a clip → real paste, not just copy.** DevClip sets the clipboard
-*and* asks the Accessibility Service to perform a paste directly into
-whatever text field you were last using in the other app (it finds the
-focused field system-wide and calls its native paste action — your overlay
-windows are non-focusable, so the field underneath never loses focus). If
-no field is focused or it doesn't support paste, DevClip falls back to
-"copied — paste manually" so you're never left with nothing.
-
-**Settings screen:**
+**Settings.**
 
 | Setting | What it does |
 |---|---|
-| Permissions status | Live green/red for accessibility, overlay, and notifications — so you can tell if the OS silently revoked one later |
-| Theme | Light / Dark / Auto (follows system) |
-| Background capture | Opens Accessibility settings to enable/manage |
-| Notifications | Requests the real system permission dialog |
-| Floating bubble | Starts/stops the bubble (asks overlay permission first) |
-| Bubble size | Small / Medium / Large — takes effect immediately, even while the bubble is showing |
-| Auto-start after reboot | Restarts the bubble automatically after the phone restarts, via a native `BootReceiver` |
-| Confirm before paste | Turn off to paste on tap with no dialog |
-| Keep at most | Auto-trims oldest clips beyond 100 / 500 / 1000 / unlimited |
-| Export backup | Writes a JSON snapshot and opens the OS share sheet — live capture always stays on fixed internal storage (required for the background service to keep writing to it), this is a point-in-time export, not a sync destination |
+| Permissions status | Live status for text capture, the bubble, and notifications — Android can revoke these silently |
+| Theme | Light / Dark / Auto |
+| Text capture | Opens the Accessibility settings screen |
+| Notifications | Requests the system permission dialog |
+| Floating bubble | Starts and stops the service |
+| Show the bubble | Hides or brings back the bubble while the service keeps running |
+| Bubble size | A 48–72dp slider, applied live |
+| Auto-start after reboot | Restarts the bubble after the phone restarts |
+| Confirm before paste | Off pastes on a single tap |
+| Keep at most | Trims beyond 100 / 500 / 1000 / unlimited, enforced at capture time as well as in the app |
+| Export backup | A JSON snapshot with timestamps, via the OS share sheet |
+| Import backup | Merges, skipping anything already stored — importing twice does nothing the second time |
 | Clear all clips | Wipes the database |
 
-First launch shows a one-time **onboarding screen** that requests the
-notification permission automatically (the one permission Android lets an
-app trigger a real system dialog for) and walks through enabling
-background capture and the bubble. Because background capture now also
-powers auto-paste, its Accessibility permission screen is broader than a
-plain "read clipboard" request — this is expected, not a bug.
+**Setup** is a wall you can walk past. Two of the three permissions cannot be
+a dialog — Android sends you into system Settings — so refusing entry until
+they are granted is not something an app gets to do. A banner in the app then
+says what DevClip cannot currently do. If a permission is revoked later the
+wall comes back, and can be walked past again.
 
-**Manual sort** snapshots whatever order you were just looking at (e.g.
-Newest first) the moment you switch to Manual, instead of jumping back to
-original insertion order.
+## 7. Limits that cannot be engineered away
 
-## 8. Adding cloud sync later (not built yet)
+- **~1MB Binder transaction buffer, shared across the process.** Everything
+  passing between apps crosses it, which caps both reading a huge selection
+  out of another app and putting one on the system clipboard. A few hundred
+  thousand characters is comfortable; approaching a million is unreliable in a
+  load-dependent way. For scale, a very long web article is ~50,000
+  characters. **DevClip's own database has no such limit** — so a very large
+  clip is saved in full and the user is told that *Android* may have handed
+  over less than they highlighted.
+- **Android 13+ lets users swipe away foreground-service notifications** while
+  the service keeps running, and can deny `POST_NOTIFICATIONS` outright. That
+  is why bringing a hidden bubble back is a first-class control in Settings
+  and not merely a notification action.
+- **Selection reading is not perfect app to app.** Standard text fields and
+  web pages are fine. Apps that draw their own text — some games,
+  canvas-based apps — may give nothing. This is why the capture confirmation
+  shows the first few words of what was saved.
 
-Because storage is isolated behind `src/db/database.ts`, adding sync later
-mostly means: add a `SyncService` that reads unsynced rows and pushes them to
-a backend, plus a `synced_at` column — the UI layer (store, screens,
-components) wouldn't need to change at all.
+## 8. Adding cloud sync later (not built)
+
+Storage is isolated behind `src/db/database.ts`, so sync would mean a service
+that reads unsynced rows and a `synced_at` column. The UI layer would not
+change.
