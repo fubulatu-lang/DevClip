@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
@@ -6,9 +6,9 @@ import { useSettingsStore } from '../store/settingsStore';
 import SearchBar from '../components/SearchBar';
 import SortMenu from '../components/SortMenu';
 import ClipListItem from '../components/ClipListItem';
-import EditClipModal from '../components/EditClipModal';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
+import { useEditStore } from '../store/editStore';
 import { Clip } from '../types/clip';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { strings } from '../strings';
@@ -21,6 +21,7 @@ export default function ClipListView() {
   // keystroke in search included — re-rendered this tree. One selector per
   // value keeps each render to what actually changed.
   const clips = useClipStore((s) => s.clips);
+  const initialised = useClipStore((s) => s.initialised);
   const search = useClipStore((s) => s.search);
   const sort = useClipStore((s) => s.sort);
   const capturing = useClipStore((s) => s.capturing);
@@ -29,14 +30,14 @@ export default function ClipListView() {
   const setSearch = useClipStore((s) => s.setSearch);
   const setSort = useClipStore((s) => s.setSort);
   const capture = useClipStore((s) => s.capture);
-  const updateClip = useClipStore((s) => s.updateClip);
-  const deleteClip = useClipStore((s) => s.deleteClip);
   const moveUp = useClipStore((s) => s.moveUp);
   const moveDown = useClipStore((s) => s.moveDown);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
-  const [editing, setEditing] = useState<Clip | null>(null);
+  // The sheet itself is rendered a level up, over the app bar as well as the
+  // list; the row only says which clip to open.
+  const openEditor = useEditStore((s) => s.open);
 
   useEffect(() => {
     init();
@@ -61,12 +62,12 @@ export default function ClipListView() {
         isManualSort={sort === 'manual'}
         isFirst={index === 0}
         isLast={index === clips.length - 1}
-        onLongPress={setEditing}
+        onLongPress={openEditor}
         index={index}
         onMove={handleMove}
       />
     ),
-    [sort, clips.length, handleMove]
+    [sort, clips.length, handleMove, openEditor]
   );
 
   const styles = useMemo(
@@ -154,11 +155,15 @@ export default function ClipListView() {
         renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            {initialised && (
+              <Inbox size={icon.lg} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            )}
             <Text style={styles.emptyText}>
-              {search
-                ? strings.clips.noMatches(search)
-                : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
+              {!initialised
+                ? strings.clips.loading
+                : search
+                  ? strings.clips.noMatches(search)
+                  : `${strings.clips.emptyTitle}\n${strings.clips.emptyBody}`}
             </Text>
           </View>
         }
@@ -178,19 +183,6 @@ export default function ClipListView() {
       </View>
 
       <Snackbar />
-
-      <EditClipModal
-        clip={editing}
-        onClose={() => setEditing(null)}
-        onSave={async (id, content, title) => {
-          await updateClip(id, content, title);
-          setEditing(null);
-        }}
-        onDelete={async (id) => {
-          await deleteClip(id);
-          setEditing(null);
-        }}
-      />
     </View>
   );
 }

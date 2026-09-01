@@ -59,7 +59,15 @@ class OverlayService : Service() {
         const val CHANNEL_ID = "devclip_overlay_channel"
         const val NOTIFICATION_ID = 1001
         const val ACTION_SET_MODE = "com.devclip.app.ACTION_SET_MODE"
-        const val ACTION_HIDE = "com.devclip.app.ACTION_HIDE"
+        /**
+         * Closes the floating list. The bubble stays where it is.
+         *
+         * Named for the window it closes, not just "hide": hiding the
+         * *bubble* is a separate thing the service is about to grow, and one
+         * constant called ACTION_HIDE would be read as whichever the reader
+         * had in mind.
+         */
+        const val ACTION_HIDE_POPUP = "com.devclip.app.ACTION_HIDE_POPUP"
         const val ACTION_OPEN_FULL = "com.devclip.app.ACTION_OPEN_FULL"
         const val EXTRA_MODE = "mode"
 
@@ -123,7 +131,7 @@ class OverlayService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_SET_MODE -> setMode(intent.getStringExtra(EXTRA_MODE) ?: MODE_MINI)
-            ACTION_HIDE -> hidePopup()
+            ACTION_HIDE_POPUP -> hidePopup()
             ACTION_OPEN_FULL -> openFullApp()
         }
         return START_STICKY
@@ -259,7 +267,17 @@ class OverlayService : Service() {
                     params.y = clamp(initialY + dy, a.top, a.bottom - size)
                     windowManager.updateViewLayout(v, params)
                     // The mini window is tethered: it travels with the bubble.
-                    if (popupVisible && mode == MODE_MINI) applyPopupGeometry()
+                    //
+                    // applyPopupGeometry only mutates the params object; nothing
+                    // reaches the screen until updateViewLayout is called with it.
+                    // Every other call site pairs the two, and this one did not —
+                    // so the popup's geometry was recalculated on every frame of
+                    // the drag and never once applied, and the window sat still
+                    // while the bubble moved out from under it.
+                    if (popupVisible && mode == MODE_MINI) {
+                        applyPopupGeometry()
+                        updatePopupLayout()
+                    }
                     true
                 }
                 // The system took the gesture away (a notification shade pull,
@@ -321,6 +339,22 @@ class OverlayService : Service() {
         if (host == null) {
             fail("DevClip couldn't reach the app to draw its window.", null)
             return null
+        }
+
+        // Nothing else starts the React host but an Activity. Launched from
+        // BootReceiver, or after the app was swiped out of Recents, the service
+        // is the first thing running in the process and the JS bundle has never
+        // been loaded — so the surface below would be created against a host
+        // with no instance behind it and would render nothing at all, which is
+        // exactly the empty coloured window this used to show. Starting it here
+        // is a no-op when an Activity already did.
+        if (host.currentReactContext == null) {
+            try {
+                host.start()
+            } catch (e: Exception) {
+                fail("DevClip couldn't start the app behind its window.", e)
+                return null
+            }
         }
 
         val themed = ContextThemeWrapper(this, applicationInfo.theme)

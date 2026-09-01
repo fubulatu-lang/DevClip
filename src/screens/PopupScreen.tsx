@@ -3,11 +3,14 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Settings as SettingsIcon } from 'lucide-react-native';
 import ClipListView from './ClipListView';
+import EditClipSheet from '../components/EditClipSheet';
 import SettingsScreen from './SettingsScreen';
 import OnboardingScreen from './OnboardingScreen';
 import Pressy from '../components/Pressy';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
+import { useClipStore } from '../store/clipStore';
+import { useEditStore } from '../store/editStore';
 import { strings } from '../strings';
 
 /**
@@ -24,6 +27,9 @@ export default function PopupScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const hasOnboarded = useSettingsStore((s) => s.hasOnboarded);
   const setOnboarded = useSettingsStore((s) => s.setOnboarded);
+  const updateClip = useClipStore((s) => s.updateClip);
+  const deleteClip = useClipStore((s) => s.deleteClip);
+  const closeEditor = useEditStore((s) => s.close);
 
   const styles = useMemo(
     () =>
@@ -89,6 +95,22 @@ export default function PopupScreen() {
       </View>
 
       <ClipListView />
+
+      {/*
+        Last child, so it draws over the app bar as well as the list. It is an
+        ordinary view rather than a Modal precisely so that it shares this
+        window — and this window's adjustResize — with everything under it.
+      */}
+      <EditClipSheet
+        onSave={async (id, content, title) => {
+          await updateClip(id, content, title);
+          closeEditor();
+        }}
+        onDelete={async (id) => {
+          await deleteClip(id);
+          closeEditor();
+        }}
+      />
     </SafeAreaView>
   );
 }

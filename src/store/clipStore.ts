@@ -12,6 +12,17 @@ interface ClipStoreState {
    * state, and nothing else's.
    */
   capturing: boolean;
+  /**
+   * False until the first load has finished, however it finished.
+   *
+   * Without it an empty `clips` means two different things — "nothing saved
+   * yet" and "not read yet" — and the list shows "No clips yet" during the
+   * moment before SQLite answers. In the floating window that moment is the
+   * whole first impression, and if `init` throws it never ends: the empty
+   * state would sit there permanently claiming the history is empty when in
+   * fact it was never opened.
+   */
+  initialised: boolean;
   /** Human-readable message for the last failed operation, or null. Cleared on the next successful action. */
   error: string | null;
   init: () => Promise<void>;
@@ -63,13 +74,20 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
   search: '',
   sort: 'date-desc',
   capturing: false,
+  initialised: false,
   error: null,
 
   init: async () => {
-    await runOrReport(set, 'Could not open your clip history.', async () => {
-      await db.initDatabase();
-      await get().refresh();
-    });
+    try {
+      await runOrReport(set, 'Could not open your clip history.', async () => {
+        await db.initDatabase();
+        await get().refresh();
+      });
+    } finally {
+      // Set even on failure: the load is over either way, and the error banner
+      // is the honest thing to show, not a spinner that never stops.
+      set({ initialised: true });
+    }
   },
 
   refresh: async () => {

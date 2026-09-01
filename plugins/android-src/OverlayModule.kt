@@ -102,10 +102,10 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    /** Closes the overlay window. The bubble stays put. */
+    /** Closes the floating list. The bubble stays put. */
     @ReactMethod
-    fun hideOverlay() {
-        sendToService(OverlayService.ACTION_HIDE)
+    fun hidePopup() {
+        sendToService(OverlayService.ACTION_HIDE_POPUP)
     }
 
     /** Opens the full-screen activity and closes the overlay. */

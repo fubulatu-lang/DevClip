@@ -55,10 +55,10 @@ export function setOverlayMode(mode: OverlayMode): void {
   NativeOverlay.setOverlayMode(mode);
 }
 
-/** Closes the overlay window. The bubble stays. */
-export function hideOverlay(): void {
+/** Closes the floating list. The bubble stays. */
+export function hidePopup(): void {
   if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.hideOverlay();
+  NativeOverlay.hidePopup();
 }
 
 /** Opens the full-screen app and closes the overlay. */

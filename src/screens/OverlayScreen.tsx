@@ -9,7 +9,7 @@ import SortMenu from '../components/SortMenu';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
 import { useTheme } from '../theme/ThemeContext';
-import { setOverlayMode, hideOverlay, openFullApp, OverlayMode } from '../native/OverlayModule';
+import { setOverlayMode, hidePopup, openFullApp, OverlayMode } from '../native/OverlayModule';
 import { strings } from '../strings';
 
 /**
@@ -30,6 +30,7 @@ export default function OverlayScreen() {
   const { colors, radii, spacing, text, icon } = useTheme();
   const [mode, setMode] = useState<OverlayMode>('mini');
   const clips = useClipStore((s) => s.clips);
+  const initialised = useClipStore((s) => s.initialised);
   const search = useClipStore((s) => s.search);
   const sort = useClipStore((s) => s.sort);
   const capturing = useClipStore((s) => s.capturing);
@@ -165,7 +166,7 @@ export default function OverlayScreen() {
         )}
 
         <Pressy
-          onPress={hideOverlay}
+          onPress={hidePopup}
           style={styles.headerBtn}
           accessibilityLabel={strings.overlay.close}
           hitSlop={4}
@@ -210,9 +211,15 @@ export default function OverlayScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Inbox size={icon.md} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            {initialised && (
+              <Inbox size={icon.md} strokeWidth={icon.stroke} color={colors.inkDisabled} />
+            )}
             <Text style={styles.emptyText}>
-              {search ? strings.clips.noMatches(search) : strings.clips.emptyTitle}
+              {!initialised
+                ? strings.clips.loading
+                : search
+                  ? strings.clips.noMatches(search)
+                  : strings.clips.emptyTitle}
             </Text>
           </View>
         }
