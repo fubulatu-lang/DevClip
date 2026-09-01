@@ -111,6 +111,16 @@ export const strings = {
     exporting: 'Exporting…',
     exportFailedBody: 'Could not create the backup file. Try again.',
 
+    importBackup: 'Import backup',
+    importing: 'Importing…',
+    importFailedBody: 'Could not read that backup. Try again.',
+    imported: (added: number, skipped: number) => {
+      if (added === 0 && skipped === 0) return 'Nothing to import from that file.';
+      if (added === 0) return `Already had all ${skipped} of those clips.`;
+      if (skipped === 0) return `Added ${added} ${added === 1 ? 'clip' : 'clips'}.`;
+      return `Added ${added} ${added === 1 ? 'clip' : 'clips'}, skipped ${skipped} you already had.`;
+    },
+
     clearAll: 'Clear all clips',
     clearAllTitle: 'Clear all clips?',
     clearAllBody: 'This deletes everything in your history. You can’t undo this.',

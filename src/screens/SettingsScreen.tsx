@@ -13,6 +13,7 @@ import {
   Power,
   Layers,
   Download,
+  Upload,
 } from 'lucide-react-native';
 import {
   isNativeOverlayAvailable,
@@ -27,7 +28,7 @@ import {
 } from '../native/OverlayModule';
 import { onBubbleState } from '../native/events';
 import { usePermissions } from '../hooks/usePermissions';
-import { exportBackup } from '../utils/backup';
+import { exportBackup, importBackup } from '../utils/backup';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import {
   useSettingsStore,
@@ -73,6 +74,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   // this screen is present for — so it is listened to, not tracked here.
   const [bubbleResting, setBubbleResting] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
@@ -85,6 +87,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const maxClips = useSettingsStore((s) => s.maxClips);
   const setMaxClips = useSettingsStore((s) => s.setMaxClips);
   const clearAll = useClipStore((s) => s.clearAll);
+  const refreshClips = useClipStore((s) => s.refresh);
   const showSnackbar = useSnackbarStore((s) => s.show);
 
   const refreshStatus = useCallback(async () => {
@@ -221,6 +224,27 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
       showSnackbar(strings.settings.exportFailedBody);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const result = await importBackup();
+      // Closing the picker is not an outcome to report. Saying "nothing was
+      // imported" to somebody who just decided not to import anything is
+      // noise pretending to be feedback.
+      if (result.cancelled) return;
+      await refreshClips();
+      showSnackbar(strings.settings.imported(result.added, result.skipped));
+    } catch (e) {
+      // parseBackup throws with copy meant for the user — it knows whether
+      // the file was unreadable or simply had nothing in it.
+      showSnackbar(
+        e instanceof Error && e.message ? e.message : strings.settings.importFailedBody
+      );
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -460,9 +484,33 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </View>
           </View>
 
-          <Pressy onPress={handleExport} style={styles.exportBtn} accessibilityLabel={strings.settings.exportBackup}>
+          <Pressy
+            onPress={handleExport}
+            disabled={exporting}
+            style={styles.exportBtn}
+            accessibilityLabel={strings.settings.exportBackup}
+          >
             <Download size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
-            <Text style={styles.exportText}>{exporting ? strings.settings.exporting : strings.settings.exportBackup}</Text>
+            <Text style={styles.exportText}>
+              {exporting ? strings.settings.exporting : strings.settings.exportBackup}
+            </Text>
+          </Pressy>
+
+          {/*
+            Import merges and skips anything already stored, so it is not a
+            destructive action and does not need a confirmation. Importing the
+            same file twice does nothing the second time.
+          */}
+          <Pressy
+            onPress={handleImport}
+            disabled={importing}
+            style={styles.exportBtn}
+            accessibilityLabel={strings.settings.importBackup}
+          >
+            <Upload size={icon.sm} strokeWidth={icon.stroke} color={colors.accent} />
+            <Text style={styles.exportText}>
+              {importing ? strings.settings.importing : strings.settings.importBackup}
+            </Text>
           </Pressy>
 
           <Pressy onPress={handleClearAll} style={styles.dangerBtn} accessibilityLabel={strings.settings.clearAll}>

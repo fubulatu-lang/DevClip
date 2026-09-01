@@ -102,6 +102,57 @@ export async function deleteAllClips(): Promise<void> {
   await db.execAsync('DELETE FROM clips;');
 }
 
+/**
+ * Merges imported clips in, skipping any whose text is already stored.
+ *
+ * One transaction for the whole file. A backup can be thousands of rows, and
+ * a partially-applied import — the app killed halfway through — would leave a
+ * history that is neither what it was nor what was asked for.
+ *
+ * The existing text is read once into a Set rather than queried per row: a
+ * thousand-row import would otherwise be a thousand SELECTs, and the check is
+ * exact equality either way.
+ */
+export async function importClips(
+  clips: { title: string | null; content: string; createdAt: number }[]
+): Promise<{ added: number; skipped: number }> {
+  const db = getDb();
+  const existingRows = await db.getAllAsync<{ content: string }>('SELECT content FROM clips;');
+  const existing = new Set(existingRows.map((r) => r.content));
+
+  const maxRow = await db.getFirstAsync<{ maxOrder: number | null }>(
+    'SELECT MAX(sort_order) as maxOrder FROM clips;'
+  );
+  let nextOrder = (maxRow?.maxOrder ?? -1) + 1;
+
+  let added = 0;
+  let skipped = 0;
+
+  await db.execAsync('BEGIN TRANSACTION;');
+  try {
+    for (const clip of clips) {
+      // Guards against duplicates already in the database and duplicates
+      // within the file itself, which a hand-merged backup can carry.
+      if (existing.has(clip.content)) {
+        skipped++;
+        continue;
+      }
+      existing.add(clip.content);
+      await db.runAsync(
+        'INSERT INTO clips (title, content, created_at, sort_order) VALUES (?, ?, ?, ?);',
+        [clip.title, clip.content, clip.createdAt, nextOrder++]
+      );
+      added++;
+    }
+    await db.execAsync('COMMIT;');
+  } catch (e) {
+    await db.execAsync('ROLLBACK;');
+    throw e;
+  }
+
+  return { added, skipped };
+}
+
 // Keeps only the most recent `max` clips (by created_at). max <= 0 means unlimited.
 export async function trimClipsToMax(max: number): Promise<void> {
   if (max <= 0) return;
