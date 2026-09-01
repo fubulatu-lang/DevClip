@@ -36,6 +36,7 @@ function withDevClipNativeFiles(config) {
         'ClipboardAccessibilityService.kt',
         'DevClipDatabaseHelper.kt',
         'DevClipEvents.kt',
+        'DismissTargetView.kt',
         'ImeWatcher.kt',
         'OverlayModule.kt',
         'OverlayPackage.kt',
@@ -185,6 +186,32 @@ const NATIVE_STRINGS = [
     value: 'Skipped that one \u2014 it looks like a password field.',
   },
   { name: 'devclip_capture_failed', value: 'DevClip couldn\u2019t save that. Try again.' },
+
+  // The notification. It is the way back to a hidden bubble, so its copy has
+  // to say what each button actually does. "Dismiss" is deliberately absent —
+  // it implies a permanence hiding the bubble does not have.
+  { name: 'devclip_notification_channel', value: 'DevClip bubble' },
+  {
+    name: 'devclip_notification_channel_description',
+    value: 'A silent, ongoing notification while the DevClip bubble is running.',
+  },
+  { name: 'devclip_notification_title', value: 'DevClip is running' },
+  { name: 'devclip_notification_text_awake', value: 'Tap the bubble to save what you\u2019ve highlighted.' },
+  { name: 'devclip_notification_text_resting', value: 'Bubble hidden.' },
+  { name: 'devclip_notification_hide', value: 'Hide bubble' },
+  { name: 'devclip_notification_show', value: 'Show bubble' },
+  { name: 'devclip_notification_turn_off', value: 'Turn off' },
+
+  // Said with a Toast, because the windows have just been torn down and there
+  // is nothing left to draw a message in.
+  {
+    name: 'devclip_bubble_hidden',
+    value: 'Bubble hidden. Bring it back from the notification, or from inside DevClip.',
+  },
+  {
+    name: 'devclip_bubble_hidden_no_notification',
+    value: 'Bubble hidden. Bring it back from inside DevClip.',
+  },
 
   // Failures that used to be silent. Every one of these was once a tap that
   // appeared to do nothing at all.

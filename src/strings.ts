@@ -13,12 +13,6 @@ export const strings = {
     name: 'DevClip',
   },
 
-  bubble: {
-    on: 'Bubble on',
-    off: 'Bubble off',
-    turnOn: 'Turn on floating bubble',
-    turnOff: 'Turn off floating bubble',
-  },
 
   clips: {
     capture: 'Capture clipboard',
@@ -93,12 +87,14 @@ export const strings = {
     stop: 'Stop',
 
     bubbleSize: 'Bubble size',
-    bubbleSmall: 'S',
-    bubbleMedium: 'M',
-    bubbleLarge: 'L',
-    bubbleSmallA11y: 'Small',
-    bubbleMediumA11y: 'Medium',
-    bubbleLargeA11y: 'Large',
+    bubbleSizeValue: (dp: number) => `${dp}dp`,
+    bubbleSizeA11y: (dp: number) => `${dp} density pixels across`,
+
+    bubbleVisibility: 'Show the bubble',
+    hideBubble: 'Hide',
+    showBubble: 'Show',
+    bubbleHiddenNote:
+      'The bubble is hidden. DevClip is still running — bring it back here or from the notification.',
 
     autoStart: 'Auto-start after reboot',
     confirmPaste: 'Confirm before paste',

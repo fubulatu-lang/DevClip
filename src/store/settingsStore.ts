@@ -8,19 +8,33 @@ import {
 } from '../native/OverlayModule';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-export type BubbleSize = 'small' | 'medium' | 'large';
+
+/**
+ * Bubble diameter in dp.
+ *
+ * The floor is Android's comfortable touch target. Below 48dp a bubble gets
+ * missed, and it gets missed most when it is sitting over a keyboard — which
+ * is exactly where it needs to be hit. The ceiling is 1.5x that; past it the
+ * bubble stops being a bubble and starts being something in the way.
+ *
+ * Both are mirrored in Prefs on the native side, which has to hold the same
+ * limits because it reads the stored value directly at startup.
+ */
+export const MIN_BUBBLE_SIZE = 48;
+export const MAX_BUBBLE_SIZE = 72;
+export const DEFAULT_BUBBLE_SIZE = 56;
 
 interface SettingsState {
   hasOnboarded: boolean;
   themeMode: ThemeMode;
-  bubbleSize: BubbleSize;
+  bubbleSize: number;
   autoStartOnBoot: boolean;
   confirmBeforePaste: boolean;
   maxClips: number; // 0 = unlimited
 
   setOnboarded: () => void;
   setThemeMode: (mode: ThemeMode) => void;
-  setBubbleSize: (size: BubbleSize) => void;
+  setBubbleSize: (sizeDp: number) => void;
   setAutoStartOnBoot: (enabled: boolean) => void;
   setConfirmBeforePaste: (enabled: boolean) => void;
   setMaxClips: (max: number) => void;
@@ -31,16 +45,19 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       hasOnboarded: false,
       themeMode: 'system',
-      bubbleSize: 'medium',
+      bubbleSize: DEFAULT_BUBBLE_SIZE,
       autoStartOnBoot: true,
       confirmBeforePaste: true,
       maxClips: 500,
 
       setOnboarded: () => set({ hasOnboarded: true }),
       setThemeMode: (mode) => set({ themeMode: mode }),
-      setBubbleSize: (size) => {
-        set({ bubbleSize: size });
-        nativeSetBubbleSize(size);
+      setBubbleSize: (sizeDp) => {
+        const clamped = Math.round(
+          Math.min(MAX_BUBBLE_SIZE, Math.max(MIN_BUBBLE_SIZE, sizeDp))
+        );
+        set({ bubbleSize: clamped });
+        nativeSetBubbleSize(clamped);
       },
       setAutoStartOnBoot: (enabled) => {
         set({ autoStartOnBoot: enabled });
@@ -55,6 +72,26 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: 'devclip-settings',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2,
+      /**
+       * Bubble size was three names; it is a number of dp now. Without this
+       * an existing install rehydrates the string 'medium' into a field the
+       * slider reads as a number, and the slider renders at NaN.
+       */
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<SettingsState> & { bubbleSize?: unknown };
+        if (version < 2) {
+          const legacy: Record<string, number> = {
+            small: MIN_BUBBLE_SIZE,
+            medium: DEFAULT_BUBBLE_SIZE,
+            large: MAX_BUBBLE_SIZE,
+          };
+          const stored = state?.bubbleSize;
+          state.bubbleSize =
+            typeof stored === 'string' ? (legacy[stored] ?? DEFAULT_BUBBLE_SIZE) : DEFAULT_BUBBLE_SIZE;
+        }
+        return state as SettingsState;
+      },
       /**
        * Native components read these from SharedPreferences and can run with
        * no JS at all — the service started by BootReceiver, capture with the

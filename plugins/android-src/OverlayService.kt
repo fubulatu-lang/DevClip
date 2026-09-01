@@ -22,6 +22,7 @@ import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
+import android.view.animation.PathInterpolator
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowInsets
@@ -30,6 +31,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import com.facebook.react.ReactApplication
 import com.facebook.react.interfaces.fabric.ReactSurface
@@ -37,9 +39,22 @@ import kotlin.math.abs
 import kotlin.math.min
 
 /**
- * Foreground service that owns two overlay windows:
- *  1. A draggable, tappable bubble showing the app icon (always visible).
+ * Foreground service that owns DevClip's floating windows:
+ *
+ *  1. The bubble — the app icon, docked to the left or right edge, draggable
+ *     up and down it, and the thing that captures a selection when tapped.
  *  2. A React Native surface rendering "DevClipPopup" — the floating list.
+ *  3. The drag-to-hide target, which exists only while a drag is in progress.
+ *
+ * Three states, not two:
+ *
+ *     service stopped          -> nothing
+ *     service running, awake   -> bubble visible
+ *     service running, resting -> bubble hidden, notification is the way back
+ *
+ * Resting is not persisted. Hiding the bubble means "get out of my way now",
+ * not "I would rather not have a bubble" — so a reboot brings it back, and
+ * turning DevClip off is a separate action with its own label.
  *
  * Native owns the list's geometry, because only this side knows where the
  * bubble is and where the system bars are. The list is tethered to the
@@ -53,7 +68,7 @@ import kotlin.math.min
  * about; the tethered list is now sized to be worth opening on its own.
  *
  * Every geometry is clamped to the area left over after the status and
- * navigation bars, so neither window is ever placed underneath them.
+ * navigation bars, so no window is ever placed underneath them.
  */
 class OverlayService : Service() {
 
@@ -77,6 +92,35 @@ class OverlayService : Service() {
      */
     private var parkedY = 0
 
+    /**
+     * Which edge the bubble is docked to, and how far down it sits.
+     *
+     * Stored as an edge and a fraction rather than as pixels, because pixels
+     * stop meaning anything the moment the window changes shape — rotation,
+     * split-screen, a foldable opening. A fraction lands in the same relative
+     * place on any of them.
+     *
+     * They live in SharedPreferences, not in a JS store, because the service
+     * needs them at startup and can be started by BootReceiver long before any
+     * React context exists. There is deliberately no setting for either:
+     * dragging the bubble is the only way to move it.
+     */
+    private var edge = Prefs.EDGE_RIGHT
+    private var yFraction = Prefs.DEFAULT_Y_FRACTION
+
+    /**
+     * Running with the bubble hidden.
+     *
+     * Not persisted, on purpose. Hiding the bubble means "get out of my way
+     * now", not "I would prefer not to have a bubble" — so a reboot brings it
+     * back, and turning DevClip off is a separate, clearly-labelled action.
+     */
+    private var resting = false
+
+    private var dismissTarget: DismissTargetView? = null
+    private var dismissParams: WindowManager.LayoutParams? = null
+    private var magnetised = false
+
     private var bubbleAnimator: ValueAnimator? = null
     private var popupSurface: ReactSurface? = null
     private var popupView: View? = null
@@ -96,6 +140,19 @@ class OverlayService : Service() {
          */
         const val ACTION_HIDE_POPUP = "com.devclip.app.ACTION_HIDE_POPUP"
         const val ACTION_OPEN_FULL = "com.devclip.app.ACTION_OPEN_FULL"
+
+        /** Hide the bubble. The service keeps running and keeps its notification. */
+        const val ACTION_REST = "com.devclip.app.ACTION_REST"
+
+        /** Bring the bubble back, at the position the user left it. */
+        const val ACTION_WAKE = "com.devclip.app.ACTION_WAKE"
+
+        /** Turn DevClip's bubble off entirely. */
+        const val ACTION_STOP = "com.devclip.app.ACTION_STOP"
+
+        /** Resize the bubble in place, without tearing it down. */
+        const val ACTION_SET_BUBBLE_SIZE = "com.devclip.app.ACTION_SET_BUBBLE_SIZE"
+        const val EXTRA_SIZE_DP = "size_dp"
 
         /**
          * The floating list is the only floating surface now that the expanded
@@ -164,15 +221,22 @@ class OverlayService : Service() {
 
         bubbleView?.let { view ->
             bubbleParams?.let { params ->
-                params.x = clamp(params.x, area.left, area.right - bubbleSizePx)
-                // Re-resolved rather than re-clamped: the parked position is
-                // what the user chose, and the new configuration may have room
-                // for it again even if the old one did not.
-                parkedY = clamp(parkedY, area.top, area.bottom - bubbleSizePx)
+                // Re-derived from the edge and the fraction rather than
+                // clamped from the old pixels. That is what storing a fraction
+                // buys: a bubble a quarter of the way down stays a quarter of
+                // the way down when the phone turns, unfolds, or is put into
+                // split screen, instead of being squeezed to whatever fits.
+                parkedY = yFromFraction(area)
+                params.x = edgeX(area)
                 params.y = resolvedY(area)
                 try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
             }
         }
+
+        // The target window is sized to the safe area, so it has to be
+        // re-measured for the new one.
+        hideDismissTarget()
+        resizeDismissTarget(area)
 
         if (popupVisible) {
             applyPopupGeometry()
@@ -184,27 +248,123 @@ class OverlayService : Service() {
         when (intent?.action) {
             ACTION_HIDE_POPUP -> hidePopup()
             ACTION_OPEN_FULL -> openFullApp()
+            ACTION_REST -> rest()
+            ACTION_WAKE -> wake()
+            ACTION_STOP -> turnOff()
+            ACTION_SET_BUBBLE_SIZE ->
+                applyBubbleSize(intent.getIntExtra(EXTRA_SIZE_DP, Prefs.DEFAULT_BUBBLE_SIZE_DP))
         }
         return START_STICKY
     }
 
-    // ---- Notification (required for any foreground service) ----
+    // ---- Notification ----
 
+    /**
+     * The notification is load-bearing now: it is the way back to a hidden
+     * bubble, and it was not built for that.
+     *
+     * IMPORTANCE_LOW, not IMPORTANCE_MIN. MIN gets collapsed into the silent
+     * section and its action buttons frequently do not render at all — which
+     * would leave the "Show bubble" button, the accessible equivalent of the
+     * drag gesture, sometimes simply absent. LOW is still silent and still
+     * never a heads-up, but it renders normally with its actions.
+     *
+     * setOngoing resists a swipe-away, but Android 13 lets the user dismiss a
+     * foreground-service notification regardless and that has drifted across
+     * releases. So this is a convenience, never the only route: turning the
+     * bubble back on from inside DevClip is first-class.
+     *
+     * "Dismiss" is deliberately absent from the copy. It implies a permanence
+     * this gesture does not have. Hide, Show and Turn off say what actually
+     * happens.
+     */
     private fun buildNotification(): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID, "DevClip Overlay", NotificationManager.IMPORTANCE_MIN
-            )
+                CHANNEL_ID,
+                getString(R.string.devclip_notification_channel),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                setShowBadge(false)
+                description = getString(R.string.devclip_notification_channel_description)
+            }
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .createNotificationChannel(channel)
         }
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("DevClip is running")
-            .setContentText("Tap the bubble to view your clipboard history.")
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(getString(R.string.devclip_notification_title))
+            .setContentText(
+                getString(
+                    if (resting) R.string.devclip_notification_text_resting
+                    else R.string.devclip_notification_text_awake
+                )
+            )
             .setSmallIcon(android.R.drawable.ic_menu_edit)
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .build()
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setSilent(true)
+            .setOngoing(true)
+            .setContentIntent(activityIntent())
+
+        if (resting) {
+            builder.addAction(
+                0,
+                getString(R.string.devclip_notification_show),
+                serviceIntent(ACTION_WAKE, 2)
+            )
+        } else {
+            // Also the accessible equivalent of drag-to-hide, which would
+            // otherwise be a gesture with no non-gesture counterpart.
+            builder.addAction(
+                0,
+                getString(R.string.devclip_notification_hide),
+                serviceIntent(ACTION_REST, 1)
+            )
+        }
+        builder.addAction(
+            0,
+            getString(R.string.devclip_notification_turn_off),
+            serviceIntent(ACTION_STOP, 3)
+        )
+
+        return builder.build()
     }
+
+    private fun refreshNotification() {
+        try {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, buildNotification())
+        } catch (e: Exception) {
+            // Notifications are blocked. The in-app route still works, which
+            // is why it is not a fallback.
+            android.util.Log.w("DevClip", "Could not update the notification", e)
+        }
+    }
+
+    private fun pendingFlags(): Int =
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+
+    private fun serviceIntent(action: String, requestCode: Int): PendingIntent {
+        val intent = Intent(this, OverlayService::class.java).apply { this.action = action }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+            PendingIntent.getForegroundService(this, requestCode, intent, pendingFlags())
+        else
+            PendingIntent.getService(this, requestCode, intent, pendingFlags())
+    }
+
+    private fun activityIntent(): PendingIntent {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        return PendingIntent.getActivity(this, 0, intent, pendingFlags())
+    }
+
+    private fun notificationsAllowed(): Boolean =
+        try {
+            NotificationManagerCompat.from(this).areNotificationsEnabled()
+        } catch (e: Exception) {
+            false
+        }
 
     // ---- Geometry ----
 
@@ -248,16 +408,20 @@ class OverlayService : Service() {
 
     /**
      * Builds the bubble: the app icon, inset far enough to leave room for a
-     * ring around it.
+     * ring around it. Size comes from the window's layout params, not from
+     * here, so the bubble can be resized without being rebuilt.
      *
      * The icon comes from the package manager rather than a copied drawable,
      * so it always matches whatever the launcher shows, and is clipped to a
      * circle because an adaptive icon draws itself square when nothing applies
      * the launcher's mask for it.
      */
-    private fun buildBubbleView(size: Int): FrameLayout {
+    private fun buildBubbleView(): FrameLayout {
         val inset = dp(SELECTION_RING_DP)
-        val iconSize = (size - inset * 2).coerceAtLeast(1)
+        // Rasterised once, at the largest size the slider allows, and scaled
+        // down by the ImageView. Redrawing the bitmap on every size change
+        // would mean redrawing it on every pixel of a slider drag.
+        val iconSize = (dp(Prefs.MAX_BUBBLE_SIZE_DP) - inset * 2).coerceAtLeast(1)
 
         val icon = ImageView(this).apply {
             val drawable = packageManager.getApplicationIcon(packageName)
@@ -265,6 +429,7 @@ class OverlayService : Service() {
                 .create(resources, drawableToBitmap(drawable, iconSize))
                 .apply { isCircular = true }
             setImageDrawable(rounded)
+            scaleType = ImageView.ScaleType.FIT_CENTER
         }
 
         return FrameLayout(this).apply {
@@ -355,6 +520,51 @@ class OverlayService : Service() {
         }
     }
 
+    // ---- Where the bubble lives ----
+
+    private fun prefs() = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+
+    private fun loadPosition() {
+        val stored = prefs()
+        edge = if (stored.getString(Prefs.KEY_BUBBLE_EDGE, Prefs.EDGE_RIGHT) == Prefs.EDGE_LEFT)
+            Prefs.EDGE_LEFT else Prefs.EDGE_RIGHT
+        yFraction = stored.getFloat(Prefs.KEY_BUBBLE_Y_FRACTION, Prefs.DEFAULT_Y_FRACTION)
+            .coerceIn(0f, 1f)
+    }
+
+    /**
+     * Writes the parked position, once the drag has settled.
+     *
+     * Debounced because a flurry of drags in quick succession is one decision,
+     * not several, and each one of these is a disk write.
+     */
+    private val persistPosition = Runnable {
+        prefs().edit()
+            .putString(Prefs.KEY_BUBBLE_EDGE, edge)
+            .putFloat(Prefs.KEY_BUBBLE_Y_FRACTION, yFraction)
+            .apply()
+    }
+
+    private fun schedulePersistPosition() {
+        mainHandler.removeCallbacks(persistPosition)
+        mainHandler.postDelayed(persistPosition, POSITION_WRITE_DELAY_MS)
+    }
+
+    /** The bubble is docked, so its x is decided by which edge, not by the drag. */
+    private fun edgeX(area: SafeArea): Int =
+        if (edge == Prefs.EDGE_LEFT) area.left + dp(EDGE_MARGIN_DP)
+        else area.right - bubbleSizePx - dp(EDGE_MARGIN_DP)
+
+    private fun yFromFraction(area: SafeArea): Int {
+        val travel = (area.height - bubbleSizePx).coerceAtLeast(0)
+        return area.top + (travel * yFraction).toInt()
+    }
+
+    private fun fractionFromY(area: SafeArea, y: Int): Float {
+        val travel = (area.height - bubbleSizePx).coerceAtLeast(1)
+        return ((y - area.top).toFloat() / travel).coerceIn(0f, 1f)
+    }
+
     // ---- Parked vs displaced ----
 
     /**
@@ -387,25 +597,32 @@ class OverlayService : Service() {
         val area = safeArea()
         val target = resolvedY(area)
         if (params.y == target) return
-        animateBubbleY(target)
+        animateBubbleTo(params.x, target)
     }
 
-    private fun animateBubbleY(target: Int) {
+    private fun animateBubbleTo(targetX: Int, targetY: Int) {
         val view = bubbleView ?: return
         val params = bubbleParams ?: return
 
         bubbleAnimator?.cancel()
 
         if (animationsDisabled()) {
-            params.y = target
+            params.x = targetX
+            params.y = targetY
             pushBubbleLayout(view, params)
             return
         }
 
-        bubbleAnimator = ValueAnimator.ofInt(params.y, target).apply {
-            duration = 200
+        val fromX = params.x
+        val fromY = params.y
+        bubbleAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = SETTLE_DURATION_MS
+            // One UI's standard curve, the same one the JS side animates on.
+            interpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f)
             addUpdateListener { animation ->
-                params.y = animation.animatedValue as Int
+                val t = animation.animatedValue as Float
+                params.x = (fromX + (targetX - fromX) * t).toInt()
+                params.y = (fromY + (targetY - fromY) * t).toInt()
                 pushBubbleLayout(view, params)
             }
             start()
@@ -426,30 +643,211 @@ class OverlayService : Service() {
         }
     }
 
-    private fun addBubble() {
-        val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
-        val sizeDp = when (prefs.getString(Prefs.KEY_BUBBLE_SIZE, "medium")) {
-            "small" -> 44
-            "large" -> 72
-            else -> 56
-        }
-        val size = dp(sizeDp)
-        bubbleSizePx = size
+    // ---- Resizing, live ----
 
-        val bubble = buildBubbleView(size)
+    /**
+     * Changes the bubble's size without tearing it down and rebuilding it.
+     *
+     * The old setter restarted the whole service. That was survivable when the
+     * size was three fixed choices; against a slider it would have torn the
+     * bubble down and rebuilt it on every pixel of the drag. The icon is
+     * rasterised once at the largest size the slider allows and scaled by the
+     * ImageView, so a resize is a layout change and nothing more.
+     */
+    private fun applyBubbleSize(sizeDp: Int) {
+        val clamped = sizeDp.coerceIn(Prefs.MIN_BUBBLE_SIZE_DP, Prefs.MAX_BUBBLE_SIZE_DP)
+        bubbleSizePx = dp(clamped)
+
+        val view = bubbleView ?: return
+        val params = bubbleParams ?: return
+        val area = safeArea()
+
+        params.width = bubbleSizePx
+        params.height = bubbleSizePx
+        parkedY = yFromFraction(area)
+        params.x = edgeX(area)
+        params.y = resolvedY(area)
+        pushBubbleLayout(view, params)
+    }
+
+    // ---- Hiding and showing the bubble ----
+
+    /**
+     * Hides the bubble. The service stays up, and so does the notification —
+     * which is now the way back.
+     */
+    private fun rest() {
+        if (resting) return
+        resting = true
+        // Hiding the bubble hides what hangs off it. Leaving the list floating
+        // with nothing to be tethered to would be its own bug.
+        hidePopup()
+        removeBubble()
+        refreshNotification()
+        DevClipEvents.emitBubbleState(true)
+
+        // A Toast, not a message in a window: the windows were just torn down.
+        // The copy has to adapt, because with notifications blocked there is
+        // no notification panel to send anyone to.
+        toast(
+            getString(
+                if (notificationsAllowed()) R.string.devclip_bubble_hidden
+                else R.string.devclip_bubble_hidden_no_notification
+            )
+        )
+    }
+
+    private fun wake() {
+        if (!resting) return
+        resting = false
+        addBubble()
+        refreshNotification()
+        DevClipEvents.emitBubbleState(false)
+    }
+
+    private fun turnOff() {
+        prefs().edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, false).apply()
+        stopSelf()
+    }
+
+    private fun removeBubble() {
+        bubbleAnimator?.cancel()
+        bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) { } }
+        bubbleView = null
+        bubbleParams = null
+        removeDismissTarget()
+    }
+
+    // ---- The drag-to-hide target ----
+
+    /**
+     * Creates the target's window, hidden, *before* the bubble's.
+     *
+     * Order matters and there is no way round it. Two windows of the same type
+     * stack by the order they were added, and an app on Android 8 and up gets
+     * exactly one type to work with — so a target window added when the drag
+     * starts would be added last and would draw over the bubble, hiding the
+     * very thing being dragged behind its own scrim. Adding it first, empty
+     * and not touchable, and merely showing its contents when a drag begins,
+     * puts it where it belongs underneath.
+     */
+    private fun ensureDismissTarget() {
+        if (dismissTarget != null) return
+        val area = safeArea()
+        val view = DismissTargetView(this).apply { visibility = View.GONE }
+        val params = WindowManager.LayoutParams(
+            area.width, area.height, overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = area.left
+            y = area.top
+        }
+        try {
+            windowManager.addView(view, params)
+            dismissTarget = view
+            dismissParams = params
+        } catch (e: Exception) {
+            // No target means no drag-to-hide. The notification's Hide action
+            // and the switch in Settings both still work, which is why the
+            // gesture is not the only way to do this.
+            android.util.Log.w("DevClip", "Could not create the hide target", e)
+        }
+    }
+
+    private fun showDismissTarget() {
+        val view = dismissTarget ?: return
+        view.engaged = false
+        view.visibility = View.VISIBLE
+    }
+
+    private fun hideDismissTarget() {
+        magnetised = false
+        val view = dismissTarget ?: return
+        view.engaged = false
+        view.visibility = View.GONE
+    }
+
+    private fun removeDismissTarget() {
+        dismissTarget?.let { try { windowManager.removeView(it) } catch (e: Exception) { } }
+        dismissTarget = null
+        dismissParams = null
+        magnetised = false
+    }
+
+    private fun resizeDismissTarget(area: SafeArea) {
+        val view = dismissTarget ?: return
+        val params = dismissParams ?: return
+        params.width = area.width
+        params.height = area.height
+        params.x = area.left
+        params.y = area.top
+        try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+    }
+
+    /**
+     * Pulls the bubble into the target when the drag gets close.
+     *
+     * Magnetising moves the bubble *into* the target, so releasing while
+     * magnetised is releasing inside it, not merely near it. That is the point
+     * of the pull: the commit is visible and felt before the finger lifts,
+     * rather than being discovered afterwards.
+     *
+     * Returns true when the bubble is being held by the target.
+     */
+    private fun updateMagnet(params: WindowManager.LayoutParams): Boolean {
+        val target = dismissTarget ?: return false
+        val origin = dismissParams ?: return false
+
+        val centreX = params.x + bubbleSizePx / 2f
+        val centreY = params.y + bubbleSizePx / 2f
+        val targetX = origin.x + target.circleCenterX
+        val targetY = origin.y + target.circleCenterY
+        val dx = centreX - targetX
+        val dy = centreY - targetY
+        val near = kotlin.math.hypot(dx, dy) <= target.magnetRadiusPx
+
+        if (near != magnetised) {
+            magnetised = near
+            target.engaged = near
+            // On entering, not on release: the user should feel the commit
+            // while they can still change their mind about it.
+            if (near) buzz()
+        }
+
+        if (near) {
+            params.x = (targetX - bubbleSizePx / 2f).toInt()
+            params.y = (targetY - bubbleSizePx / 2f).toInt()
+        }
+        return near
+    }
+
+    private fun addBubble() {
+        loadPosition()
+        bubbleSizePx = dp(
+            prefs().getInt(Prefs.KEY_BUBBLE_SIZE_DP, Prefs.DEFAULT_BUBBLE_SIZE_DP)
+                .coerceIn(Prefs.MIN_BUBBLE_SIZE_DP, Prefs.MAX_BUBBLE_SIZE_DP)
+        )
+        val size = bubbleSizePx
+
+        // Before the bubble's window, so it stacks underneath it.
+        ensureDismissTarget()
+
+        val bubble = buildBubbleView()
 
         val area = safeArea()
+        parkedY = yFromFraction(area)
         val params = WindowManager.LayoutParams(
             size, size, overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = area.left + dp(EDGE_MARGIN_DP)
-            y = area.top + dp(96)
+            x = edgeX(area)
+            y = resolvedY(area)
         }
-        parkedY = params.y
-        params.y = resolvedY(area)
 
         var initialX = 0
         var initialY = 0
@@ -488,6 +886,7 @@ class OverlayService : Service() {
         bubble.setOnTouchListener { v, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    bubbleAnimator?.cancel()
                     initialX = params.x
                     initialY = params.y
                     touchX = event.rawX
@@ -500,29 +899,26 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
-                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                    if (!moved && (abs(dx) > touchSlop || abs(dy) > touchSlop)) {
                         moved = true
                         mainHandler.removeCallbacks(longPress)
+                        // Only once a drag has actually started. Flashing a
+                        // dismiss target under every tap would be alarming.
+                        showDismissTarget()
                     }
+                    if (!moved) return@setOnTouchListener true
+
                     val a = safeArea()
-                    params.x = clamp(initialX + dx, a.left, a.right - size)
+                    // Free in both axes during the drag — the snap to an edge
+                    // happens on release. A bubble that could not leave its
+                    // rail could never reach the bottom-centre target.
+                    params.x = clamp(initialX + dx, a.left, a.right - bubbleSizePx)
                     // Clamped to the band the user can actually see. Dragging
                     // the bubble under a raised keyboard would put it
                     // somewhere they cannot reach it again.
                     params.y = clamp(initialY + dy, a.top, bubbleMaxY(a))
-                    windowManager.updateViewLayout(v, params)
-                    // The list window is tethered: it travels with the bubble.
-                    //
-                    // applyPopupGeometry only mutates the params object; nothing
-                    // reaches the screen until updateViewLayout is called with it.
-                    // Every other call site pairs the two, and this one did not —
-                    // so the popup's geometry was recalculated on every frame of
-                    // the drag and never once applied, and the window sat still
-                    // while the bubble moved out from under it.
-                    if (popupVisible) {
-                        applyPopupGeometry()
-                        updatePopupLayout()
-                    }
+                    updateMagnet(params)
+                    pushBubbleLayout(v, params)
                     true
                 }
                 // The system took the gesture away (a notification shade pull,
@@ -530,18 +926,24 @@ class OverlayService : Service() {
                 MotionEvent.ACTION_CANCEL -> {
                     moved = true
                     mainHandler.removeCallbacks(longPress)
+                    hideDismissTarget()
+                    settle()
                     true
                 }
                 MotionEvent.ACTION_UP -> {
                     mainHandler.removeCallbacks(longPress)
                     if (moved) {
-                        // Dropping the bubble sets where it lives. Doing this
-                        // with the keyboard up means the keyboard can bias the
-                        // parked position upward over time; the alternative is
-                        // a drag that silently does not take, which is worse.
-                        parkedY = params.y
-                    }
-                    if (!moved && !longPressFired) {
+                        val hide = magnetised
+                        hideDismissTarget()
+                        if (hide) {
+                            // Posted, not called: rest() tears down this very
+                            // view's window, and doing that from inside its
+                            // own touch dispatch is asking for trouble.
+                            mainHandler.post { rest() }
+                        } else {
+                            park(params)
+                        }
+                    } else if (!longPressFired) {
                         // An exception thrown from here escapes view dispatch and
                         // takes the whole touch listener down with it — the bubble
                         // would still be drawn but would stop responding, with no
@@ -564,6 +966,31 @@ class OverlayService : Service() {
         bubbleView = bubble
         bubbleParams = params
         showSelectionRing(SelectionCapture.hasLiveSelection)
+    }
+
+    /**
+     * Where a released drag ends up: docked to the nearer edge, at the height
+     * it was dropped.
+     *
+     * The bubble lives on an edge. Letting it stop anywhere would put it in
+     * the middle of whatever the user is reading, and it is the edge-docking
+     * that makes the bottom-centre hide target safe to have at all.
+     */
+    private fun park(params: WindowManager.LayoutParams) {
+        val area = safeArea()
+        val centre = params.x + bubbleSizePx / 2
+        edge = if (centre < area.left + area.width / 2) Prefs.EDGE_LEFT else Prefs.EDGE_RIGHT
+        parkedY = params.y
+        yFraction = fractionFromY(area, parkedY)
+        schedulePersistPosition()
+        animateBubbleTo(edgeX(area), resolvedY(area))
+    }
+
+    /** Return the bubble to where it belongs after an interrupted drag. */
+    private fun settle() {
+        val params = bubbleParams ?: return
+        val area = safeArea()
+        animateBubbleTo(edgeX(area), resolvedY(area))
     }
 
     /**
@@ -768,9 +1195,11 @@ class OverlayService : Service() {
         super.onDestroy()
         SelectionCapture.listener = null
         ImeWatcher.listener = null
-        bubbleAnimator?.cancel()
+        // Anything the debounce still owes gets written now rather than lost.
+        mainHandler.removeCallbacks(persistPosition)
+        persistPosition.run()
         mainHandler.removeCallbacksAndMessages(null)
-        bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+        removeBubble()
         popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) {}
         }

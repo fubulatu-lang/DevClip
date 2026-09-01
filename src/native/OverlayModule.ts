@@ -51,9 +51,28 @@ export function openFullApp(): void {
   NativeOverlay.openFullApp();
 }
 
-export function setBubbleSize(size: 'small' | 'medium' | 'large'): void {
+/**
+ * Bubble diameter in dp, applied live.
+ *
+ * Native clamps to the same floor and ceiling this side does, because native
+ * is the one that has to be right when the value came from SharedPreferences
+ * rather than from here.
+ */
+export function setBubbleSize(sizeDp: number): void {
   if (!isNativeOverlayAvailable()) return;
-  NativeOverlay.setBubbleSize(size);
+  NativeOverlay.setBubbleSize(sizeDp);
+}
+
+/** Hides the bubble. The service keeps running; the notification brings it back. */
+export function restBubble(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.restBubble();
+}
+
+/** Brings a hidden bubble back, at the position the user left it. */
+export function wakeBubble(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.wakeBubble();
 }
 
 /**
