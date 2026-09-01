@@ -24,15 +24,33 @@ export const MIN_BUBBLE_SIZE = 48;
 export const MAX_BUBBLE_SIZE = 72;
 export const DEFAULT_BUBBLE_SIZE = 56;
 
+/**
+ * The permission picture at the moment the user last walked past setup.
+ *
+ * Kept so the wall can tell "they already decided to live without this" from
+ * "something they had has since been taken away" — Android revokes
+ * permissions on its own for apps that have not been opened in months, and
+ * says nothing about it.
+ */
+export interface SkippedPermissions {
+  overlay: boolean;
+  accessibility: boolean;
+  notifications: boolean;
+}
+
 interface SettingsState {
   hasOnboarded: boolean;
+  permissionSkip: SkippedPermissions | null;
   themeMode: ThemeMode;
   bubbleSize: number;
   autoStartOnBoot: boolean;
   confirmBeforePaste: boolean;
   maxClips: number; // 0 = unlimited
 
-  setOnboarded: () => void;
+  /** Records what was granted when the user chose to carry on without the rest. */
+  skipPermissions: (state: SkippedPermissions) => void;
+  /** Puts the setup wall back up, from the banner in the app. */
+  clearPermissionSkip: () => void;
   setThemeMode: (mode: ThemeMode) => void;
   setBubbleSize: (sizeDp: number) => void;
   setAutoStartOnBoot: (enabled: boolean) => void;
@@ -44,13 +62,15 @@ export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
       hasOnboarded: false,
+      permissionSkip: null,
       themeMode: 'system',
       bubbleSize: DEFAULT_BUBBLE_SIZE,
       autoStartOnBoot: true,
       confirmBeforePaste: true,
       maxClips: 500,
 
-      setOnboarded: () => set({ hasOnboarded: true }),
+      skipPermissions: (state) => set({ hasOnboarded: true, permissionSkip: state }),
+      clearPermissionSkip: () => set({ permissionSkip: null }),
       setThemeMode: (mode) => set({ themeMode: mode }),
       setBubbleSize: (sizeDp) => {
         const clamped = Math.round(

@@ -5,12 +5,15 @@ import { Settings as SettingsIcon } from 'lucide-react-native';
 import ClipListView from './ClipListView';
 import EditClipSheet from '../components/EditClipSheet';
 import SettingsScreen from './SettingsScreen';
-import OnboardingScreen from './OnboardingScreen';
+import SetupScreen from './SetupScreen';
+import PermissionBanner from '../components/PermissionBanner';
 import Pressy from '../components/Pressy';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import { useSettingsStore } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import { useEditStore } from '../store/editStore';
+import { usePermissions, allGranted, hasRegressed } from '../hooks/usePermissions';
+import { isNativeOverlayAvailable } from '../native/OverlayModule';
 import { strings } from '../strings';
 
 /**
@@ -26,7 +29,10 @@ export default function PopupScreen() {
   const { gutter } = useAdaptiveLayout();
   const [showSettings, setShowSettings] = useState(false);
   const hasOnboarded = useSettingsStore((s) => s.hasOnboarded);
-  const setOnboarded = useSettingsStore((s) => s.setOnboarded);
+  const permissionSkip = useSettingsStore((s) => s.permissionSkip);
+  const skipPermissions = useSettingsStore((s) => s.skipPermissions);
+  const clearPermissionSkip = useSettingsStore((s) => s.clearPermissionSkip);
+  const { permissions, refresh: refreshPermissions } = usePermissions();
   const updateClip = useClipStore((s) => s.updateClip);
   const deleteClip = useClipStore((s) => s.deleteClip);
   const closeEditor = useEditStore((s) => s.close);
@@ -63,8 +69,33 @@ export default function PopupScreen() {
     [colors, radii, spacing, text, gutter]
   );
 
-  if (!hasOnboarded) {
-    return <OnboardingScreen onDone={setOnboarded} />;
+  /**
+   * The wall goes up on first run, and again whenever something that was
+   * granted has since been taken away.
+   *
+   * Regression, not difference: granting one more permission changes the
+   * picture too, and throwing the user back at setup for making progress
+   * would be absurd. Android revokes permissions on its own for apps left
+   * unopened for months and announces nothing, which is the case this exists
+   * for.
+   *
+   * In Expo Go there is no native module and none of this can be satisfied,
+   * so there is nothing to gate on — the wall would be unskippable-looking
+   * and pointless.
+   */
+  const showSetup =
+    isNativeOverlayAvailable() &&
+    !allGranted(permissions) &&
+    (!hasOnboarded || permissionSkip === null || hasRegressed(permissionSkip, permissions));
+
+  if (showSetup || !hasOnboarded) {
+    return (
+      <SetupScreen
+        permissions={permissions}
+        refresh={refreshPermissions}
+        onSkip={() => skipPermissions(permissions)}
+      />
+    );
   }
 
   // Settings is a whole screen with its own back control and title. Keeping
@@ -93,6 +124,11 @@ export default function PopupScreen() {
           <SettingsIcon size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
         </Pressy>
       </View>
+
+      <PermissionBanner
+        permissions={permissions}
+        onFix={clearPermissionSkip}
+      />
 
       <ClipListView />
 

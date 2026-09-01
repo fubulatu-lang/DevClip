@@ -116,22 +116,35 @@ export const strings = {
     clearAllBody: 'This deletes everything in your history. You can’t undo this.',
   },
 
-  onboarding: {
+  setup: {
     heading: 'Set up DevClip',
-    sub: 'Grant these permissions to finish setup. You can change them later in Settings.',
-    notifications: 'Notifications',
-    notificationsBody: 'Shows a quiet, permanent notification while the bubble is running.',
+    sub: 'DevClip needs all three to do its job. You can carry on without them and turn them on later in Settings.',
+    expoGoSub:
+      'This build can’t use the bubble or text capture — those need the custom dev client. Everything else works. See SETUP_GUIDE.md.',
     textCapture: 'Text capture',
     textCaptureBody:
       'Lets DevClip read the text you have highlighted, so tapping the bubble saves it, and paste a saved clip back into the field you were using. Android will show a broader permission screen for this — that’s expected.',
     floatingBubble: 'Floating bubble',
-    floatingBubbleBody: 'Lets DevClip draw the bubble on top of other apps.',
+    floatingBubbleBody: 'Lets DevClip draw its bubble on top of other apps.',
+    notifications: 'Notifications',
+    notificationsBody:
+      'Shows a silent, ongoing notification while the bubble is running. It’s also how you get a hidden bubble back.',
+    notificationsDenied:
+      'Android only offers this once. Turn notifications on for DevClip in Android Settings if you change your mind.',
     enable: 'Enable',
     done: 'Done',
-    pending: '…',
     enableA11y: (feature: string) => `Enable ${feature.toLowerCase()}`,
     enabledA11y: (feature: string) => `${feature} is enabled`,
     continue: 'Continue',
+    skip: 'Continue without these',
+    skipHint: 'Opens DevClip with the features these permissions provide turned off.',
+
+    /** Shown in the app itself while something is missing. */
+    crippled: (missing: string) => `DevClip can’t ${missing} until you finish setup.`,
+    crippledAction: 'Finish setup',
+    missingCapture: 'save what you highlight',
+    missingBubble: 'show its bubble',
+    missingNotification: 'bring a hidden bubble back',
   },
 
   overlay: {

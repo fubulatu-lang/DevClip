@@ -19,9 +19,6 @@ import {
   requestOverlayPermission,
   requestAccessibilityPermission,
   requestNotificationPermission,
-  isAccessibilityServiceEnabled,
-  isOverlayPermissionGranted,
-  isNotificationPermissionGranted,
   isBubbleRunning,
   startBubble,
   stopBubble,
@@ -29,6 +26,7 @@ import {
   wakeBubble,
 } from '../native/OverlayModule';
 import { onBubbleState } from '../native/events';
+import { usePermissions } from '../hooks/usePermissions';
 import { exportBackup } from '../utils/backup';
 import { useTheme, useAdaptiveLayout } from '../theme/ThemeContext';
 import {
@@ -61,9 +59,14 @@ const MAX_CLIPS_OPTIONS = [
 export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const { colors, radii, spacing, text, icon } = useTheme();
   const { gutter } = useAdaptiveLayout();
-  const [accessibilityOn, setAccessibilityOn] = useState(false);
-  const [overlayOn, setOverlayOn] = useState(false);
-  const [notifOn, setNotifOn] = useState(false);
+  // One source for the three permissions, shared with the setup wall. Two of
+  // them can only be changed by leaving for system Settings, so the hook
+  // re-checks whenever the app comes back rather than trusting a stale
+  // answer.
+  const { permissions, refresh: refreshPermissions } = usePermissions();
+  const accessibilityOn = permissions.accessibility;
+  const overlayOn = permissions.overlay;
+  const notifOn = permissions.notifications;
   const [bubbleRunning, setBubbleRunning] = useState(false);
   // Hidden but still running. Native owns this — the bubble can be hidden by
   // dragging it into the target or from the notification, neither of which
@@ -85,9 +88,6 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const showSnackbar = useSnackbarStore((s) => s.show);
 
   const refreshStatus = useCallback(async () => {
-    setAccessibilityOn(await isAccessibilityServiceEnabled());
-    setOverlayOn(await isOverlayPermissionGranted());
-    setNotifOn(await isNotificationPermissionGranted());
     // This was never read from native at all: the screen assumed the bubble
     // was off every time it opened, so the button offered to start a bubble
     // that was already running.
@@ -299,7 +299,10 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 label={strings.settings.notifications}
                 active={notifOn}
                 buttonLabel={notifOn ? strings.settings.manage : strings.settings.enable}
-                onPress={async () => setNotifOn(await requestNotificationPermission())}
+                onPress={async () => {
+                  await requestNotificationPermission();
+                  refreshPermissions();
+                }}
                 styles={styles}
               />
               <SettingRow
