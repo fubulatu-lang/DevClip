@@ -4,7 +4,6 @@ import { ClipboardPaste, Inbox } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
 import { useSettingsStore } from '../store/settingsStore';
 import SearchBar from '../components/SearchBar';
-import SortMenu from '../components/SortMenu';
 import ClipListItem from '../components/ClipListItem';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
@@ -23,15 +22,11 @@ export default function ClipListView() {
   const clips = useClipStore((s) => s.clips);
   const initialised = useClipStore((s) => s.initialised);
   const search = useClipStore((s) => s.search);
-  const sort = useClipStore((s) => s.sort);
   const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
   const init = useClipStore((s) => s.init);
   const setSearch = useClipStore((s) => s.setSearch);
-  const setSort = useClipStore((s) => s.setSort);
   const capture = useClipStore((s) => s.capture);
-  const moveUp = useClipStore((s) => s.moveUp);
-  const moveDown = useClipStore((s) => s.moveDown);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
@@ -47,27 +42,9 @@ export default function ClipListView() {
     trimToMax(maxClips);
   }, [maxClips, clips.length]);
 
-  // Passing a fresh arrow per row would hand React.memo a new prop every
-  // render and defeat it. One stable handler takes the index instead, and
-  // the row binds its own.
-  const handleMove = useCallback(
-    (index: number, direction: -1 | 1) => (direction === -1 ? moveUp(index) : moveDown(index)),
-    [moveUp, moveDown]
-  );
-
   const renderItem = useCallback(
-    ({ item, index }: { item: Clip; index: number }) => (
-      <ClipListItem
-        clip={item}
-        isManualSort={sort === 'manual'}
-        isFirst={index === 0}
-        isLast={index === clips.length - 1}
-        onLongPress={openEditor}
-        index={index}
-        onMove={handleMove}
-      />
-    ),
-    [sort, clips.length, handleMove, openEditor]
+    ({ item }: { item: Clip }) => <ClipListItem clip={item} onLongPress={openEditor} />,
+    [openEditor]
   );
 
   const styles = useMemo(
@@ -136,7 +113,6 @@ export default function ClipListView() {
       )}
 
       <SearchBar value={search} onChange={setSearch} />
-      <SortMenu value={sort} onChange={setSort} />
 
       <FlatList
         data={clips}

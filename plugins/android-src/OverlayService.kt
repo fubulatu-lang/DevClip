@@ -30,15 +30,18 @@ import kotlin.math.min
 /**
  * Foreground service that owns two overlay windows:
  *  1. A draggable, tappable bubble showing the app icon (always visible).
- *  2. A React Native surface rendering "DevClipPopup", in one of two shapes.
+ *  2. A React Native surface rendering "DevClipPopup" — the floating list.
  *
- * The popup has two geometries and native owns both, because only this side
- * knows where the bubble is and where the system bars are:
+ * Native owns the list's geometry, because only this side knows where the
+ * bubble is and where the system bars are. The list is tethered to the
+ * bubble: it hangs below it, left edges aligned, flips above when there is no
+ * room below, slides inward near an edge, and travels with the bubble while
+ * it is dragged.
  *
- *  - MINI is tethered to the bubble. It hangs below it, left edges aligned,
- *    flips above when there is no room below, and slides inward near an
- *    edge. Dragging the bubble carries it along.
- *  - EXPANDED detaches and becomes a half-height sheet across the bottom.
+ * There used to be a second, expanded shape — a half-height sheet across the
+ * bottom, detached from the bubble. It is gone. It duplicated the full app in
+ * a worse window, and its geometry branch was the hardest code here to reason
+ * about; the tethered list is now sized to be worth opening on its own.
  *
  * Every geometry is clamped to the area left over after the status and
  * navigation bars, so neither window is ever placed underneath them.
@@ -53,12 +56,10 @@ class OverlayService : Service() {
     private var popupView: View? = null
     private var popupParams: WindowManager.LayoutParams? = null
     private var popupVisible = false
-    private var mode = MODE_MINI
 
     companion object {
         const val CHANNEL_ID = "devclip_overlay_channel"
         const val NOTIFICATION_ID = 1001
-        const val ACTION_SET_MODE = "com.devclip.app.ACTION_SET_MODE"
         /**
          * Closes the floating list. The bubble stays where it is.
          *
@@ -69,14 +70,15 @@ class OverlayService : Service() {
          */
         const val ACTION_HIDE_POPUP = "com.devclip.app.ACTION_HIDE_POPUP"
         const val ACTION_OPEN_FULL = "com.devclip.app.ACTION_OPEN_FULL"
-        const val EXTRA_MODE = "mode"
 
-        const val MODE_MINI = "mini"
-        const val MODE_EXPANDED = "expanded"
-
-        /** Mini is sized to show two clips; the list scrolls past that. */
-        private const val MINI_WIDTH_DP = 300
-        private const val MINI_HEIGHT_DP = 344
+        /**
+         * The floating list is the only floating surface now that the expanded
+         * sheet is gone, so it is sized to be worth opening — roughly a third
+         * of a phone screen, scrolling past that — rather than to be the
+         * smaller of two options.
+         */
+        private const val LIST_WIDTH_DP = 320
+        private const val LIST_HEIGHT_DP = 460
         /** Breathing room between the bubble and the window hanging off it. */
         private const val TETHER_GAP_DP = 8
         private const val EDGE_MARGIN_DP = 8
@@ -130,7 +132,6 @@ class OverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_SET_MODE -> setMode(intent.getStringExtra(EXTRA_MODE) ?: MODE_MINI)
             ACTION_HIDE_POPUP -> hidePopup()
             ACTION_OPEN_FULL -> openFullApp()
         }
@@ -266,7 +267,7 @@ class OverlayService : Service() {
                     params.x = clamp(initialX + dx, a.left, a.right - size)
                     params.y = clamp(initialY + dy, a.top, a.bottom - size)
                     windowManager.updateViewLayout(v, params)
-                    // The mini window is tethered: it travels with the bubble.
+                    // The list window is tethered: it travels with the bubble.
                     //
                     // applyPopupGeometry only mutates the params object; nothing
                     // reaches the screen until updateViewLayout is called with it.
@@ -274,7 +275,7 @@ class OverlayService : Service() {
                     // so the popup's geometry was recalculated on every frame of
                     // the drag and never once applied, and the window sat still
                     // while the bubble moved out from under it.
-                    if (popupVisible && mode == MODE_MINI) {
+                    if (popupVisible) {
                         applyPopupGeometry()
                         updatePopupLayout()
                     }
@@ -294,11 +295,7 @@ class OverlayService : Service() {
                         // visible sign of why. Nothing about opening the popup is
                         // worth that.
                         try {
-                            // A tap always opens mini, never the shape it was left in.
-                            if (popupVisible) hidePopup() else {
-                                mode = MODE_MINI
-                                showPopup()
-                            }
+                            if (popupVisible) hidePopup() else showPopup()
                         } catch (e: Exception) {
                             // Every failure here used to look identical to a
                             // tap that was never registered. Say something.
@@ -402,7 +399,7 @@ class OverlayService : Service() {
         }
 
         val params = WindowManager.LayoutParams(
-            dp(MINI_WIDTH_DP), dp(MINI_HEIGHT_DP), overlayType,
+            dp(LIST_WIDTH_DP), dp(LIST_HEIGHT_DP), overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
@@ -439,48 +436,34 @@ class OverlayService : Service() {
         popupVisible = false
     }
 
-    private fun setMode(next: String) {
-        mode = next
-        if (!popupVisible) { showPopup(); return }
-        applyPopupGeometry()
-        updatePopupLayout()
-    }
 
     /**
-     * Sizes and positions the popup for the current mode, always inside the
-     * safe area. Mini hangs off the bubble and flips above it when there is
-     * no room below; expanded ignores the bubble and takes the bottom half.
+     * Sizes and positions the floating list, always inside the safe area. It
+     * hangs off the bubble and flips above it when there is no room below.
      */
     private fun applyPopupGeometry() {
         val params = popupParams ?: return
         val area = safeArea()
 
-        if (mode == MODE_EXPANDED) {
-            params.width = area.width
-            params.height = area.height / 2
-            params.x = area.left
-            params.y = area.bottom - params.height
-        } else {
-            val width = min(dp(MINI_WIDTH_DP), area.width - dp(EDGE_MARGIN_DP) * 2)
-                .coerceAtLeast(1)
-            val height = min(dp(MINI_HEIGHT_DP), area.height - dp(EDGE_MARGIN_DP) * 2)
-                .coerceAtLeast(1)
-            val bubble = bubbleParams
-            val gap = dp(TETHER_GAP_DP)
+        val width = min(dp(LIST_WIDTH_DP), area.width - dp(EDGE_MARGIN_DP) * 2)
+            .coerceAtLeast(1)
+        val height = min(dp(LIST_HEIGHT_DP), area.height - dp(EDGE_MARGIN_DP) * 2)
+            .coerceAtLeast(1)
+        val bubble = bubbleParams
+        val gap = dp(TETHER_GAP_DP)
 
-            val x = bubble?.x ?: area.left
-            var y = (bubble?.y ?: area.top) + bubbleSizePx + gap
+        val x = bubble?.x ?: area.left
+        var y = (bubble?.y ?: area.top) + bubbleSizePx + gap
 
-            // No room below: hang it above the bubble instead.
-            if (y + height > area.bottom) {
-                y = (bubble?.y ?: area.top) - height - gap
-            }
-
-            params.width = width
-            params.height = height
-            params.x = clamp(x, area.left, area.right - width)
-            params.y = clamp(y, area.top, area.bottom - height)
+        // No room below: hang it above the bubble instead.
+        if (y + height > area.bottom) {
+            y = (bubble?.y ?: area.top) - height - gap
         }
+
+        params.width = width
+        params.height = height
+        params.x = clamp(x, area.left, area.right - width)
+        params.y = clamp(y, area.top, area.bottom - height)
     }
 
     private fun openFullApp() {

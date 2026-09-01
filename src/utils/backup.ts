@@ -10,7 +10,7 @@ import * as db from '../db/database';
  * point-in-time snapshot, not a sync destination.
  */
 export async function exportBackup(): Promise<void> {
-  const clips = await db.getAllClips('date-desc', '');
+  const clips = await db.getAllClips('');
 
   const payload = {
     exportedAt: new Date().toISOString(),

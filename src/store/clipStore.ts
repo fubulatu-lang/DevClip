@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import { Clip, SortMode } from '../types/clip';
+import { Clip } from '../types/clip';
 import * as db from '../db/database';
 import { readSystemClipboard } from '../utils/clipboardCapture';
 
 interface ClipStoreState {
   clips: Clip[];
   search: string;
-  sort: SortMode;
   /**
    * True only while a capture is in flight — the Capture button's own busy
    * state, and nothing else's.
@@ -28,14 +27,11 @@ interface ClipStoreState {
   init: () => Promise<void>;
   refresh: () => Promise<void>;
   setSearch: (q: string) => void;
-  setSort: (s: SortMode) => Promise<void>;
   capture: () => Promise<void>;
   updateClip: (id: number, content: string, title: string | null) => Promise<void>;
   deleteClip: (id: number) => Promise<void>;
   clearAll: () => Promise<void>;
   trimToMax: (max: number) => Promise<void>;
-  moveUp: (index: number) => Promise<void>;
-  moveDown: (index: number) => Promise<void>;
   dismissError: () => void;
 }
 
@@ -72,7 +68,6 @@ async function runOrReport(set: (partial: Partial<ClipStoreState>) => void, fall
 export const useClipStore = create<ClipStoreState>((set, get) => ({
   clips: [],
   search: '',
-  sort: 'date-desc',
   capturing: false,
   initialised: false,
   error: null,
@@ -93,7 +88,7 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
   refresh: async () => {
     const token = ++refreshToken;
     await runOrReport(set, 'Could not load your clips.', async () => {
-      const clips = await db.getAllClips(get().sort, get().search);
+      const clips = await db.getAllClips(get().search);
       // A newer refresh started while this query was running. Its results are
       // the ones the user is waiting for; these are already stale, and
       // publishing them would show results for a query that has moved on.
@@ -113,19 +108,6 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
     }, SEARCH_DEBOUNCE_MS);
   },
 
-  setSort: async (s: SortMode) => {
-    await runOrReport(set, 'Could not change sort order.', async () => {
-      const { sort: previousSort, clips } = get();
-      if (s === 'manual' && previousSort !== 'manual') {
-        // Snapshot the order the user is currently looking at (e.g. Newest
-        // first) as the new manual order, instead of jumping back to
-        // whatever order clips were originally inserted in.
-        await db.snapshotOrder(clips.map((c) => c.id));
-      }
-      set({ sort: s });
-      await get().refresh();
-    });
-  },
 
   /**
    * Read the system clipboard and save whatever is on it.
@@ -181,24 +163,6 @@ export const useClipStore = create<ClipStoreState>((set, get) => ({
     });
   },
 
-  // Manual reorder only makes sense while sort === 'manual'
-  moveUp: async (index: number) => {
-    const { clips, sort } = get();
-    if (sort !== 'manual' || index <= 0) return;
-    await runOrReport(set, 'Could not reorder that clip.', async () => {
-      await db.swapClipOrder(clips[index], clips[index - 1]);
-      await get().refresh();
-    });
-  },
-
-  moveDown: async (index: number) => {
-    const { clips, sort } = get();
-    if (sort !== 'manual' || index >= clips.length - 1) return;
-    await runOrReport(set, 'Could not reorder that clip.', async () => {
-      await db.swapClipOrder(clips[index], clips[index + 1]);
-      await get().refresh();
-    });
-  },
 
   dismissError: () => set({ error: null }),
 }));

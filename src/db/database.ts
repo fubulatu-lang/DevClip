@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Clip, SortMode } from '../types/clip';
+import { Clip } from '../types/clip';
 
 // IMPORTANT: This filename/location must exactly match the path the native
 // ClipboardAccessibilityService.kt writes to, so both the JS app and the
@@ -40,13 +40,21 @@ function rowToClip(row: any): Clip {
   };
 }
 
-export async function getAllClips(sort: SortMode, search: string): Promise<Clip[]> {
+/**
+ * Newest first, always.
+ *
+ * There is one order in DevClip now. Rows are numbered by position in the
+ * list, and a number that means something different depending on a sort menu
+ * is worse than no number at all. Finding a specific clip is what search is
+ * for, and search is in the full app where there is room for it.
+ *
+ * `id DESC` breaks the tie: two clips captured inside the same millisecond
+ * would otherwise come back in whatever order SQLite felt like, and the row
+ * numbers would swap between refreshes.
+ */
+export async function getAllClips(search: string): Promise<Clip[]> {
   const db = getDb();
-  let orderBy = 'sort_order ASC';
-  if (sort === 'title-asc') orderBy = 'title COLLATE NOCASE ASC';
-  if (sort === 'title-desc') orderBy = 'title COLLATE NOCASE DESC';
-  if (sort === 'date-asc') orderBy = 'created_at ASC';
-  if (sort === 'date-desc') orderBy = 'created_at DESC';
+  const orderBy = 'created_at DESC, id DESC';
 
   const query = search
     ? `SELECT * FROM clips WHERE title LIKE ? OR content LIKE ? ORDER BY ${orderBy};`
@@ -106,34 +114,3 @@ export async function trimClipsToMax(max: number): Promise<void> {
   );
 }
 
-// Swaps sort_order between two clips (used for up/down manual reordering).
-export async function swapClipOrder(a: Clip, b: Clip): Promise<void> {
-  const db = getDb();
-  await db.execAsync('BEGIN TRANSACTION;');
-  try {
-    await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [b.sortOrder, a.id]);
-    await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [a.sortOrder, b.id]);
-    await db.execAsync('COMMIT;');
-  } catch (e) {
-    await db.execAsync('ROLLBACK;');
-    throw e;
-  }
-}
-
-// Rewrites sort_order to match the given id order exactly. Used when the
-// user switches to Manual sort, so manual reordering starts from whatever
-// order they were just looking at (e.g. Newest first) instead of jumping
-// back to original insertion order.
-export async function snapshotOrder(orderedIds: number[]): Promise<void> {
-  const db = getDb();
-  await db.execAsync('BEGIN TRANSACTION;');
-  try {
-    for (let i = 0; i < orderedIds.length; i++) {
-      await db.runAsync('UPDATE clips SET sort_order = ? WHERE id = ?;', [i, orderedIds[i]]);
-    }
-    await db.execAsync('COMMIT;');
-  } catch (e) {
-    await db.execAsync('ROLLBACK;');
-    throw e;
-  }
-}

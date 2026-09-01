@@ -1,57 +1,53 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { ClipboardPaste, Inbox, Maximize2, Minimize2, X, Expand } from 'lucide-react-native';
+import { Inbox, X, Expand } from 'lucide-react-native';
 import { useClipStore } from '../store/clipStore';
 import { useSettingsStore } from '../store/settingsStore';
 import ClipListItem from '../components/ClipListItem';
-import SearchBar from '../components/SearchBar';
-import SortMenu from '../components/SortMenu';
 import Pressy from '../components/Pressy';
 import Snackbar from '../components/Snackbar';
 import { useTheme } from '../theme/ThemeContext';
-import { setOverlayMode, hidePopup, openFullApp, OverlayMode } from '../native/OverlayModule';
+import { hidePopup, openFullApp } from '../native/OverlayModule';
 import { strings } from '../strings';
 
 /**
- * The floating overlay, mounted by OverlayService in its own window.
+ * The floating list, mounted by OverlayService in its own window.
  *
- * Two shapes. `mini` is tethered to the bubble and is paste-only: tap a clip
- * and it pastes, and nothing else is reachable from here. `expanded` is a
- * half-height sheet across the bottom with search, sort and editing.
+ * One shape, tethered to the bubble. It used to have a second, expanded
+ * half-screen shape as well; cutting it removed the trickiest geometry in the
+ * service and left this as the only floating surface, which is why it is now
+ * sized to be worth opening rather than to be the smaller of two options.
  *
- * Native owns both geometries — it is the only side that knows where the
- * bubble sits and where the system bars are — so this screen asks for a
- * shape by name and lays itself out to whatever window it is given.
+ * Paste only. No search — that lives in the full app, where there is room for
+ * a keyboard and a result list. No capture button either: the overlay window
+ * is deliberately non-focusable, and since Android 10 an app without focus
+ * cannot read the clipboard, so the button here could only ever have saved
+ * nothing. Capture happens by tapping the bubble with text selected.
+ *
+ * Native owns the geometry — it is the only side that knows where the bubble
+ * sits and where the system bars are — so this screen simply lays itself out
+ * to whatever window it is given.
  */
-/** Mini is paste-only, so the row's edit and reorder hooks go nowhere. */
+/** Mini is paste-only, so the row's edit hook goes nowhere. */
 const noop = () => {};
 
 export default function OverlayScreen() {
   const { colors, radii, spacing, text, icon } = useTheme();
-  const [mode, setMode] = useState<OverlayMode>('mini');
   const clips = useClipStore((s) => s.clips);
   const initialised = useClipStore((s) => s.initialised);
-  const search = useClipStore((s) => s.search);
-  const sort = useClipStore((s) => s.sort);
-  const capturing = useClipStore((s) => s.capturing);
   const error = useClipStore((s) => s.error);
   const init = useClipStore((s) => s.init);
-  const setSearch = useClipStore((s) => s.setSearch);
-  const setSort = useClipStore((s) => s.setSort);
-  const capture = useClipStore((s) => s.capture);
   const trimToMax = useClipStore((s) => s.trimToMax);
   const dismissError = useClipStore((s) => s.dismissError);
   const maxClips = useSettingsStore((s) => s.maxClips);
 
-  useEffect(() => { init(); }, []);
-  useEffect(() => { trimToMax(maxClips); }, [maxClips, clips.length]);
+  useEffect(() => {
+    init();
+  }, [init]);
 
-  const changeMode = (next: OverlayMode) => {
-    setMode(next);
-    setOverlayMode(next);
-  };
-
-  const mini = mode === 'mini';
+  useEffect(() => {
+    trimToMax(maxClips);
+  }, [maxClips, clips.length, trimToMax]);
 
   const styles = useMemo(
     () =>
@@ -98,25 +94,6 @@ export default function OverlayScreen() {
           paddingHorizontal: spacing.lg,
         },
         emptyText: { ...text.caption, color: colors.inkFaint, textAlign: 'center' },
-        actionBar: {
-          paddingHorizontal: spacing.lg,
-          paddingTop: spacing.sm,
-          paddingBottom: spacing.md,
-          borderTopWidth: 1,
-          borderTopColor: colors.divider,
-        },
-        captureBtn: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: spacing.sm,
-          backgroundColor: colors.accent,
-          minHeight: 48,
-          paddingHorizontal: spacing.lg,
-          borderRadius: radii.pill,
-        },
-        captureBtnBusy: { opacity: 0.5 },
-        captureText: { ...text.button, color: colors.onAccent },
         errorBanner: {
           marginHorizontal: spacing.lg,
           marginTop: spacing.sm,
@@ -142,28 +119,13 @@ export default function OverlayScreen() {
         </Text>
 
         <Pressy
-          onPress={() => changeMode(mini ? 'expanded' : 'mini')}
+          onPress={openFullApp}
           style={styles.headerBtn}
-          accessibilityLabel={mini ? strings.overlay.expand : strings.overlay.collapse}
+          accessibilityLabel={strings.overlay.openFullApp}
           hitSlop={4}
         >
-          {mini ? (
-            <Maximize2 size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
-          ) : (
-            <Minimize2 size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
-          )}
+          <Expand size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
         </Pressy>
-
-        {!mini && (
-          <Pressy
-            onPress={openFullApp}
-            style={styles.headerBtn}
-            accessibilityLabel={strings.overlay.openFullApp}
-            hitSlop={4}
-          >
-            <Expand size={icon.sm} strokeWidth={icon.stroke} color={colors.inkSoft} />
-          </Pressy>
-        )}
 
         <Pressy
           onPress={hidePopup}
@@ -186,59 +148,22 @@ export default function OverlayScreen() {
         </View>
       ) : null}
 
-      {!mini && (
-        <>
-          <SearchBar value={search} onChange={setSearch} />
-          <SortMenu value={sort} onChange={setSort} />
-        </>
-      )}
-
       <FlatList
         data={clips}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
-        renderItem={({ item, index }) => (
-          <ClipListItem
-            clip={item}
-            variant={mini ? 'mini' : 'full'}
-            isManualSort={!mini && sort === 'manual'}
-            isFirst={index === 0}
-            isLast={index === clips.length - 1}
-            onLongPress={noop}
-            index={index}
-            onMove={noop}
-          />
-        )}
+        renderItem={({ item }) => <ClipListItem clip={item} variant="mini" onLongPress={noop} />}
         ListEmptyComponent={
           <View style={styles.empty}>
             {initialised && (
               <Inbox size={icon.md} strokeWidth={icon.stroke} color={colors.inkDisabled} />
             )}
             <Text style={styles.emptyText}>
-              {!initialised
-                ? strings.clips.loading
-                : search
-                  ? strings.clips.noMatches(search)
-                  : strings.clips.emptyTitle}
+              {initialised ? strings.clips.emptyTitle : strings.clips.loading}
             </Text>
           </View>
         }
       />
-
-      <View style={styles.actionBar}>
-        <Pressy
-          onPress={capture}
-          // An async action that stays tappable invites a double capture.
-          disabled={capturing}
-          style={[styles.captureBtn, capturing && styles.captureBtnBusy]}
-          accessibilityLabel={strings.clips.captureA11y}
-        >
-          <ClipboardPaste size={icon.sm} strokeWidth={icon.stroke} color={colors.onAccent} />
-          <Text style={styles.captureText}>
-            {capturing ? strings.clips.capturing : strings.clips.capture}
-          </Text>
-        </Pressy>
-      </View>
 
       <Snackbar />
     </View>

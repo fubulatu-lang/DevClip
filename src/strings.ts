@@ -35,8 +35,6 @@ export const strings = {
     moreOptionsHint: 'Opens edit and delete.',
     fallbackTitle: 'this clip',
     pasteHint: 'Double tap to paste.',
-    moveUp: 'Move clip up',
-    moveDown: 'Move clip down',
   },
 
   paste: {
@@ -51,14 +49,6 @@ export const strings = {
     clearA11yLabel: 'Clear search',
   },
 
-  sort: {
-    dateDesc: 'Newest',
-    dateAsc: 'Oldest',
-    titleAsc: 'Title A–Z',
-    titleDesc: 'Title Z–A',
-    manual: 'Manual',
-    a11yPrefix: 'Sort by',
-  },
 
   edit: {
     title: 'Title',
@@ -149,8 +139,6 @@ export const strings = {
   },
 
   overlay: {
-    expand: 'Expand',
-    collapse: 'Shrink back to mini',
     openFullApp: 'Open the full app',
     close: 'Close DevClip',
   },

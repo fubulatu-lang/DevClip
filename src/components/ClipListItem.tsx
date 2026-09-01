@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, Alert, Animated } from 'react-native';
-import { ChevronUp, ChevronDown, Copy, MoreVertical } from 'lucide-react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
+import { Copy, MoreVertical } from 'lucide-react-native';
 import { Clip } from '../types/clip';
 import { pasteClip } from '../utils/clipboardCapture';
 import { useTheme } from '../theme/ThemeContext';
@@ -11,34 +11,18 @@ import { strings } from '../strings';
 
 interface Props {
   clip: Clip;
-  isManualSort: boolean;
-  isFirst: boolean;
-  isLast: boolean;
   onLongPress: (clip: Clip) => void;
-  /** Index in the list, so the row can ask for its own move. */
-  index: number;
-  /** Stable across renders; the row binds its own index to it. */
-  onMove: (index: number, direction: -1 | 1) => void;
   /**
-   * `mini` is the tethered bubble window: paste only. It drops the reorder
-   * controls and both routes to edit — the more button and the long press.
-   * Dropping them together is deliberate: leaving the long press behind
-   * would make a gesture the only way to reach editing, which is the
-   * accessibility failure the more button was added to fix.
+   * `mini` is the tethered bubble window: paste only. It drops both routes to
+   * edit — the more button and the long press. Dropping them together is
+   * deliberate: leaving the long press behind would make a gesture the only
+   * way to reach editing, which is the accessibility failure the more button
+   * was added to fix.
    */
   variant?: 'full' | 'mini';
 }
 
-function ClipListItem({
-  clip,
-  isManualSort,
-  isFirst,
-  isLast,
-  onLongPress,
-  index,
-  onMove,
-  variant = 'full',
-}: Props) {
+function ClipListItem({ clip, onLongPress, variant = 'full' }: Props) {
   const { colors, radii, spacing, shadow, text, icon } = useTheme();
   const confirmBeforePaste = useSettingsStore((s) => s.confirmBeforePaste);
   const showSnackbar = useSnackbarStore((s) => s.show);
@@ -69,19 +53,6 @@ function ClipListItem({
         title: { ...text.body, fontWeight: '500', color: colors.ink, marginBottom: 2 },
         content: { ...text.secondary, color: colors.inkSoft, lineHeight: 22 },
         date: { ...text.caption, color: colors.inkFaint, marginTop: spacing.sm },
-        // Each chevron is 32dp with an 8dp hitSlop, so each target is a
-        // correct 48dp — but an 8dp gap is exactly what the two slops
-        // consume, leaving the targets flush and a near-miss moving the clip
-        // the wrong way. 16dp keeps 8dp of dead space between them.
-        reorderCol: { alignItems: 'center', gap: spacing.lg },
-        circleBtn: {
-          width: 32,
-          height: 32,
-          borderRadius: radii.pill,
-          backgroundColor: colors.surfaceSunken,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
         moreBtn: {
           width: 32,
           height: 32,
@@ -138,27 +109,6 @@ function ClipListItem({
           <Text style={styles.date}>{formatWhen(clip.createdAt)}</Text>
         </View>
 
-        {isManualSort && !mini && (
-          <View style={styles.reorderCol}>
-            <CircleButton
-              style={styles.circleBtn}
-              disabled={isFirst}
-              onPress={() => onMove(index, -1)}
-              accessibilityLabel={strings.clips.moveUp}
-            >
-              <ChevronUp size={icon.sm} strokeWidth={icon.stroke} color={isFirst ? colors.inkDisabled : colors.ink} />
-            </CircleButton>
-            <CircleButton
-              style={styles.circleBtn}
-              disabled={isLast}
-              onPress={() => onMove(index, 1)}
-              accessibilityLabel={strings.clips.moveDown}
-            >
-              <ChevronDown size={icon.sm} strokeWidth={icon.stroke} color={isLast ? colors.inkDisabled : colors.ink} />
-            </CircleButton>
-          </View>
-        )}
-
         {/*
           Long press is a shortcut, not the only route: switch control and
           many motor-impairment setups cannot perform one, so edit and delete
@@ -176,32 +126,6 @@ function ClipListItem({
         </Pressy>
         )}
       </View>
-    </Pressy>
-  );
-}
-
-function CircleButton({
-  children,
-  onPress,
-  disabled,
-  style,
-  accessibilityLabel,
-}: {
-  children: React.ReactNode;
-  onPress: () => void;
-  disabled?: boolean;
-  style: any;
-  accessibilityLabel: string;
-}) {
-  return (
-    <Pressy
-      onPress={disabled ? undefined : onPress}
-      style={style}
-      disabled={disabled}
-      accessibilityLabel={accessibilityLabel}
-      hitSlop={8}
-    >
-      <Animated.View style={{ opacity: disabled ? 0.4 : 1 }}>{children}</Animated.View>
     </Pressy>
   );
 }

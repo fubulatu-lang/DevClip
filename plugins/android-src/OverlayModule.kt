@@ -94,14 +94,6 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         }
     }
 
-    /** "mini" (tethered to the bubble) or "expanded" (half-height sheet). */
-    @ReactMethod
-    fun setOverlayMode(mode: String) {
-        sendToService(OverlayService.ACTION_SET_MODE) {
-            it.putExtra(OverlayService.EXTRA_MODE, mode)
-        }
-    }
-
     /** Closes the floating list. The bubble stays put. */
     @ReactMethod
     fun hidePopup() {
