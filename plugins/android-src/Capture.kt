@@ -31,11 +31,12 @@ object Capture {
 
     sealed class Outcome {
         /**
-         * Saved. [message] confirms *what* was saved — the first few words —
-         * because reading a selection is not perfect across every app, and
-         * seeing the right words is how the user knows it worked.
+         * Saved. [message] confirms *what* was saved — it carries the first
+         * few words — because reading a selection is not perfect across every
+         * app, and seeing the right words back is how the user knows the right
+         * thing was grabbed.
          */
-        data class Saved(val preview: String, val message: String) : Outcome()
+        data class Saved(val message: String) : Outcome()
 
         /** Identical to the clip already at the top. Almost always a double tap. */
         object Duplicate : Outcome()
@@ -102,7 +103,7 @@ object Capture {
             else -> context.getString(R.string.devclip_capture_saved, preview)
         }
 
-        return Outcome.Saved(preview, message)
+        return Outcome.Saved(message)
     }
 
     /**
