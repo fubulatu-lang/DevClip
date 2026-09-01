@@ -142,6 +142,11 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     }
 
     @ReactMethod
+    fun setMaxClips(max: Double) {
+        prefs().edit().putInt(Prefs.KEY_MAX_CLIPS, max.toInt()).apply()
+    }
+
+    @ReactMethod
     fun setAutoStartOnBoot(enabled: Boolean) {
         prefs().edit().putBoolean(Prefs.KEY_AUTO_START_ON_BOOT, enabled).apply()
     }
@@ -162,12 +167,27 @@ class OverlayModule(reactContext: ReactApplicationContext) :
     }
 }
 
-/** Shared preferences keys used to pass simple settings from JS into native
- *  components (OverlayService, BootReceiver) that can run independently of
- *  the JS thread. */
+/**
+ * Settings passed from JS into native components that can run with no JS
+ * thread at all — OverlayService, BootReceiver, the accessibility service.
+ *
+ * SharedPreferences rather than a store read over the bridge, because these
+ * are needed at moments when there is no bridge: the service can be started
+ * by BootReceiver long before any React context exists.
+ */
 object Prefs {
     const val NAME = "devclip_prefs"
     const val KEY_BUBBLE_RUNNING = "bubble_running"
     const val KEY_BUBBLE_SIZE = "bubble_size" // "small" | "medium" | "large"
     const val KEY_AUTO_START_ON_BOOT = "auto_start_on_boot"
+
+    /**
+     * The user's clip limit, mirrored here so capture can enforce it.
+     *
+     * Trimming used to happen only while the app was open. Capture happens
+     * with the app closed — that is the point of it — so the limit was not a
+     * limit until DevClip was next opened.
+     */
+    const val KEY_MAX_CLIPS = "max_clips"
+    const val DEFAULT_MAX_CLIPS = 500
 }

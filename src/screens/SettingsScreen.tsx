@@ -223,7 +223,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
         {isNativeOverlayAvailable() && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{strings.settings.permissions}</Text>
-            <PermissionRow label={strings.settings.backgroundCapture} granted={accessibilityOn} colors={colors} styles={styles} />
+            <PermissionRow label={strings.settings.textCapture} granted={accessibilityOn} colors={colors} styles={styles} />
             <PermissionRow label={strings.settings.floatingBubble} granted={overlayOn} colors={colors} styles={styles} />
             <PermissionRow label={strings.settings.notifications} granted={notifOn} colors={colors} styles={styles} />
           </View>
@@ -265,7 +265,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             <>
               <SettingRow
                 icon={<ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={accessibilityOn ? colors.accent : colors.inkFaint} />}
-                label={strings.settings.backgroundCapture}
+                label={strings.settings.textCapture}
                 active={accessibilityOn}
                 buttonLabel={accessibilityOn ? strings.settings.manage : strings.settings.enable}
                 onPress={requestAccessibilityPermission}

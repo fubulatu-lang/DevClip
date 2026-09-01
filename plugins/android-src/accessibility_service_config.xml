@@ -1,6 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  typeViewTextSelectionChanged is what makes capture possible: it is the event
+  that says the user highlighted something, and it feeds the remembered
+  selection that backs up the live tree read.
+
+  typeWindowsChanged is how the bubble learns the keyboard is up. An overlay
+  window with FLAG_NOT_FOCUSABLE receives no IME insets, so it cannot measure
+  the keyboard itself; the window list can, and this service is already
+  mandatory for capture.
+
+  No new permissions: canRetrieveWindowContent and flagRetrieveInteractiveWindows
+  were already declared for pasting into another app's field, and they are
+  exactly what reading a selection needs.
+-->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewFocused"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewFocused|typeViewTextSelectionChanged|typeWindowsChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows"
     android:canRetrieveWindowContent="true"

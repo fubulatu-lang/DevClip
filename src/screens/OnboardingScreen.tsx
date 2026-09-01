@@ -119,16 +119,16 @@ export default function OnboardingScreen({ onDone }: { onDone: () => void }) {
                 <ShieldCheck size={icon.md} strokeWidth={icon.stroke} color={colors.ink} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.cardTitle}>{strings.onboarding.backgroundCapture}</Text>
-                <Text style={styles.cardBody}>{strings.onboarding.backgroundCaptureBody}</Text>
+                <Text style={styles.cardTitle}>{strings.onboarding.textCapture}</Text>
+                <Text style={styles.cardBody}>{strings.onboarding.textCaptureBody}</Text>
               </View>
               <Pressy
                 onPress={requestAccessibilityPermission}
                 style={[styles.actionBtn, accessibilityGranted && styles.actionBtnDone]}
                 accessibilityLabel={
                   accessibilityGranted
-                    ? strings.onboarding.enabledA11y(strings.onboarding.backgroundCapture)
-                    : strings.onboarding.enableA11y(strings.onboarding.backgroundCapture)
+                    ? strings.onboarding.enabledA11y(strings.onboarding.textCapture)
+                    : strings.onboarding.enableA11y(strings.onboarding.textCapture)
                 }
               >
                 <Text style={[styles.actionText, accessibilityGranted && styles.actionTextDone]}>

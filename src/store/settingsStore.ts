@@ -1,7 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setAutoStartOnBoot as nativeSetAutoStartOnBoot, setBubbleSize as nativeSetBubbleSize } from '../native/OverlayModule';
+import {
+  setAutoStartOnBoot as nativeSetAutoStartOnBoot,
+  setBubbleSize as nativeSetBubbleSize,
+  setMaxClips as nativeSetMaxClips,
+} from '../native/OverlayModule';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type BubbleSize = 'small' | 'medium' | 'large';
@@ -43,11 +47,29 @@ export const useSettingsStore = create<SettingsState>()(
         nativeSetAutoStartOnBoot(enabled);
       },
       setConfirmBeforePaste: (enabled) => set({ confirmBeforePaste: enabled }),
-      setMaxClips: (max) => set({ maxClips: max }),
+      setMaxClips: (max) => {
+        set({ maxClips: max });
+        nativeSetMaxClips(max);
+      },
     }),
     {
       name: 'devclip-settings',
       storage: createJSONStorage(() => AsyncStorage),
+      /**
+       * Native components read these from SharedPreferences and can run with
+       * no JS at all — the service started by BootReceiver, capture with the
+       * app closed. The setters below push each change across, but a value
+       * that was never changed on this install had never been pushed at all,
+       * so native fell back to its own defaults and quietly disagreed with
+       * what Settings was showing. Pushing the whole set once on rehydrate
+       * makes the two sides agree from the first launch.
+       */
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        nativeSetBubbleSize(state.bubbleSize);
+        nativeSetAutoStartOnBoot(state.autoStartOnBoot);
+        nativeSetMaxClips(state.maxClips);
+      },
     }
   )
 );

@@ -26,7 +26,7 @@ export const strings = {
     capturing: 'Capturing…',
     loading: 'Opening your clips…',
     emptyTitle: 'No clips yet',
-    emptyBody: 'Copy something, then tap Capture below.',
+    emptyBody: 'Highlight text anywhere, then tap the bubble.',
     noMatches: (term: string) => `No clips match “${term}”`,
     when: {
       justNow: 'just now',
@@ -83,8 +83,8 @@ export const strings = {
 
     capture: 'Capture',
     devClientNote:
-      'Background capture and the floating bubble need the custom dev client build — see SETUP_GUIDE.md.',
-    backgroundCapture: 'Background capture',
+      'Text capture and the floating bubble need the custom dev client build — see SETUP_GUIDE.md.',
+    textCapture: 'Text capture',
     notifications: 'Notifications',
     floatingBubble: 'Floating bubble',
     enable: 'Enable',
@@ -124,10 +124,10 @@ export const strings = {
     heading: 'Set up DevClip',
     sub: 'Grant these permissions to finish setup. You can change them later in Settings.',
     notifications: 'Notifications',
-    notificationsBody: 'Shows a quiet, permanent notification while capture is active.',
-    backgroundCapture: 'Background capture',
-    backgroundCaptureBody:
-      'Lets DevClip save copies made in any app automatically, and paste a saved clip directly into whatever field you were using. Android will show a broader permission screen for this — that’s expected.',
+    notificationsBody: 'Shows a quiet, permanent notification while the bubble is running.',
+    textCapture: 'Text capture',
+    textCaptureBody:
+      'Lets DevClip read the text you have highlighted, so tapping the bubble saves it, and paste a saved clip back into the field you were using. Android will show a broader permission screen for this — that’s expected.',
     floatingBubble: 'Floating bubble',
     floatingBubbleBody: 'Lets DevClip draw the bubble on top of other apps.',
     enable: 'Enable',

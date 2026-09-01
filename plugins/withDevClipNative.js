@@ -31,13 +31,15 @@ function withDevClipNativeFiles(config) {
       fs.mkdirSync(xmlDir, { recursive: true });
 
       const ktFiles = [
+        'BootReceiver.kt',
+        'Capture.kt',
         'ClipboardAccessibilityService.kt',
-        'DevClipEvents.kt',
         'DevClipDatabaseHelper.kt',
-        'OverlayService.kt',
+        'DevClipEvents.kt',
         'OverlayModule.kt',
         'OverlayPackage.kt',
-        'BootReceiver.kt',
+        'OverlayService.kt',
+        'SelectionCapture.kt',
       ];
       for (const file of ktFiles) {
         fs.copyFileSync(path.join(SRC_DIR, file), path.join(javaDir, file));
@@ -147,15 +149,65 @@ function withDevClipManifest(config) {
   });
 }
 
+/**
+ * Every string the native side shows the user.
+ *
+ * The JS side keeps its copy in src/strings.ts so it can be reviewed as copy
+ * and localised through one seam. Native cannot read that file, so it gets the
+ * same treatment through the mechanism Android provides: resources, not string
+ * literals scattered through Kotlin.
+ */
+const NATIVE_STRINGS = [
+  {
+    name: 'devclip_accessibility_description',
+    value:
+      'Lets DevClip read the text you have highlighted, so tapping its bubble saves it, and paste a saved clip back into the field you were using.',
+  },
+
+  // Capture feedback. The preview is not decoration — reading a selection is
+  // not perfect in every app, and seeing the right words back is how the user
+  // knows the right thing was saved.
+  { name: 'devclip_capture_saved', value: 'Saved \u201C%1$s\u201D' },
+  {
+    name: 'devclip_capture_saved_no_clipboard',
+    value:
+      'Saved \u201C%1$s\u201D \u2014 Android wouldn\u2019t put it on the clipboard, but DevClip has it.',
+  },
+  {
+    name: 'devclip_capture_saved_large',
+    value:
+      'Saved %1$d characters. Android limits how much it hands between apps, so a selection this big may have arrived cut short \u2014 DevClip saved all of what it got.',
+  },
+  { name: 'devclip_capture_duplicate', value: 'That\u2019s already the clip at the top.' },
+  {
+    name: 'devclip_capture_password',
+    value: 'Skipped that one \u2014 it looks like a password field.',
+  },
+  { name: 'devclip_capture_failed', value: 'DevClip couldn\u2019t save that. Try again.' },
+
+  // Failures that used to be silent. Every one of these was once a tap that
+  // appeared to do nothing at all.
+  {
+    name: 'devclip_error_no_app',
+    value: 'DevClip couldn\u2019t reach the app to draw its window.',
+  },
+  {
+    name: 'devclip_error_start_app',
+    value: 'DevClip couldn\u2019t start the app behind its window.',
+  },
+  { name: 'devclip_error_build_window', value: 'DevClip couldn\u2019t build its window.' },
+  {
+    name: 'devclip_error_place_window',
+    value: 'DevClip couldn\u2019t place its window on screen.',
+  },
+  { name: 'devclip_error_open_window', value: 'DevClip couldn\u2019t open its window.' },
+  { name: 'devclip_error_tap', value: 'DevClip couldn\u2019t handle that tap.' },
+];
+
 function withDevClipStrings(config) {
   return withStringsXml(config, (config) => {
     config.modResults = AndroidConfig.Strings.setStringItem(
-      [
-        {
-          $: { name: 'devclip_accessibility_description' },
-          _: 'Lets DevClip save text you copy anywhere on your phone, and paste a saved clip directly into the text field you were using.',
-        },
-      ],
+      NATIVE_STRINGS.map((s) => ({ $: { name: s.name }, _: s.value })),
       config.modResults
     );
     return config;

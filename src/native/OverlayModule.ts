@@ -56,6 +56,17 @@ export function setBubbleSize(size: 'small' | 'medium' | 'large'): void {
   NativeOverlay.setBubbleSize(size);
 }
 
+/**
+ * Mirrors the clip limit into native.
+ *
+ * Capture happens with the app closed, so trimming has to happen there too —
+ * a limit only applied while DevClip is open is not a limit.
+ */
+export function setMaxClips(max: number): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setMaxClips(max);
+}
+
 export function setAutoStartOnBoot(enabled: boolean): void {
   if (!isNativeOverlayAvailable()) return;
   NativeOverlay.setAutoStartOnBoot(enabled);

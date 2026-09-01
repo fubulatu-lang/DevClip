@@ -6,18 +6,26 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.provider.Settings
 import android.util.TypedValue
 import android.view.ContextThemeWrapper
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
@@ -52,6 +60,7 @@ class OverlayService : Service() {
     private var bubbleView: View? = null
     private var bubbleParams: WindowManager.LayoutParams? = null
     private var bubbleSizePx = 0
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var popupSurface: ReactSurface? = null
     private var popupView: View? = null
     private var popupParams: WindowManager.LayoutParams? = null
@@ -83,6 +92,13 @@ class OverlayService : Service() {
         private const val TETHER_GAP_DP = 8
         private const val EDGE_MARGIN_DP = 8
 
+        /**
+         * Used when the app theme has no colorAccent to resolve. Matches the
+         * dark-theme accent in src/theme/theme.ts, which is the lighter of the
+         * two and therefore the one that survives a dark background.
+         */
+        private const val DEFAULT_ACCENT = 0xFF5FB0E8.toInt()
+
         private val overlayType =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -103,6 +119,14 @@ class OverlayService : Service() {
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         startForeground(NOTIFICATION_ID, buildNotification())
         addBubble()
+
+        // The ring is the only advertisement tap-to-capture gets. Events
+        // arrive on the accessibility service's thread, so the hop to the main
+        // thread is not optional — a window change from any other thread is a
+        // crash.
+        SelectionCapture.listener = { live ->
+            mainHandler.post { showSelectionRing(live) }
+        }
     }
 
     /**
@@ -196,6 +220,115 @@ class OverlayService : Service() {
         return bitmap
     }
 
+    /**
+     * Builds the bubble: the app icon, inset far enough to leave room for a
+     * ring around it.
+     *
+     * The icon comes from the package manager rather than a copied drawable,
+     * so it always matches whatever the launcher shows, and is clipped to a
+     * circle because an adaptive icon draws itself square when nothing applies
+     * the launcher's mask for it.
+     */
+    private fun buildBubbleView(size: Int): FrameLayout {
+        val inset = dp(SELECTION_RING_DP)
+        val iconSize = (size - inset * 2).coerceAtLeast(1)
+
+        val icon = ImageView(this).apply {
+            val drawable = packageManager.getApplicationIcon(packageName)
+            val rounded = RoundedBitmapDrawableFactory
+                .create(resources, drawableToBitmap(drawable, iconSize))
+                .apply { isCircular = true }
+            setImageDrawable(rounded)
+        }
+
+        return FrameLayout(this).apply {
+            elevation = dp(6).toFloat()
+            // Constant padding, ring or no ring: the ring is a background, so
+            // showing it must not resize the icon inside it.
+            setPadding(inset, inset, inset, inset)
+            addView(
+                icon,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+    }
+
+    /**
+     * The ring drawn around the bubble while a selection is live.
+     *
+     * Two strokes, not one. The bubble floats over whatever app the user is
+     * in, so a single accent-coloured ring is legible against some backgrounds
+     * and invisible against others. A dark hairline outside the accent ring
+     * gives it an edge on a light background, and the accent gives it one on a
+     * dark background.
+     */
+    private fun selectionRing(): Drawable {
+        val stroke = dp(SELECTION_RING_DP)
+        val accent = TypedValue().let { value ->
+            val themed = ContextThemeWrapper(this, applicationInfo.theme)
+            if (themed.theme.resolveAttribute(android.R.attr.colorAccent, value, true) &&
+                value.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
+                value.type <= TypedValue.TYPE_LAST_COLOR_INT
+            ) value.data else DEFAULT_ACCENT
+        }
+
+        val outline = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke(stroke + dp(1), Color.argb(90, 0, 0, 0))
+        }
+        val ring = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(Color.TRANSPARENT)
+            setStroke(stroke, accent)
+        }
+        return LayerDrawable(arrayOf<Drawable>(outline, ring))
+    }
+
+    /** Advertise capture rather than hiding it behind a gesture nobody tried. */
+    private fun showSelectionRing(live: Boolean) {
+        val view = bubbleView ?: return
+        view.background = if (live) selectionRing() else null
+    }
+
+    /**
+     * A short flash, so a capture is felt and seen as well as read.
+     *
+     * Skipped when the user has animations turned off — the haptic and the
+     * message still land, which is what actually carries the confirmation.
+     */
+    private fun flashBubble() {
+        val view = bubbleView ?: return
+        if (animationsDisabled()) return
+        view.animate().cancel()
+        view.alpha = 1f
+        view.animate().alpha(0.3f).setDuration(90).withEndAction {
+            view.animate().alpha(1f).setDuration(150).start()
+        }.start()
+    }
+
+    private fun animationsDisabled(): Boolean =
+        try {
+            Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+        } catch (e: Exception) {
+            false
+        }
+
+    private fun buzz() {
+        val view = bubbleView ?: return
+        val feedback =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM
+            else HapticFeedbackConstants.LONG_PRESS
+        try {
+            view.performHapticFeedback(feedback)
+        } catch (e: Exception) {
+            // Haptics are off, or the device has no vibrator. Not worth a log.
+        }
+    }
+
     private fun addBubble() {
         val prefs = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
         val sizeDp = when (prefs.getString(Prefs.KEY_BUBBLE_SIZE, "medium")) {
@@ -206,18 +339,7 @@ class OverlayService : Service() {
         val size = dp(sizeDp)
         bubbleSizePx = size
 
-        // The bubble wears the app icon. Taken from the package manager rather
-        // than a copied drawable, so it always matches whatever the launcher
-        // shows, and clipped to a circle because an adaptive icon draws itself
-        // square when nothing applies the launcher's mask for it.
-        val bubble = ImageView(this).apply {
-            val icon = packageManager.getApplicationIcon(packageName)
-            val rounded = RoundedBitmapDrawableFactory
-                .create(resources, drawableToBitmap(icon, size))
-                .apply { isCircular = true }
-            setImageDrawable(rounded)
-            elevation = dp(6).toFloat()
-        }
+        val bubble = buildBubbleView(size)
 
         val area = safeArea()
         val params = WindowManager.LayoutParams(
@@ -235,6 +357,7 @@ class OverlayService : Service() {
         var touchX = 0f
         var touchY = 0f
         var moved = false
+        var longPressFired = false
 
         // Android's own tap/drag threshold, in pixels for this display.
         //
@@ -245,6 +368,20 @@ class OverlayService : Service() {
         // and the branch that opens the popup never ran. The bubble dragged
         // perfectly and tapping it did nothing whatsoever.
         val touchSlop = ViewConfiguration.get(this).scaledTouchSlop
+
+        // Long press always opens the list, even with text selected. Without
+        // it there would be no way to reach the list at all while a selection
+        // is live, and holding is the same gesture the rest of Android uses
+        // for "the other thing this control does".
+        val longPress = Runnable {
+            longPressFired = true
+            buzz()
+            try {
+                if (!popupVisible) showPopup()
+            } catch (e: Exception) {
+                fail(getString(R.string.devclip_error_open_window), e)
+            }
+        }
 
         // actionMasked, not action: getAction() packs the pointer index into
         // its high bits, so a second finger landing on the bubble makes the
@@ -257,12 +394,17 @@ class OverlayService : Service() {
                     touchX = event.rawX
                     touchY = event.rawY
                     moved = false
+                    longPressFired = false
+                    mainHandler.postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
                     val dx = (event.rawX - touchX).toInt()
                     val dy = (event.rawY - touchY).toInt()
-                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) moved = true
+                    if (abs(dx) > touchSlop || abs(dy) > touchSlop) {
+                        moved = true
+                        mainHandler.removeCallbacks(longPress)
+                    }
                     val a = safeArea()
                     params.x = clamp(initialX + dx, a.left, a.right - size)
                     params.y = clamp(initialY + dy, a.top, a.bottom - size)
@@ -285,21 +427,22 @@ class OverlayService : Service() {
                 // another window). Not a tap, and not a drag to finish.
                 MotionEvent.ACTION_CANCEL -> {
                     moved = true
+                    mainHandler.removeCallbacks(longPress)
                     true
                 }
                 MotionEvent.ACTION_UP -> {
-                    if (!moved) {
+                    mainHandler.removeCallbacks(longPress)
+                    if (!moved && !longPressFired) {
                         // An exception thrown from here escapes view dispatch and
                         // takes the whole touch listener down with it — the bubble
                         // would still be drawn but would stop responding, with no
-                        // visible sign of why. Nothing about opening the popup is
-                        // worth that.
+                        // visible sign of why. Nothing a tap does is worth that.
                         try {
-                            if (popupVisible) hidePopup() else showPopup()
+                            onBubbleTapped()
                         } catch (e: Exception) {
                             // Every failure here used to look identical to a
                             // tap that was never registered. Say something.
-                            fail("DevClip couldn't open its window.", e)
+                            fail(getString(R.string.devclip_error_tap), e)
                         }
                     }
                     true
@@ -311,6 +454,44 @@ class OverlayService : Service() {
         windowManager.addView(bubble, params)
         bubbleView = bubble
         bubbleParams = params
+        showSelectionRing(SelectionCapture.hasLiveSelection)
+    }
+
+    /**
+     * A tap means "capture", if there is anything to capture.
+     *
+     * If there is not, it means "show me my clips" — which is what the bubble
+     * meant before capture existed, and what a user who taps it with nothing
+     * selected is asking for.
+     */
+    private fun onBubbleTapped() {
+        when (val outcome = Capture.attempt(this)) {
+            is Capture.Outcome.Saved -> {
+                buzz()
+                flashBubble()
+                showSelectionRing(false)
+                toast(outcome.message)
+            }
+            is Capture.Outcome.Duplicate -> {
+                showSelectionRing(false)
+                toast(getString(R.string.devclip_capture_duplicate))
+            }
+            is Capture.Outcome.Password -> {
+                showSelectionRing(false)
+                toast(getString(R.string.devclip_capture_password))
+            }
+            is Capture.Outcome.Failed -> {
+                showSelectionRing(false)
+                toast(getString(R.string.devclip_capture_failed))
+            }
+            is Capture.Outcome.NoSelection -> {
+                if (popupVisible) hidePopup() else showPopup()
+            }
+        }
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     // ---- Popup (React Native content) ----
@@ -334,7 +515,7 @@ class OverlayService : Service() {
 
         val host = (application as? ReactApplication)?.reactHost
         if (host == null) {
-            fail("DevClip couldn't reach the app to draw its window.", null)
+            fail(getString(R.string.devclip_error_no_app), null)
             return null
         }
 
@@ -349,7 +530,7 @@ class OverlayService : Service() {
             try {
                 host.start()
             } catch (e: Exception) {
-                fail("DevClip couldn't start the app behind its window.", e)
+                fail(getString(R.string.devclip_error_start_app), e)
                 return null
             }
         }
@@ -360,7 +541,7 @@ class OverlayService : Service() {
 
         val view = surface.view
         if (view == null) {
-            fail("DevClip couldn't build its window.", null)
+            fail(getString(R.string.devclip_error_build_window), null)
             return null
         }
 
@@ -417,7 +598,7 @@ class OverlayService : Service() {
             windowManager.addView(view, params)
             popupVisible = true
         } catch (e: Exception) {
-            fail("DevClip couldn't place its window on screen.", e)
+            fail(getString(R.string.devclip_error_place_window), e)
             popupVisible = false
         }
     }
@@ -476,6 +657,8 @@ class OverlayService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        SelectionCapture.listener = null
+        mainHandler.removeCallbacksAndMessages(null)
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
         popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) {}
