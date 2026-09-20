@@ -10,6 +10,7 @@ import {
   BackHandler,
   Animated,
   Easing,
+  useWindowDimensions,
 } from 'react-native';
 import { Trash2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -45,6 +46,10 @@ interface Props {
 export default function EditClipSheet({ onSave, onDelete }: Props) {
   const { colors, radii, spacing, shadow, text, icon, easing, duration } = useTheme();
   const insets = useSafeAreaInsets();
+  // The window, not the screen. `softwareKeyboardLayoutMode: "resize"` shrinks
+  // it when the keyboard opens, so this is already the space actually left to
+  // lay out in — which is what the content field has to be bounded against.
+  const { height: windowHeight } = useWindowDimensions();
   const reduceMotion = useReduceMotion();
   const clip = useEditStore((s) => s.clip);
   const close = useEditStore((s) => s.close);
@@ -144,6 +149,21 @@ export default function EditClipSheet({ onSave, onDelete }: Props) {
           paddingVertical: spacing.md,
           minHeight: 48,
         },
+        /**
+         * Bounded, so the field scrolls instead of growing.
+         *
+         * It used to have a floor and no ceiling, so a long clip made the
+         * field as tall as its text. Tapping near the bottom of one put the
+         * caret below where the keyboard was about to appear, and nothing
+         * brought it back: the surrounding ScrollView tracks the field as a
+         * whole, not the caret inside it, so it had no reason to move.
+         *
+         * With a ceiling the field scrolls itself, and Android keeps the caret
+         * in view the way it does in every other text box on the phone —
+         * that behaviour was always there, it just never had anything to
+         * scroll. The ceiling comes from the live window height, so with the
+         * keyboard up it shrinks to match the room actually left.
+         */
         contentInput: {
           ...text.body,
           color: colors.ink,
@@ -152,6 +172,7 @@ export default function EditClipSheet({ onSave, onDelete }: Props) {
           paddingHorizontal: spacing.lg,
           paddingVertical: spacing.md,
           minHeight: 120,
+          maxHeight: Math.max(120, Math.round(windowHeight * 0.35)),
           lineHeight: 24,
         },
         actions: {
@@ -186,7 +207,7 @@ export default function EditClipSheet({ onSave, onDelete }: Props) {
         },
         saveText: { ...text.button, color: colors.onAccent },
       }),
-    [colors, radii, spacing, shadow, text, insets.bottom]
+    [colors, radii, spacing, shadow, text, insets.bottom, windowHeight]
   );
 
   if (!clip) return null;
@@ -219,7 +240,14 @@ export default function EditClipSheet({ onSave, onDelete }: Props) {
           },
         ]}
       >
-        <ScrollView style={styles.sheetScroll} contentContainerStyle={styles.sheetContent}>
+        <ScrollView
+          style={styles.sheetScroll}
+          contentContainerStyle={styles.sheetContent}
+          // Without this the first tap anywhere in the sheet while the
+          // keyboard is up is swallowed dismissing it, so moving between the
+          // title and the text took two taps and felt broken.
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.handle} importantForAccessibility="no" />
 
           <Text style={styles.label}>{strings.edit.title}</Text>
@@ -238,6 +266,10 @@ export default function EditClipSheet({ onSave, onDelete }: Props) {
             value={content}
             onChangeText={setContent}
             multiline
+            // Explicit, not assumed. This is the field that scrolls now, and
+            // it sits inside a ScrollView that would otherwise be the one
+            // taking the drag.
+            scrollEnabled
             textAlignVertical="top"
             accessibilityLabel={strings.edit.contentA11y}
           />
