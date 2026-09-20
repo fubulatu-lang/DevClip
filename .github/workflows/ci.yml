@@ -31,6 +31,52 @@ jobs:
 
       - run: npx tsc --noEmit
 
+  android:
+    name: Android compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Expo SDK 57 and React Native 0.86 both build against JDK 17.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: android-actions/setup-android@v3
+
+      # The android/ project is generated, not committed. This is the step
+      # that runs plugins/withDevClipNative.js, which copies every .kt file
+      # and the accessibility config into it — so without a prebuild there is
+      # no Kotlin anywhere for a compiler to see.
+      - name: Prebuild the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          build-root-directory: android
+
+      # compileReleaseKotlin, not assembleRelease. Compiling is what catches
+      # the class of error this job exists for, it needs no signing key, and
+      # it costs a fraction of a full build. It is also the exact task that
+      # failed on EAS in September, with four unresolved references that
+      # nothing in this repo could have caught: the checks above read the
+      # TypeScript and never the Kotlin, so a compile error reached a real
+      # build untouched.
+      #
+      # It depends on the resource step, so a string referenced from Kotlin
+      # but never added to the config plugin fails here too.
+      - name: Compile the Kotlin
+        working-directory: android
+        run: ./gradlew :app:compileReleaseKotlin --no-daemon
+
   one-ui:
     name: One UI conformance
     runs-on: ubuntu-latest
