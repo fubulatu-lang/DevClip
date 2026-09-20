@@ -82,6 +82,47 @@ class DevClipDatabaseHelper(context: Context) :
         }
     }
 
+    /** One row of the clip list, as the floating list needs it. */
+    data class Clip(val id: Long, val title: String?, val content: String)
+
+    /**
+     * The newest [limit] clips, newest first.
+     *
+     * Ordered by `created_at DESC, id DESC` to match the JS side exactly —
+     * two clips captured inside the same millisecond would otherwise come back
+     * in whatever order SQLite felt like, and the row numbers would swap
+     * between reads of the same data.
+     *
+     * The floating list is a quick-paste surface, not the history: it reads a
+     * bounded window rather than the whole table, because the whole table can
+     * be the user's full limit and this runs on the main thread when the
+     * bubble is tapped.
+     */
+    fun listClips(limit: Int): List<Clip> {
+        if (limit <= 0) return emptyList()
+        return try {
+            readableDatabase.rawQuery(
+                "SELECT id, title, content FROM clips ORDER BY created_at DESC, id DESC LIMIT ?;",
+                arrayOf(limit.toString())
+            ).use { cursor ->
+                val out = ArrayList<Clip>(cursor.count)
+                while (cursor.moveToNext()) {
+                    out.add(
+                        Clip(
+                            id = cursor.getLong(0),
+                            title = if (cursor.isNull(1)) null else cursor.getString(1),
+                            content = cursor.getString(2)
+                        )
+                    )
+                }
+                out
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not read the clip history", e)
+            emptyList()
+        }
+    }
+
     /**
      * Keeps only the newest [max] clips. `max <= 0` means no limit.
      *

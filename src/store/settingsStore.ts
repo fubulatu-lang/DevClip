@@ -3,8 +3,13 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   setAutoStartOnBoot as nativeSetAutoStartOnBoot,
+  setBubbleAlpha as nativeSetBubbleAlpha,
+  setBubbleIdleFade as nativeSetBubbleIdleFade,
   setBubbleSize as nativeSetBubbleSize,
+  setConfirmBeforePaste as nativeSetConfirmBeforePaste,
   setMaxClips as nativeSetMaxClips,
+  setPopupAlpha as nativeSetPopupAlpha,
+  setTuckDelay as nativeSetTuckDelay,
 } from '../native/OverlayModule';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
@@ -23,6 +28,32 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export const MIN_BUBBLE_SIZE = 48;
 export const MAX_BUBBLE_SIZE = 72;
 export const DEFAULT_BUBBLE_SIZE = 56;
+
+/**
+ * How opaque the bubble and the floating list are, as percentages.
+ *
+ * The floor is not zero. A window at zero opacity is invisible but still takes
+ * touches, which from the outside is indistinguishable from a phone that has
+ * started ignoring part of its own screen — so the slider stops well before
+ * the point where the bubble could be lost entirely.
+ *
+ * Mirrored in Prefs on the native side, which clamps to the same floor because
+ * it reads the stored value directly at startup.
+ */
+export const MIN_ALPHA = 20;
+export const MAX_ALPHA = 100;
+export const DEFAULT_ALPHA = 100;
+
+/**
+ * Seconds of stillness before the bubble tucks itself into the screen edge.
+ *
+ * Zero means never, and is the default: a bubble that disappears on its own is
+ * a surprise the first time it happens, so it should be something the user
+ * turned on rather than something they have to discover and switch off.
+ */
+export const MIN_TUCK_DELAY = 0;
+export const MAX_TUCK_DELAY = 120;
+export const DEFAULT_TUCK_DELAY = 0;
 
 /**
  * The permission picture at the moment the user last walked past setup.
@@ -46,6 +77,12 @@ interface SettingsState {
   autoStartOnBoot: boolean;
   confirmBeforePaste: boolean;
   maxClips: number; // 0 = unlimited
+  bubbleAlpha: number;
+  /** Whether bubbleAlpha applies only while the bubble is idle. */
+  bubbleIdleFade: boolean;
+  popupAlpha: number;
+  /** Seconds before the bubble becomes an edge handle. 0 = never. */
+  tuckDelay: number;
 
   /** Records what was granted when the user chose to carry on without the rest. */
   skipPermissions: (state: SkippedPermissions) => void;
@@ -56,7 +93,15 @@ interface SettingsState {
   setAutoStartOnBoot: (enabled: boolean) => void;
   setConfirmBeforePaste: (enabled: boolean) => void;
   setMaxClips: (max: number) => void;
+  setBubbleAlpha: (alpha: number) => void;
+  setBubbleIdleFade: (enabled: boolean) => void;
+  setPopupAlpha: (alpha: number) => void;
+  setTuckDelay: (seconds: number) => void;
 }
+
+/** Shared clamp for both transparency sliders. */
+const clampAlpha = (value: number): number =>
+  Math.round(Math.min(MAX_ALPHA, Math.max(MIN_ALPHA, value)));
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -68,6 +113,10 @@ export const useSettingsStore = create<SettingsState>()(
       autoStartOnBoot: true,
       confirmBeforePaste: true,
       maxClips: 500,
+      bubbleAlpha: DEFAULT_ALPHA,
+      bubbleIdleFade: false,
+      popupAlpha: DEFAULT_ALPHA,
+      tuckDelay: DEFAULT_TUCK_DELAY,
 
       skipPermissions: (state) => set({ hasOnboarded: true, permissionSkip: state }),
       clearPermissionSkip: () => set({ permissionSkip: null }),
@@ -83,10 +132,37 @@ export const useSettingsStore = create<SettingsState>()(
         set({ autoStartOnBoot: enabled });
         nativeSetAutoStartOnBoot(enabled);
       },
-      setConfirmBeforePaste: (enabled) => set({ confirmBeforePaste: enabled }),
+      // Mirrored now, unlike before. The floating list is drawn natively and
+      // opens with no React context behind it, so the setting that decides
+      // whether a tap pastes immediately has to be where native can read it.
+      setConfirmBeforePaste: (enabled) => {
+        set({ confirmBeforePaste: enabled });
+        nativeSetConfirmBeforePaste(enabled);
+      },
       setMaxClips: (max) => {
         set({ maxClips: max });
         nativeSetMaxClips(max);
+      },
+      setBubbleAlpha: (alpha) => {
+        const clamped = clampAlpha(alpha);
+        set({ bubbleAlpha: clamped });
+        nativeSetBubbleAlpha(clamped);
+      },
+      setBubbleIdleFade: (enabled) => {
+        set({ bubbleIdleFade: enabled });
+        nativeSetBubbleIdleFade(enabled);
+      },
+      setPopupAlpha: (alpha) => {
+        const clamped = clampAlpha(alpha);
+        set({ popupAlpha: clamped });
+        nativeSetPopupAlpha(clamped);
+      },
+      setTuckDelay: (seconds) => {
+        const clamped = Math.round(
+          Math.min(MAX_TUCK_DELAY, Math.max(MIN_TUCK_DELAY, seconds))
+        );
+        set({ tuckDelay: clamped });
+        nativeSetTuckDelay(clamped);
       },
     }),
     {
@@ -126,6 +202,11 @@ export const useSettingsStore = create<SettingsState>()(
         nativeSetBubbleSize(state.bubbleSize);
         nativeSetAutoStartOnBoot(state.autoStartOnBoot);
         nativeSetMaxClips(state.maxClips);
+        nativeSetConfirmBeforePaste(state.confirmBeforePaste);
+        nativeSetBubbleAlpha(state.bubbleAlpha);
+        nativeSetBubbleIdleFade(state.bubbleIdleFade);
+        nativeSetPopupAlpha(state.popupAlpha);
+        nativeSetTuckDelay(state.tuckDelay);
       },
     }
   )

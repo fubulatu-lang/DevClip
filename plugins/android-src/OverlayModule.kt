@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
 import com.facebook.react.bridge.*
@@ -180,6 +181,128 @@ class OverlayModule(reactContext: ReactApplicationContext) :
         promise.resolve(prefs().getBoolean(Prefs.KEY_BUBBLE_RUNNING, false))
     }
 
+    /** How see-through the bubble is, as a percentage. */
+    @ReactMethod
+    fun setBubbleAlpha(alpha: Double) {
+        prefs().edit()
+            .putInt(Prefs.KEY_BUBBLE_ALPHA, alpha.toInt().coerceIn(Prefs.MIN_ALPHA, 100))
+            .apply()
+        applyAppearance()
+    }
+
+    /**
+     * Whether the chosen transparency applies only when the bubble is idle.
+     *
+     * Off, the bubble simply sits at that level. On, it rests there and
+     * returns to solid the moment it is touched — which is what makes a very
+     * faint bubble usable, because you can see it as you reach for it.
+     */
+    @ReactMethod
+    fun setBubbleIdleFade(enabled: Boolean) {
+        prefs().edit().putBoolean(Prefs.KEY_BUBBLE_IDLE_FADE, enabled).apply()
+        applyAppearance()
+    }
+
+    /** How see-through the floating list is, as a percentage. */
+    @ReactMethod
+    fun setPopupAlpha(alpha: Double) {
+        prefs().edit()
+            .putInt(Prefs.KEY_POPUP_ALPHA, alpha.toInt().coerceIn(Prefs.MIN_ALPHA, 100))
+            .apply()
+        applyAppearance()
+    }
+
+    /** Seconds of stillness before the bubble tucks itself away. 0 never does. */
+    @ReactMethod
+    fun setTuckDelay(seconds: Double) {
+        prefs().edit()
+            .putInt(Prefs.KEY_TUCK_DELAY_SEC, seconds.toInt().coerceIn(0, Prefs.MAX_TUCK_DELAY_SEC))
+            .apply()
+        applyAppearance()
+    }
+
+    /**
+     * Mirrors tap-to-arm into native.
+     *
+     * The floating list is native now, so the setting that governs whether a
+     * tap pastes immediately has to be readable without a React context —
+     * exactly like the clip limit, and for the same reason.
+     */
+    @ReactMethod
+    fun setConfirmBeforePaste(enabled: Boolean) {
+        prefs().edit().putBoolean(Prefs.KEY_CONFIRM_BEFORE_PASTE, enabled).apply()
+    }
+
+    private fun applyAppearance() {
+        if (prefs().getBoolean(Prefs.KEY_BUBBLE_RUNNING, false)) {
+            sendToService(OverlayService.ACTION_APPLY_SETTINGS)
+        }
+    }
+
+    /**
+     * Whether Android is allowed to put DevClip to sleep.
+     *
+     * This is not cosmetic. Capture depends on an accessibility service
+     * staying bound, and a phone that decides DevClip is idle will quietly
+     * unbind it — the permission still reads as granted in Settings while
+     * nothing is listening, which is the single hardest failure in this app to
+     * recognise from the outside.
+     */
+    @ReactMethod
+    fun isBatteryOptimised(promise: Promise) {
+        val context = reactApplicationContext
+        val manager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+        if (manager == null) {
+            promise.resolve(false)
+            return
+        }
+        promise.resolve(!manager.isIgnoringBatteryOptimizations(context.packageName))
+    }
+
+    /**
+     * Asks Android to stop optimising DevClip.
+     *
+     * An app cannot grant itself this; the most it can do is raise the system
+     * dialog that asks. Where even that is unavailable, the app-details screen
+     * is the honest fallback — one tap away from the setting, rather than a
+     * button that silently does nothing.
+     */
+    @ReactMethod
+    fun requestIgnoreBatteryOptimisations(promise: Promise) {
+        val context = reactApplicationContext
+        try {
+            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                .setData(Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            openBatterySettings()
+            promise.resolve(false)
+        }
+    }
+
+    /**
+     * Opens the place the user has to go by hand.
+     *
+     * Samsung's own "deep sleeping apps" list is not reachable through any
+     * public API — it cannot even be read — so for the manufacturer most
+     * likely to break capture, taking the user to the right screen and saying
+     * what to do there is the whole of what an app can offer.
+     */
+    @ReactMethod
+    fun openBatterySettings() {
+        val context = reactApplicationContext
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            android.util.Log.w("DevClip", "Could not open the battery settings screen", e)
+        }
+    }
+
     @ReactMethod
     fun pasteIntoFocusedField(text: String, promise: Promise) {
         val service = ClipboardAccessibilityService.instance
@@ -247,4 +370,48 @@ object Prefs {
      */
     const val KEY_MAX_CLIPS = "max_clips"
     const val DEFAULT_MAX_CLIPS = 500
+
+    /**
+     * Tap-to-arm, mirrored for the floating list.
+     *
+     * The list is native now and opens with no React context behind it, so a
+     * setting it obeys has to live where it can read it.
+     */
+    const val KEY_CONFIRM_BEFORE_PASTE = "confirm_before_paste"
+
+    /**
+     * How opaque the bubble and the list are, as percentages.
+     *
+     * The floor is not zero. A window at zero opacity is invisible but still
+     * takes touches, which is indistinguishable from a phone that has started
+     * ignoring part of the screen — so the slider stops well before the point
+     * where the user could lose the bubble entirely.
+     */
+    const val KEY_BUBBLE_ALPHA = "bubble_alpha"
+    const val KEY_POPUP_ALPHA = "popup_alpha"
+    const val MIN_ALPHA = 20
+    const val DEFAULT_ALPHA = 100
+
+    /** Whether the chosen transparency applies only while the bubble is idle. */
+    const val KEY_BUBBLE_IDLE_FADE = "bubble_idle_fade"
+
+    /**
+     * Seconds of stillness before the bubble becomes an edge handle. 0 is off.
+     *
+     * Off by default: a bubble that disappears on its own is a surprise the
+     * first time it happens, and it should be something the user turned on.
+     */
+    const val KEY_TUCK_DELAY_SEC = "tuck_delay_sec"
+    const val DEFAULT_TUCK_DELAY_SEC = 0
+    const val MAX_TUCK_DELAY_SEC = 120
+
+    /**
+     * The size the user last dragged the floating list to, in dp.
+     *
+     * Stored in dp, never pixels, for the same reason the bubble's position
+     * is: a pixel size stops meaning anything the moment the window changes
+     * shape, and this has to survive a rotation and a reboot.
+     */
+    const val KEY_POPUP_WIDTH_DP = "popup_width_dp"
+    const val KEY_POPUP_HEIGHT_DP = "popup_height_dp"
 }

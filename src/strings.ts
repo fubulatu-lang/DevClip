@@ -96,10 +96,47 @@ export const strings = {
     bubbleHiddenNote:
       'The bubble is hidden. DevClip is still running — bring it back here or from the notification.',
 
+    bubbleOpacity: 'Bubble opacity',
+    bubbleOpacityValue: (pct: number) => `${pct}%`,
+    bubbleOpacityA11y: (pct: number) => `${pct} percent opaque`,
+
+    fadeWhenIdle: 'Fade when idle',
+    fadeWhenIdleNote:
+      'On, the bubble sits at that opacity and turns solid the moment you touch it. Off, it stays at it.',
+
+    listOpacity: 'Clip list opacity',
+    listOpacityValue: (pct: number) => `${pct}%`,
+    listOpacityA11y: (pct: number) => `${pct} percent opaque`,
+
+    listResizeNote:
+      'Drag any edge or corner of the floating list to resize it. DevClip remembers the size.',
+
+    tuckDelay: 'Tuck away after',
+    tuckDelayValue: (seconds: number) => (seconds === 0 ? 'Never' : `${seconds}s`),
+    tuckDelayA11y: (seconds: number) =>
+      seconds === 0 ? 'Never tuck away' : `Tuck away after ${seconds} seconds`,
+    tuckDelayNote:
+      'The bubble becomes a slim handle on the screen edge when you have not used it. Touch the handle to bring it back.',
+
     autoStart: 'Auto-start after reboot',
     confirmPaste: 'Confirm before paste',
     on: 'On',
     off: 'Off',
+
+    battery: 'Battery',
+    batteryOptimised: 'Battery optimisation',
+    batteryRestricted: 'Restricted',
+    batteryUnrestricted: 'Unrestricted',
+    batteryFix: 'Fix',
+    /**
+     * Named for the consequence, not the setting. "Battery optimisation is on"
+     * means nothing to somebody wondering why capture stopped working; losing
+     * text capture without warning is the thing they care about.
+     */
+    batteryWarning:
+      'Android may put DevClip to sleep, which silently stops text capture — the permission keeps reading as granted while nothing is listening.',
+    batterySamsungNote:
+      'On Samsung phones also check Settings \u203A Battery \u203A Background usage limits, and make sure DevClip is not in Sleeping or Deep sleeping apps. Android has no way for an app to read or change that list.',
 
     storage: 'Storage',
     keepAtMost: 'Keep at most',
