@@ -50,7 +50,14 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      # packages: '' or the action installs the obsolete `tools` SDK package
+      # by default, which Google no longer publishes — sdkmanager exits 1 on
+      # "Failed to find package 'tools'" and the job dies before it has
+      # compiled anything. The runner image already carries the SDK and its
+      # accepted licences; all this step needs to do is point at them.
       - uses: android-actions/setup-android@v3
+        with:
+          packages: ''
 
       # The android/ project is generated, not committed. This is the step
       # that runs plugins/withDevClipNative.js, which copies every .kt file
