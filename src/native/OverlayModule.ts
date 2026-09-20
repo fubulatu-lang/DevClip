@@ -106,6 +106,92 @@ export async function pasteIntoFocusedField(text: string): Promise<boolean> {
   return NativeOverlay.pasteIntoFocusedField(text);
 }
 
+/**
+ * How opaque the bubble is, 20-100.
+ *
+ * Native clamps to the same floor this side does, because native is the one
+ * that has to be right when the value came from SharedPreferences rather than
+ * from here.
+ */
+export function setBubbleAlpha(alpha: number): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setBubbleAlpha(alpha);
+}
+
+/**
+ * Whether the chosen transparency applies only while the bubble is idle.
+ *
+ * Off, the bubble simply sits at that level. On, it rests there and returns to
+ * solid the moment it is touched — which is what makes a very faint bubble
+ * usable, because you can see it as you reach for it.
+ */
+export function setBubbleIdleFade(enabled: boolean): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setBubbleIdleFade(enabled);
+}
+
+/** How opaque the floating list is, 20-100. */
+export function setPopupAlpha(alpha: number): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setPopupAlpha(alpha);
+}
+
+/** Seconds of stillness before the bubble tucks itself away. 0 never does. */
+export function setTuckDelay(seconds: number): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setTuckDelay(seconds);
+}
+
+/**
+ * Mirrors tap-to-arm into native.
+ *
+ * The floating list is drawn natively and opens with no React context behind
+ * it, so a setting it obeys has to be readable from SharedPreferences — the
+ * same reason the clip limit is mirrored.
+ */
+export function setConfirmBeforePaste(enabled: boolean): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.setConfirmBeforePaste(enabled);
+}
+
+/**
+ * Whether Android is allowed to put DevClip to sleep.
+ *
+ * Not cosmetic. Capture depends on the accessibility service staying bound,
+ * and a phone that decides DevClip is idle will quietly unbind it — leaving
+ * the permission reading as granted while nothing is listening. That is the
+ * hardest failure in this app to recognise from the outside, so the app says
+ * so rather than waiting to be asked.
+ */
+export async function isBatteryOptimised(): Promise<boolean> {
+  if (!isNativeOverlayAvailable()) return false;
+  return NativeOverlay.isBatteryOptimised();
+}
+
+/**
+ * Raises Android's own "stop optimising this app" dialog.
+ *
+ * Resolves false when the system would not show it, in which case native has
+ * already opened the app-details screen instead — there is no way for an app
+ * to grant itself this, only to ask.
+ */
+export async function requestIgnoreBatteryOptimisations(): Promise<boolean> {
+  if (!isNativeOverlayAvailable()) return false;
+  return NativeOverlay.requestIgnoreBatteryOptimisations();
+}
+
+/**
+ * Opens DevClip's app-details screen.
+ *
+ * Samsung's "deep sleeping apps" list is not reachable through any public API
+ * — it cannot even be read — so for the manufacturer most likely to break
+ * capture, this plus a plain instruction is the whole of what an app can do.
+ */
+export function openBatterySettings(): void {
+  if (!isNativeOverlayAvailable()) return;
+  NativeOverlay.openBatterySettings();
+}
+
 // Standard Android runtime permission (Android 13+/API 33+). Needed for the
 // foreground service's notification to actually show. This one DOES trigger
 // the normal system permission dialog, unlike overlay/accessibility which

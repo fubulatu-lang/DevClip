@@ -36,11 +36,15 @@ function withDevClipNativeFiles(config) {
         'ClipboardAccessibilityService.kt',
         'DevClipDatabaseHelper.kt',
         'DevClipEvents.kt',
+        'DevClipTheme.kt',
         'DismissTargetView.kt',
+        'EdgeHandleView.kt',
         'ImeWatcher.kt',
         'OverlayModule.kt',
         'OverlayPackage.kt',
         'OverlayService.kt',
+        'PopupListView.kt',
+        'ResizableFrame.kt',
         'SelectionCapture.kt',
       ];
       for (const file of ktFiles) {
@@ -186,6 +190,25 @@ const NATIVE_STRINGS = [
     value: 'Skipped that one \u2014 it looks like a password field.',
   },
   { name: 'devclip_capture_failed', value: 'DevClip couldn\u2019t save that. Try again.' },
+
+  // The floating list. It is drawn in native views now rather than by React,
+  // so its copy lives here beside the rest of the native strings instead of in
+  // src/strings.ts.
+  { name: 'devclip_popup_title', value: 'DevClip' },
+  { name: 'devclip_popup_open_full', value: 'Open the full app' },
+  { name: 'devclip_popup_close', value: 'Close DevClip' },
+  { name: 'devclip_popup_empty', value: 'No clips yet' },
+  { name: 'devclip_popup_tap_to_paste', value: 'Tap to paste' },
+  { name: 'devclip_popup_armed', value: 'Tap again to paste' },
+  {
+    name: 'devclip_paste_copied_only',
+    value:
+      'Couldn\u2019t paste automatically, so it\u2019s on your clipboard \u2014 paste it manually.',
+  },
+
+  // The edge handle the bubble becomes when it tucks itself away. Its label
+  // says what touching it does, because its shape deliberately does not.
+  { name: 'devclip_handle_description', value: 'Show the DevClip bubble' },
 
   // The notification. It is the way back to a hidden bubble, so its copy has
   // to say what each button actually does. "Dismiss" is deliberately absent —

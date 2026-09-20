@@ -1,17 +1,18 @@
-import { AppRegistry } from 'react-native';
 import { registerRootComponent } from 'expo';
 import App from './App';
-import OverlayApp from './src/OverlayApp';
 import appJson from './app.json';
 
 const appName = appJson.expo.name;
 
 // The launcher app: the whole thing, full screen.
+//
+// There used to be a second root registered here, "DevClipPopup", which
+// OverlayService mounted as a React surface inside the floating window. It is
+// gone, and so is the bug it caused: a surface draws nothing without a live
+// React instance behind it, and nothing starts one but an Activity — so the
+// floating list came up as an empty outline until the launcher app had been
+// opened once, and looked intermittent while being entirely deterministic.
+// The list is drawn in native views now, by PopupListView.kt.
 registerRootComponent(App);
-
-// The floating list that OverlayService.kt mounts in its own window.
-// A separate root from App: it is tethered to the bubble and paste-only — a
-// different surface, not a resized one.
-AppRegistry.registerComponent('DevClipPopup', () => OverlayApp);
 
 export default appName;

@@ -33,8 +33,6 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
-import com.facebook.react.ReactApplication
-import com.facebook.react.interfaces.fabric.ReactSurface
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -43,7 +41,7 @@ import kotlin.math.min
  *
  *  1. The bubble — the app icon, docked to the left or right edge, draggable
  *     up and down it, and the thing that captures a selection when tapped.
- *  2. A React Native surface rendering "DevClipPopup" — the floating list.
+ *  2. The floating list, drawn in ordinary views by PopupListView.
  *  3. The drag-to-hide target, which exists only while a drag is in progress.
  *
  * Three states, not two:
@@ -117,15 +115,42 @@ class OverlayService : Service() {
      */
     private var resting = false
 
+    /**
+     * Tucked away at the edge as a handle.
+     *
+     * A third visible state alongside awake and resting, and unlike resting it
+     * is not a decision the user made — the bubble did it on a timer. So it
+     * undoes itself on a touch rather than needing the notification, and it is
+     * never persisted.
+     */
+    private var tucked = false
+    private var handleView: View? = null
+    private var handleParams: WindowManager.LayoutParams? = null
+
     private var dismissTarget: DismissTargetView? = null
     private var dismissParams: WindowManager.LayoutParams? = null
     private var magnetised = false
 
     private var bubbleAnimator: ValueAnimator? = null
-    private var popupSurface: ReactSurface? = null
-    private var popupView: View? = null
+    private var popupContent: PopupListView? = null
+    private var popupView: ResizableFrame? = null
     private var popupParams: WindowManager.LayoutParams? = null
     private var popupVisible = false
+
+    /**
+     * The size the user last dragged the list to, in pixels.
+     *
+     * Held here as well as in SharedPreferences because a resize drag updates
+     * it on every move event and the preference is written once, on release.
+     */
+    private var popupWidthPx = 0
+    private var popupHeightPx = 0
+
+    /** Window geometry captured when a resize drag begins. */
+    private var resizeStartWidth = 0
+    private var resizeStartHeight = 0
+    private var resizeStartX = 0
+    private var resizeStartY = 0
 
     companion object {
         const val CHANNEL_ID = "devclip_overlay_channel"
@@ -155,6 +180,17 @@ class OverlayService : Service() {
         const val EXTRA_SIZE_DP = "size_dp"
 
         /**
+         * Re-read the appearance settings and apply them.
+         *
+         * One action rather than one per setting. The values live in
+         * SharedPreferences because the service needs them at startup, long
+         * before any React context exists — so the writer has already written
+         * them by the time this arrives, and every extra action would only be
+         * a second copy of a number the service can already see.
+         */
+        const val ACTION_APPLY_SETTINGS = "com.devclip.app.ACTION_APPLY_SETTINGS"
+
+        /**
          * The floating list is the only floating surface now that the expanded
          * sheet is gone, so it is sized to be worth opening — roughly a third
          * of a phone screen, scrolling past that — rather than to be the
@@ -162,6 +198,19 @@ class OverlayService : Service() {
          */
         private const val LIST_WIDTH_DP = 320
         private const val LIST_HEIGHT_DP = 460
+
+        /**
+         * How far the list can be dragged in each direction.
+         *
+         * The floor is the point below which a clip row stops being readable
+         * at all; the ceiling is checked again against the safe area every
+         * time the window is placed, so a size dragged on a tablet cannot
+         * strand the window off the edge of a phone.
+         */
+        private const val LIST_MIN_WIDTH_DP = 220
+        private const val LIST_MIN_HEIGHT_DP = 160
+        private const val LIST_MAX_WIDTH_DP = 560
+        private const val LIST_MAX_HEIGHT_DP = 900
         /** Breathing room between the bubble and the window hanging off it. */
         private const val TETHER_GAP_DP = 8
         private const val EDGE_MARGIN_DP = 8
@@ -177,6 +226,19 @@ class OverlayService : Service() {
 
         /** How long the bubble takes to settle onto its edge. */
         private const val SETTLE_DURATION_MS = 220L
+
+        /**
+         * How long after the last touch the bubble drops to its faded level.
+         *
+         * Fixed rather than configurable. The setting the user wants control
+         * over is how see-through it becomes, not the handful of seconds
+         * before it gets there, and every extra dial is one more thing to
+         * explain in a settings screen.
+         */
+        private const val IDLE_FADE_DELAY_MS = 3000L
+
+        /** How long the bubble takes to fade, and to slide away or back. */
+        private const val FADE_DURATION_MS = 180L
 
         /**
          * How long after a drag the parked position is written.
@@ -253,6 +315,13 @@ class OverlayService : Service() {
             }
         }
 
+        // The handle is docked to an edge like the bubble it replaced, so a
+        // rotation or an unfold moves it for the same reasons.
+        if (tucked) {
+            removeHandle()
+            addHandle()
+        }
+
         // The target window is sized to the safe area, so it has to be
         // re-measured for the new one.
         hideDismissTarget()
@@ -273,6 +342,7 @@ class OverlayService : Service() {
             ACTION_STOP -> turnOff()
             ACTION_SET_BUBBLE_SIZE ->
                 applyBubbleSize(intent.getIntExtra(EXTRA_SIZE_DP, Prefs.DEFAULT_BUBBLE_SIZE_DP))
+            ACTION_APPLY_SETTINGS -> applySettings()
         }
         return START_STICKY
     }
@@ -699,6 +769,10 @@ class OverlayService : Service() {
     private fun rest() {
         if (resting) return
         resting = true
+        mainHandler.removeCallbacks(fadeToIdle)
+        mainHandler.removeCallbacks(tuckAway)
+        tucked = false
+        removeHandle()
         // Hiding the bubble hides what hangs off it. Leaving the list floating
         // with nothing to be tethered to would be its own bug.
         hidePopup()
@@ -720,6 +794,8 @@ class OverlayService : Service() {
     private fun wake() {
         if (!resting) return
         resting = false
+        tucked = false
+        removeHandle()
         addBubble()
         refreshNotification()
         DevClipEvents.emitBubbleState(false)
@@ -736,6 +812,154 @@ class OverlayService : Service() {
         bubbleView = null
         bubbleParams = null
         removeDismissTarget()
+    }
+
+    /**
+     * Applies changed appearance settings to windows that already exist.
+     *
+     * A tucked bubble is brought back first: the settings screen is the one
+     * place the user is definitely looking at DevClip rather than at the app
+     * underneath it, and leaving the bubble hidden while they drag a slider
+     * meant to change how it looks would show them nothing at all.
+     */
+    private fun applySettings() {
+        if (tucked) untuck()
+        applyBubbleAlpha(idle = false)
+        popupView?.alpha = popupAlpha()
+        scheduleIdle()
+    }
+
+    // ---- Transparency and tucking away ----
+
+    private val fadeToIdle = Runnable { applyBubbleAlpha(idle = true) }
+    private val tuckAway = Runnable { tuck() }
+
+    /** The level the user set, as a fraction. */
+    private fun bubbleAlpha(): Float =
+        prefs().getInt(Prefs.KEY_BUBBLE_ALPHA, Prefs.DEFAULT_ALPHA)
+            .coerceIn(Prefs.MIN_ALPHA, 100) / 100f
+
+    private fun idleFadeEnabled(): Boolean =
+        prefs().getBoolean(Prefs.KEY_BUBBLE_IDLE_FADE, false)
+
+    /**
+     * Puts the bubble at the right opacity for what is happening.
+     *
+     * With idle fade off, the chosen level is simply how the bubble looks, all
+     * the time. With it on, the level is where the bubble *rests* and a touch
+     * brings it back to solid — which is the behaviour that makes a very
+     * transparent bubble usable at all, because you can see what you are
+     * about to press the moment you press it.
+     */
+    private fun applyBubbleAlpha(idle: Boolean) {
+        val view = bubbleView ?: return
+        val target = when {
+            !idleFadeEnabled() -> bubbleAlpha()
+            idle -> bubbleAlpha()
+            else -> 1f
+        }
+        if (view.alpha == target) return
+        if (animationsDisabled()) {
+            view.alpha = target
+        } else {
+            view.animate().alpha(target).setDuration(FADE_DURATION_MS).start()
+        }
+    }
+
+    /**
+     * Called whenever the user touches the bubble.
+     *
+     * Restores full opacity and restarts both timers, so a bubble in use never
+     * fades or tucks itself out from under the finger using it.
+     */
+    private fun onBubbleInteraction() {
+        mainHandler.removeCallbacks(fadeToIdle)
+        mainHandler.removeCallbacks(tuckAway)
+        applyBubbleAlpha(idle = false)
+    }
+
+    /** Restarts the idle timers after an interaction has finished. */
+    private fun scheduleIdle() {
+        mainHandler.removeCallbacks(fadeToIdle)
+        mainHandler.removeCallbacks(tuckAway)
+        if (resting || tucked) return
+        if (idleFadeEnabled()) mainHandler.postDelayed(fadeToIdle, IDLE_FADE_DELAY_MS)
+        val delay = prefs().getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)
+        if (delay > 0) mainHandler.postDelayed(tuckAway, delay * 1000L)
+    }
+
+    /**
+     * Replaces the bubble with a slim handle on the screen edge.
+     *
+     * Not the same thing as resting. Resting is the user saying "get out of my
+     * way" and is undone from the notification; this is the bubble getting out
+     * of its own way on a timer, and a touch on the handle is enough to undo
+     * it. The list is closed first for the same reason resting closes it:
+     * something tethered to a bubble that is no longer there is its own bug.
+     */
+    private fun tuck() {
+        if (tucked || resting) return
+        if (popupVisible) return
+        tucked = true
+        hidePopup()
+        removeBubble()
+        addHandle()
+    }
+
+    /** Brings the bubble back, where the handle was. */
+    private fun untuck() {
+        if (!tucked) return
+        tucked = false
+        removeHandle()
+        addBubble()
+        onBubbleInteraction()
+        scheduleIdle()
+    }
+
+    private fun addHandle() {
+        val area = safeArea()
+        val onLeft = edge == Prefs.EDGE_LEFT
+        val view = EdgeHandleView(this, onLeft).apply {
+            contentDescription = getString(R.string.devclip_handle_description)
+            isClickable = true
+            setOnClickListener { untuck() }
+        }
+
+        val width = dp(EdgeHandleView.TOUCH_WIDTH_DP)
+        val height = dp(EdgeHandleView.HEIGHT_DP)
+        val params = WindowManager.LayoutParams(
+            width, height, overlayType,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = if (onLeft) area.left else area.right - width
+            // Centred on where the bubble was, so the handle appears where the
+            // user last left the thing it replaced.
+            y = clamp(
+                parkedY + bubbleSizePx / 2 - height / 2,
+                area.top,
+                area.bottom - height
+            )
+        }
+
+        try {
+            windowManager.addView(view, params)
+            handleView = view
+            handleParams = params
+        } catch (e: Exception) {
+            // Losing the handle would leave no way back to the bubble at all,
+            // so failing to place it undoes the tuck rather than stranding it.
+            android.util.Log.w("DevClip", "Could not place the edge handle", e)
+            tucked = false
+            addBubble()
+        }
+    }
+
+    private fun removeHandle() {
+        handleView?.let { try { windowManager.removeView(it) } catch (e: Exception) { } }
+        handleView = null
+        handleParams = null
     }
 
     // ---- The drag-to-hide target ----
@@ -907,6 +1131,7 @@ class OverlayService : Service() {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     bubbleAnimator?.cancel()
+                    onBubbleInteraction()
                     initialX = params.x
                     initialY = params.y
                     touchX = event.rawX
@@ -948,6 +1173,7 @@ class OverlayService : Service() {
                     mainHandler.removeCallbacks(longPress)
                     hideDismissTarget()
                     settle()
+                    scheduleIdle()
                     true
                 }
                 MotionEvent.ACTION_UP -> {
@@ -976,6 +1202,7 @@ class OverlayService : Service() {
                             fail(getString(R.string.devclip_error_tap), e)
                         }
                     }
+                    scheduleIdle()
                     true
                 }
                 else -> false
@@ -986,6 +1213,8 @@ class OverlayService : Service() {
         bubbleView = bubble
         bubbleParams = params
         showSelectionRing(SelectionCapture.hasLiveSelection)
+        applyBubbleAlpha(idle = false)
+        scheduleIdle()
     }
 
     /**
@@ -1050,74 +1279,182 @@ class OverlayService : Service() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    // ---- Popup (React Native content) ----
+    // ---- Popup (native content) ----
 
     /**
      * Builds the popup's view once and keeps it for the life of the service.
      *
-     * There is no bridge left to reach for. `ReactNativeHost` and
-     * `ReactRootView` belong to the architecture React Native 0.86 removed,
-     * and `ReactApplication.reactNativeHost` is now a default getter that
-     * throws outright — so the old code threw on the very first tap, inside
-     * the bubble's touch listener, and the popup never appeared. A surface
-     * created from `reactHost` is the supported equivalent.
+     * This used to create a React Native surface, and that is the bug the user
+     * saw as "the bubble opens an empty outline". A surface draws nothing
+     * without a live React instance behind it, and nothing starts one but an
+     * Activity — so after a reboot, or after DevClip was swiped out of
+     * Recents, the window was added and stayed blank until the launcher app
+     * had been opened once. Starting the host here first was tried and did not
+     * fix it: the host starts asynchronously, so the surface was still created
+     * against an instance that did not exist yet.
      *
-     * The surface is themed from the application's own theme: a Service has
-     * no theme of its own, and React Native's widgets resolve AppCompat
-     * attributes off whatever context they are inflated with.
+     * Views have none of that lifecycle. They draw when they are added.
      */
-    private fun ensurePopupView(): View? {
+    private fun ensurePopupView(): ResizableFrame? {
         popupView?.let { return it }
 
-        val host = (application as? ReactApplication)?.reactHost
-        if (host == null) {
-            fail(getString(R.string.devclip_error_no_app), null)
-            return null
+        val content = PopupListView(this).apply {
+            // Posted, not called. Both of these tear down the very window the
+            // click is being dispatched inside, and removing a window from
+            // within its own touch dispatch is the same trouble the drag-to-
+            // hide gesture already avoids this way.
+            onOpenFullApp = { mainHandler.post { this@OverlayService.openFullApp() } }
+            onClose = { mainHandler.post { this@OverlayService.hidePopup() } }
+            onPaste = { text -> this@OverlayService.pasteFromPopup(text) }
         }
 
-        // Nothing else starts the React host but an Activity. Launched from
-        // BootReceiver, or after the app was swiped out of Recents, the service
-        // is the first thing running in the process and the JS bundle has never
-        // been loaded — so the surface below would be created against a host
-        // with no instance behind it and would render nothing at all, which is
-        // exactly the empty coloured window this used to show. Starting it here
-        // is a no-op when an Activity already did.
-        if (host.currentReactContext == null) {
-            try {
-                host.start()
-            } catch (e: Exception) {
-                fail(getString(R.string.devclip_error_start_app), e)
-                return null
+        val frame = ResizableFrame(this).apply {
+            addView(
+                content,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+            )
+            onResizeStart = { this@OverlayService.beginPopupResize() }
+            onResizeEnd = { this@OverlayService.endPopupResize() }
+            resizeListener = ResizableFrame.ResizeListener { l, t, r, b, dx, dy ->
+                this@OverlayService.applyPopupResize(l, t, r, b, dx, dy)
             }
         }
 
-        val themed = ContextThemeWrapper(this, applicationInfo.theme)
-        val surface = host.createSurface(themed, "DevClipPopup", null)
-        surface.start()
+        frame.alpha = popupAlpha()
+        popupContent = content
+        popupView = frame
+        return frame
+    }
 
-        val view = surface.view
-        if (view == null) {
-            fail(getString(R.string.devclip_error_build_window), null)
-            return null
+    /** The list's transparency, as the user set it. */
+    private fun popupAlpha(): Float =
+        prefs().getInt(Prefs.KEY_POPUP_ALPHA, Prefs.DEFAULT_ALPHA)
+            .coerceIn(Prefs.MIN_ALPHA, 100) / 100f
+
+    /**
+     * Reads the clips and hands them to the list.
+     *
+     * On the main thread, like the capture that writes them: both are the
+     * direct consequence of a tap on the bubble, both are bounded reads of a
+     * small table, and a background thread here would mean the window
+     * appearing before its contents on every single open.
+     */
+    private fun refreshPopupContent() {
+        val content = popupContent ?: return
+        val limit = prefs().getInt(Prefs.KEY_MAX_CLIPS, Prefs.DEFAULT_MAX_CLIPS)
+            .let { if (it <= 0) PopupListView.MAX_ROWS else min(it, PopupListView.MAX_ROWS) }
+
+        val helper = DevClipDatabaseHelper(applicationContext)
+        val clips = try {
+            helper.listClips(limit)
+        } finally {
+            try { helper.close() } catch (e: Exception) { }
         }
+        content.render(clips, prefs().getBoolean(Prefs.KEY_CONFIRM_BEFORE_PASTE, true))
+    }
 
-        // React paints asynchronously, and the window is TRANSLUCENT, so until
-        // the first frame lands there is nothing on screen at all — a failure
-        // to render is indistinguishable from a tap that did nothing. An
-        // opaque ground taken from the app's own theme (so it follows
-        // light/dark) means the window is visibly present the moment it is
-        // added.
-        val background = TypedValue()
-        if (themed.theme.resolveAttribute(android.R.attr.colorBackground, background, true) &&
-            background.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
-            background.type <= TypedValue.TYPE_LAST_COLOR_INT
-        ) {
-            view.setBackgroundColor(background.data)
+    /**
+     * Hands a clip back to whatever the user was doing.
+     *
+     * The clipboard is written either way; the direct paste is the part that
+     * can fail, when there is no focused field or it does not accept a paste.
+     * Saying so is the difference between "nothing happened" and "it is on
+     * your clipboard, paste it yourself".
+     */
+    private fun pasteFromPopup(text: String) {
+        val service = ClipboardAccessibilityService.instance
+        val pasted = service?.pasteIntoFocusedField(text) ?: false
+        if (!pasted) {
+            if (service == null) {
+                // Without the accessibility service there is no paste at all,
+                // so the clipboard write has to happen here instead.
+                try {
+                    val manager = getSystemService(Context.CLIPBOARD_SERVICE)
+                        as? android.content.ClipboardManager
+                    manager?.setPrimaryClip(
+                        android.content.ClipData.newPlainText("DevClip", text)
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w("DevClip", "Could not set the clipboard", e)
+                }
+            }
+            toast(getString(R.string.devclip_paste_copied_only))
         }
+    }
 
-        popupSurface = surface
-        popupView = view
-        return view
+    // ---- Popup resizing ----
+
+    private fun beginPopupResize() {
+        val params = popupParams ?: return
+        resizeStartWidth = params.width
+        resizeStartHeight = params.height
+        resizeStartX = params.x
+        resizeStartY = params.y
+        buzz()
+    }
+
+    /**
+     * Applies a resize drag to the window.
+     *
+     * Dragging the left or top edge moves the window as well as resizing it,
+     * because the opposite edge has to stay where it is — otherwise pulling
+     * the left edge would drag the whole list leftward instead of widening it.
+     * Both are clamped before either is committed, so a drag that runs past a
+     * limit stops growing rather than sliding the window sideways.
+     */
+    private fun applyPopupResize(
+        left: Boolean, top: Boolean, right: Boolean, bottom: Boolean, dx: Int, dy: Int
+    ) {
+        val params = popupParams ?: return
+        val view = popupView ?: return
+        val area = safeArea()
+
+        var width = resizeStartWidth
+        var height = resizeStartHeight
+        var x = resizeStartX
+        var y = resizeStartY
+
+        if (right) width = resizeStartWidth + dx
+        if (bottom) height = resizeStartHeight + dy
+        if (left) width = resizeStartWidth - dx
+        if (top) height = resizeStartHeight - dy
+
+        width = clamp(width, dp(LIST_MIN_WIDTH_DP), min(dp(LIST_MAX_WIDTH_DP), area.width))
+        height = clamp(height, dp(LIST_MIN_HEIGHT_DP), min(dp(LIST_MAX_HEIGHT_DP), area.height))
+
+        // Re-derived from the clamped size, not from the raw drag, so the
+        // fixed edge stays fixed once the moving one has stopped.
+        if (left) x = resizeStartX + (resizeStartWidth - width)
+        if (top) y = resizeStartY + (resizeStartHeight - height)
+
+        params.width = width
+        params.height = height
+        params.x = clamp(x, area.left, area.right - width)
+        params.y = clamp(y, area.top, area.bottom - height)
+        popupWidthPx = width
+        popupHeightPx = height
+
+        try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+    }
+
+    /** Writes the dragged size once, on release, rather than on every move. */
+    private fun endPopupResize() {
+        val density = resources.displayMetrics.density
+        prefs().edit()
+            .putInt(Prefs.KEY_POPUP_WIDTH_DP, (popupWidthPx / density).toInt())
+            .putInt(Prefs.KEY_POPUP_HEIGHT_DP, (popupHeightPx / density).toInt())
+            .apply()
+    }
+
+    /** The stored list size, falling back to the default shape. */
+    private fun loadPopupSize() {
+        val storedW = prefs().getInt(Prefs.KEY_POPUP_WIDTH_DP, LIST_WIDTH_DP)
+        val storedH = prefs().getInt(Prefs.KEY_POPUP_HEIGHT_DP, LIST_HEIGHT_DP)
+        popupWidthPx = dp(storedW.coerceIn(LIST_MIN_WIDTH_DP, LIST_MAX_WIDTH_DP))
+        popupHeightPx = dp(storedH.coerceIn(LIST_MIN_HEIGHT_DP, LIST_MAX_HEIGHT_DP))
     }
 
     /** Report a failure the user can see, instead of appearing to do nothing. */
@@ -1128,6 +1465,11 @@ class OverlayService : Service() {
 
     private fun showPopup() {
         val view = ensurePopupView() ?: return
+        // Every open, not just the first: a clip captured while the list was
+        // closed has to be in it when it opens, and the list is cheap to fill.
+        refreshPopupContent()
+        view.alpha = popupAlpha()
+        if (popupWidthPx == 0 || popupHeightPx == 0) loadPopupSize()
 
         if (popupVisible) {
             applyPopupGeometry()
@@ -1136,7 +1478,7 @@ class OverlayService : Service() {
         }
 
         val params = WindowManager.LayoutParams(
-            dp(LIST_WIDTH_DP), dp(LIST_HEIGHT_DP), overlayType,
+            popupWidthPx, popupHeightPx, overlayType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
@@ -1182,9 +1524,13 @@ class OverlayService : Service() {
         val params = popupParams ?: return
         val area = safeArea()
 
-        val width = min(dp(LIST_WIDTH_DP), area.width - dp(EDGE_MARGIN_DP) * 2)
+        if (popupWidthPx == 0 || popupHeightPx == 0) loadPopupSize()
+        // Clamped to what is on screen now, every time. A size dragged on an
+        // unfolded foldable, or before a rotation, must not strand the window
+        // wider than the display it is being placed on.
+        val width = min(popupWidthPx, area.width - dp(EDGE_MARGIN_DP) * 2)
             .coerceAtLeast(1)
-        val height = min(dp(LIST_HEIGHT_DP), area.height - dp(EDGE_MARGIN_DP) * 2)
+        val height = min(popupHeightPx, area.height - dp(EDGE_MARGIN_DP) * 2)
             .coerceAtLeast(1)
         val bubble = bubbleParams
         val gap = dp(TETHER_GAP_DP)
@@ -1219,15 +1565,13 @@ class OverlayService : Service() {
         mainHandler.removeCallbacks(persistPosition)
         persistPosition.run()
         mainHandler.removeCallbacksAndMessages(null)
+        removeHandle()
         removeBubble()
         popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) {}
         }
-        popupSurface?.let {
-            try { it.stop() } catch (e: Exception) {}
-            try { it.detach() } catch (e: Exception) {}
-        }
-        popupSurface = null
+        popupContent?.release()
+        popupContent = null
         popupView = null
     }
 }

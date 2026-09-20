@@ -14,6 +14,10 @@ import {
   Layers,
   Download,
   Upload,
+  Droplet,
+  EyeOff,
+  PanelRightClose,
+  BatteryCharging,
 } from 'lucide-react-native';
 import {
   isNativeOverlayAvailable,
@@ -25,6 +29,8 @@ import {
   stopBubble,
   restBubble,
   wakeBubble,
+  isBatteryOptimised,
+  requestIgnoreBatteryOptimisations,
 } from '../native/OverlayModule';
 import { onBubbleState } from '../native/events';
 import { usePermissions } from '../hooks/usePermissions';
@@ -35,6 +41,10 @@ import {
   ThemeMode,
   MIN_BUBBLE_SIZE,
   MAX_BUBBLE_SIZE,
+  MIN_ALPHA,
+  MAX_ALPHA,
+  MIN_TUCK_DELAY,
+  MAX_TUCK_DELAY,
 } from '../store/settingsStore';
 import { useClipStore } from '../store/clipStore';
 import { useSnackbarStore } from '../store/snackbarStore';
@@ -75,6 +85,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const [bubbleResting, setBubbleResting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  /**
+   * Whether Android is currently allowed to put DevClip to sleep.
+   *
+   * Re-read on every foreground rather than remembered, for the same reason
+   * the permissions are: the phone can change this without telling the app,
+   * and a stale "you're fine" here is exactly how capture dies unnoticed.
+   */
+  const [batteryOptimised, setBatteryOptimised] = useState(false);
 
   const themeMode = useSettingsStore((s) => s.themeMode);
   const setThemeMode = useSettingsStore((s) => s.setThemeMode);
@@ -86,6 +104,14 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
   const setConfirmBeforePaste = useSettingsStore((s) => s.setConfirmBeforePaste);
   const maxClips = useSettingsStore((s) => s.maxClips);
   const setMaxClips = useSettingsStore((s) => s.setMaxClips);
+  const bubbleAlpha = useSettingsStore((s) => s.bubbleAlpha);
+  const setBubbleAlpha = useSettingsStore((s) => s.setBubbleAlpha);
+  const bubbleIdleFade = useSettingsStore((s) => s.bubbleIdleFade);
+  const setBubbleIdleFade = useSettingsStore((s) => s.setBubbleIdleFade);
+  const popupAlpha = useSettingsStore((s) => s.popupAlpha);
+  const setPopupAlpha = useSettingsStore((s) => s.setPopupAlpha);
+  const tuckDelay = useSettingsStore((s) => s.tuckDelay);
+  const setTuckDelay = useSettingsStore((s) => s.setTuckDelay);
   const clearAll = useClipStore((s) => s.clearAll);
   const refreshClips = useClipStore((s) => s.refresh);
   const showSnackbar = useSnackbarStore((s) => s.show);
@@ -95,6 +121,7 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
     // was off every time it opened, so the button offered to start a bubble
     // that was already running.
     setBubbleRunning(await isBubbleRunning());
+    setBatteryOptimised(await isBatteryOptimised());
   }, []);
 
   useEffect(() => {
@@ -417,6 +444,93 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
                 />
               </View>
 
+              <View style={styles.stackRow}>
+                <View style={styles.row}>
+                  <View style={styles.rowLeft}>
+                    <Droplet size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                    <Text style={styles.rowLabel}>{strings.settings.bubbleOpacity}</Text>
+                  </View>
+                  <Text style={styles.valueLabel}>
+                    {strings.settings.bubbleOpacityValue(bubbleAlpha)}
+                  </Text>
+                </View>
+                <Slider
+                  value={bubbleAlpha}
+                  min={MIN_ALPHA}
+                  max={MAX_ALPHA}
+                  onChange={setBubbleAlpha}
+                  accessibilityLabel={strings.settings.bubbleOpacity}
+                  formatValue={strings.settings.bubbleOpacityA11y}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <View style={styles.rowLeft}>
+                  <EyeOff size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                  <Text style={styles.rowLabel}>{strings.settings.fadeWhenIdle}</Text>
+                </View>
+                <Pressy
+                  onPress={() => setBubbleIdleFade(!bubbleIdleFade)}
+                  style={[styles.actionBtn, bubbleIdleFade && styles.actionBtnActive]}
+                  accessibilityLabel={strings.settings.fadeWhenIdle}
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: bubbleIdleFade }}
+                >
+                  <Text
+                    style={[styles.actionBtnText, bubbleIdleFade && styles.actionBtnTextActive]}
+                  >
+                    {bubbleIdleFade ? strings.settings.on : strings.settings.off}
+                  </Text>
+                </Pressy>
+              </View>
+              <Text style={styles.note}>{strings.settings.fadeWhenIdleNote}</Text>
+
+              <View style={styles.stackRow}>
+                <View style={styles.row}>
+                  <View style={styles.rowLeft}>
+                    <PanelRightClose
+                      size={icon.md}
+                      strokeWidth={icon.stroke}
+                      color={colors.inkFaint}
+                    />
+                    <Text style={styles.rowLabel}>{strings.settings.tuckDelay}</Text>
+                  </View>
+                  <Text style={styles.valueLabel}>
+                    {strings.settings.tuckDelayValue(tuckDelay)}
+                  </Text>
+                </View>
+                <Slider
+                  value={tuckDelay}
+                  min={MIN_TUCK_DELAY}
+                  max={MAX_TUCK_DELAY}
+                  onChange={setTuckDelay}
+                  accessibilityLabel={strings.settings.tuckDelay}
+                  formatValue={strings.settings.tuckDelayA11y}
+                />
+              </View>
+              <Text style={styles.note}>{strings.settings.tuckDelayNote}</Text>
+
+              <View style={styles.stackRow}>
+                <View style={styles.row}>
+                  <View style={styles.rowLeft}>
+                    <Droplet size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
+                    <Text style={styles.rowLabel}>{strings.settings.listOpacity}</Text>
+                  </View>
+                  <Text style={styles.valueLabel}>
+                    {strings.settings.listOpacityValue(popupAlpha)}
+                  </Text>
+                </View>
+                <Slider
+                  value={popupAlpha}
+                  min={MIN_ALPHA}
+                  max={MAX_ALPHA}
+                  onChange={setPopupAlpha}
+                  accessibilityLabel={strings.settings.listOpacity}
+                  formatValue={strings.settings.listOpacityA11y}
+                />
+              </View>
+              <Text style={styles.note}>{strings.settings.listResizeNote}</Text>
+
               <View style={styles.row}>
                 <View style={styles.rowLeft}>
                   <Power size={icon.md} strokeWidth={icon.stroke} color={colors.inkFaint} />
@@ -455,6 +569,42 @@ export default function SettingsScreen({ onBack }: { onBack: () => void }) {
             </Pressy>
           </View>
         </View>
+
+        {/* Battery. Ahead of Storage because a phone that sleeps DevClip
+            silently breaks capture, which matters more than how many clips
+            are kept. */}
+        {isNativeOverlayAvailable() && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{strings.settings.battery}</Text>
+            <View style={styles.row}>
+              <View style={styles.rowLeft}>
+                <BatteryCharging
+                  size={icon.md}
+                  strokeWidth={icon.stroke}
+                  color={batteryOptimised ? colors.warning : colors.inkFaint}
+                />
+                <Text style={styles.rowLabel}>{strings.settings.batteryOptimised}</Text>
+              </View>
+              {batteryOptimised ? (
+                <Pressy
+                  onPress={async () => {
+                    await requestIgnoreBatteryOptimisations();
+                    // The answer only changes once the user has acted in the
+                    // system dialog, so the foreground listener re-reads it.
+                  }}
+                  style={styles.actionBtn}
+                  accessibilityLabel={strings.settings.batteryFix}
+                >
+                  <Text style={styles.actionBtnText}>{strings.settings.batteryFix}</Text>
+                </Pressy>
+              ) : (
+                <Text style={styles.valueLabel}>{strings.settings.batteryUnrestricted}</Text>
+              )}
+            </View>
+            {batteryOptimised && <Text style={styles.note}>{strings.settings.batteryWarning}</Text>}
+            <Text style={styles.note}>{strings.settings.batterySamsungNote}</Text>
+          </View>
+        )}
 
         {/* Storage */}
         <View style={styles.section}>
