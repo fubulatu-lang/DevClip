@@ -331,9 +331,36 @@ fun SettingsScreen(
                     onSelect = { OverlayController.setThemeMode(context, it); revision++ }
                 )
             }
+
+            // ---- Which build this is ----
+            //
+            // The APK on the release page carries its version in its file
+            // name; this is the other half of that pair. Without it there is
+            // no way to tell, from the phone, whether the thing you just
+            // installed is the thing you just downloaded.
+            item { Note(appVersion(context)) }
         }
         }
     }
+}
+
+/**
+ * "DevClip 1.1.0 (2)" — the name, the version, and the code Android compares.
+ *
+ * Read from the installed package rather than from BuildConfig, so it is
+ * what the phone believes it is running, not what the source said at the
+ * moment it was compiled.
+ */
+private fun appVersion(context: android.content.Context): String = try {
+    val info = context.packageManager.getPackageInfo(context.packageName, 0)
+    val code = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        info.longVersionCode
+    } else {
+        @Suppress("DEPRECATION") info.versionCode.toLong()
+    }
+    "DevClip ${info.versionName} ($code)"
+} catch (e: Exception) {
+    "DevClip"
 }
 
 /** The clip limits offered. 0 means no limit. */

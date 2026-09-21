@@ -116,11 +116,25 @@ jobs:
             echo "::error::The APK is unsigned and will not install. Check the release signingConfig in app/build.gradle.kts."
             exit 1
           fi
-          cp "$APK" "DevClip.apk"
+          # The name carries the version and the build number, because a
+          # file called DevClip.apk in a downloads folder is indistinguishable
+          # from the four DevClip.apk files already there. The run number is
+          # in it as well as the version: not every build bumps the version,
+          # and two builds of 1.1.0 still need telling apart.
+          #
+          # sed rather than grep -P: the version is read out of the Gradle
+          # file so it can never disagree with what is inside the APK.
+          VERSION=$(sed -n 's/.*versionName *= *"\([^"]*\)".*/\1/p' app/build.gradle.kts | head -1)
+          [ -n "$VERSION" ] || { echo "::error::No versionName in app/build.gradle.kts"; exit 1; }
+          NAME="DevClip-v${VERSION}-b${GITHUB_RUN_NUMBER}.apk"
+
+          cp "$APK" "$NAME"
           {
-            echo "path=DevClip.apk"
-            echo "size=$(du -h DevClip.apk | cut -f1)"
-            echo "sha=$(sha256sum DevClip.apk | cut -d' ' -f1)"
+            echo "path=$NAME"
+            echo "name=$NAME"
+            echo "version=$VERSION"
+            echo "size=$(du -h "$NAME" | cut -f1)"
+            echo "sha=$(sha256sum "$NAME" | cut -d' ' -f1)"
           } >> "$GITHUB_OUTPUT"
 
       - name: Publish
@@ -131,7 +145,9 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo "Built from \`${GITHUB_SHA}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
+            echo "**${{ steps.apk.outputs.name }}**"
+            echo
+            echo "Version ${{ steps.apk.outputs.version }}, built from \`${GITHUB_SHA}\` on $(date -u '+%Y-%m-%d %H:%M UTC')."
             echo
             echo "| | |"
             echo "|---|---|"
@@ -145,13 +161,28 @@ jobs:
             fi
           } > notes.md
 
+          TITLE="DevClip ${{ steps.apk.outputs.version }}"
+
           if gh release view "${TAG}" >/dev/null 2>&1; then
+            # Every APK now has a different name, so --clobber no longer
+            # replaces the previous one — it would sit there beside the new
+            # file and the release would fill up with builds, which is the
+            # confusion this was meant to end. Old assets go first.
+            for OLD in $(gh release view "${TAG}" --json assets -q '.assets[].name'); do
+              [ "$OLD" = "${{ steps.apk.outputs.name }}" ] && continue
+              gh release delete-asset "${TAG}" "$OLD" -y
+            done
             gh release upload "${TAG}" "${{ steps.apk.outputs.path }}" --clobber
-            gh release edit "${TAG}" --notes-file notes.md
+            # --prerelease=false on every run, not only at creation: the
+            # release was already marked one, and github.com/.../releases/latest
+            # means "the newest release that is not a prerelease". With only a
+            # prerelease to find, that link — the one in SETUP_GUIDE.md —
+            # showed nothing at all.
+            gh release edit "${TAG}" --title "${TITLE}" --notes-file notes.md \
+              --prerelease=false --latest
           else
             gh release create "${TAG}" "${{ steps.apk.outputs.path }}" \
-              --title "DevClip ${TAG}" --notes-file notes.md \
-              $([ "${TAG}" = "latest" ] && echo --prerelease)
+              --title "${TITLE}" --notes-file notes.md --latest
           fi
 
           echo "### [Download the APK](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})" >> "$GITHUB_STEP_SUMMARY"
