@@ -1,78 +1,106 @@
-# DevClip — Setup Guide (GitHub + Expo Website Only)
+# DevClip — Setup Guide (phone only)
 
-No terminal, no Codespaces, no Expo Go app. Just github.com and expo.dev,
-with one unavoidable exception explained at the bottom.
+No terminal, no computer, no Expo Go. Just github.com, with one step near
+the end that is worth a computer if you can reach one — explained honestly
+where it comes up.
 
 ---
 
-## 1. Push the code to GitHub
+## 1. How builds happen
 
-1. Create a repo named `DevClip` on github.com.
-2. Upload every file/folder from the unzipped project (drag-and-drop
-   works on github.com's "upload files" page, or use the GitHub mobile app).
-3. Make sure `.eas/workflows/build.yml` made it into the repo — this is
-   the file that makes builds automatic.
+Every push to `main` builds an installable APK on GitHub Actions and
+attaches it to a release tagged `latest`. Nothing to click and nothing to
+trigger.
 
-## 2. Connect the repo to your Expo project
+> An earlier version of this guide told you to check for a file called
+> `.eas/workflows/build.yml`, and said that file was what made builds
+> automatic. **That file was never in the repository.** Builds were not
+> automatic, and pushes did not produce new APKs — which is why the app on
+> the phone could sit weeks behind the code. `.github/workflows/apk.yml`
+> is the real thing, and it is committed.
 
-1. On expo.dev, open your **DevClip** project.
-2. Go to **Project settings → GitHub → Connect**.
-3. Authorize the Expo GitHub App and pick your `DevClip` repo.
+## 2. Getting the app on your phone
 
-That's it for wiring — you do **not** need to set up "Build triggers" on
-that page anymore. The `.eas/workflows/build.yml` file already committed
-to your repo does that job instead, and it travels with your code instead
-of living only in dashboard settings.
+Open the repository's **Releases** page in your phone browser and download
+the APK from the release tagged `latest`. It is always the most recent
+build of `main`.
 
-## 3. The one unavoidable manual step: Android signing credentials
+The direct link:
 
-EAS Build needs to know how your app is going to be signed. There is
-currently no "generate a fresh keystore" button on the Expo website — the
-dashboard's Credentials page only accepts uploading a keystore file you
-already have, which you don't. Generating one from nothing requires a
-single command, run once, ever, from a command line:
-
-```bash
-eas credentials --platform android
+```
+https://github.com/fubulatu-lang/DevClip/releases/latest
 ```
 
-Practically, this means either:
-- Opening a **GitHub Codespace** on your repo just this once to run that
-  one line (Codespaces is still browser-only — no computer needed), or
-- Asking anyone with any terminal (a friend, a library computer) to run
-  that one command against your Expo login — it only takes a few seconds
-  and doesn't need your project files, just `npm install -g eas-cli && eas login && eas credentials --platform android`.
+Android will ask you to allow "install unknown apps" for your browser the
+first time. That is expected for an app installed outside the Play Store.
 
-When prompted: profile → **development**, then choose to generate a new
-keystore. After this one-time step, EAS stores the keystore permanently on
-its own servers — every future push-triggered build reuses it
-automatically. You will never need to touch a terminal again after this.
+## 3. Signing — the step that decides whether updates hurt
 
-## 4. Trigger a build
+Android refuses to install an update whose signing key differs from the
+installed app's. It does not offer to merge them; it makes you uninstall
+first, **and uninstalling DevClip deletes your clip history.**
 
-Push any commit to `main` (even a trivial one, like editing the README on
-github.com's web editor). Expo detects the push via the GitHub App and
-runs `.eas/workflows/build.yml` automatically — no dashboard click needed.
+So the key matters more than it sounds.
 
-Watch progress on expo.dev under your project's **Workflows** or **Builds**
-page.
+**Without any setup**, the workflow builds with a throwaway key that Gradle
+generates fresh each run. Every build therefore disagrees with the last,
+and every install means: export a backup, uninstall, install, import the
+backup. It works, but it is tedious and one forgotten export loses
+everything.
 
-## 5. Install the app on your phone
+**With the project keystore stored as a secret**, builds agree with each
+other and with the app already on your phone, and installing is just
+installing.
 
-When the build finishes, open its page on expo.dev from your phone browser
-and tap **Install**. This downloads and installs the DevClip APK directly —
-you do **not** need the Expo Go app; this is a standalone custom build,
-not something that runs inside Expo Go.
+### Setting it up
 
-You may need to allow "install unknown apps" for your browser once,
-the first time Android asks.
+The keystore you want already exists — EAS has been signing with it. On
+expo.dev, open the project, go to **Credentials → Android**, and download
+the keystore file. That page also shows the keystore password, key alias
+and key password.
 
-## 6. Making changes later
+Then add four repository secrets on github.com, under
+**Settings → Secrets and variables → Actions**:
 
-Edit files directly on github.com (or re-upload updated files) and push to
-`main`. The workflow file re-triggers a build automatically every time.
+| Secret | Value |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | the keystore file, base64-encoded |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password from expo.dev |
+| `ANDROID_KEY_ALIAS` | key alias from expo.dev |
+| `ANDROID_KEY_PASSWORD` | key password from expo.dev |
 
-## 7. Turning on the real features
+The awkward one is the first. GitHub secrets hold text, not files, so the
+keystore has to be base64-encoded — and that needs something that can run
+`base64 devclip.jks`. A computer does it in one command; on the phone,
+Termux does the same.
+
+**Do not paste a signing keystore into an online base64 converter.**
+Anyone holding that file and its passwords can publish an app that Android
+will accept as an update to yours. It is worth waiting until you are near
+a computer.
+
+Until the secrets exist, builds still happen and are still installable —
+they just carry the warning above, and the release notes say so.
+
+## 4. Making changes
+
+Edit files on github.com, or push from anywhere, and a new APK appears on
+the `latest` release a few minutes later. The release notes carry the
+commit it was built from, its size and its SHA-256, so you can always tell
+which build is on your phone.
+
+## 5. What runs before a build
+
+Three checks run on every pull request, and the first two also gate merges:
+
+- **Typecheck** — the TypeScript compiles.
+- **Android compile** — the Kotlin compiles. This one exists because
+  nothing used to check it: native code reached a real build untouched,
+  and a compile error once got as far as EAS before anything noticed.
+- **One UI conformance** — a scan for hard-coded colours and off-scale
+  spacing. Advisory; it reports rather than blocks.
+
+## 6. Turning on the real features
 
 The app walks you through this on first launch, on a setup screen you can
 also skip past and come back to. If you skipped it, everything below is in
@@ -87,7 +115,7 @@ also skip past and come back to. If you skipped it, everything below is in
 3. **Notifications** → say yes. Android only offers this once, and the
    notification is one of the ways to bring the bubble back after you hide it.
 
-## 8. Using it
+## 7. Using it
 
 - **Highlight text anywhere, then tap the bubble.** It is saved, and it goes
   on your clipboard too, so the bubble replaces the Copy button rather than
@@ -105,11 +133,36 @@ also skip past and come back to. If you skipped it, everything below is in
 
 ## Troubleshooting
 
-- **Build fails on credentials again** — the one-time step in section 3
-  wasn't completed, or was done for the wrong profile. Re-run
-  `eas credentials --platform android` and pick **development** again.
-- **Any other build error** — paste the log from the build's page on
-  expo.dev into chat with me. Native Android build errors are normal on
-  a first pass and usually take one or two small fixes.
-- **OEM battery optimization kills the accessibility service** — exempt
-  DevClip from battery optimization in your phone's app settings.
+- **Text capture stops working, but Settings says it is granted.** This is
+  the most likely thing to go wrong and the hardest to spot, because
+  nothing announces it. Samsung unbinds accessibility services from apps
+  it decides are idle, and the permission switch keeps reading as on while
+  nothing is listening.
+
+  Tell them apart by highlighting text and watching the bubble: a ring
+  around it means the service is alive. No ring means it is not, whatever
+  Settings claims.
+
+  Fix it by turning the permission off and on again in Android's
+  Accessibility settings, then check the ring again. To stop it recurring,
+  set DevClip to **Unrestricted** under Settings → Apps → DevClip →
+  Battery, and make sure it is not in Sleeping or Deep sleeping apps under
+  Settings → Battery → Background usage limits. Android gives apps no way
+  to read or change that list, so it has to be done by hand.
+
+- **It also happens after installing a new build.** Reinstalling is when
+  Android most often leaves the switch on while the service stops binding.
+  Worth checking the ring after every install.
+
+- **A new APK will not install.** Its signing key differs from the
+  installed app's — see section 3. Export a backup from Settings first,
+  then uninstall and install.
+
+- **A build failed.** Open the run under the repository's **Actions** tab;
+  the failing step names the file and line. Kotlin compile errors are
+  caught earlier now, on the pull request, by the Android compile check.
+
+- **The bubble is gone and the notification is too.** It may have tucked
+  itself into the screen edge — look for a slim handle on the left or
+  right edge and touch it. If the tuck delay is set too short for you,
+  Settings turns it off.

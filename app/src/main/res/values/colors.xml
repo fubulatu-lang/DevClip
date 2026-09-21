@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two colours only, and neither is a design token. The design system lives in
+  DevClipTheme.kt; these exist because a window has to be painted before any
+  Kotlin runs, and they must agree with it.
+-->
+<resources>
+    <color name="window_background">#FFFFFF</color>
+    <color name="ic_launcher_background">#345065</color>
+</resources>
