@@ -99,12 +99,18 @@ object OneUiHeaderDefaults {
      *
      * A share of the screen rather than a fixed number, because the gesture
      * exists to bring controls within thumb reach and a thumb's reach is a
-     * share of the screen. Bounded at both ends: too little is not worth the
-     * drag, too much leaves no list to look at on a small phone.
+     * share of the screen.
+     *
+     * It was 30% and the pull did not feel like it went anywhere. The title
+     * has to travel far enough to read as having moved into the middle of the
+     * screen, and the controls have to end up somewhere a thumb can actually
+     * get to — which on a phone this tall is not the top third. The floor is
+     * what keeps that true on a small screen, where 44% of not very much is
+     * still not very far.
      */
     @Composable
     fun expandedHeight(): Dp =
-        (LocalConfiguration.current.screenHeightDp * 0.30f).dp.coerceIn(180.dp, 280.dp)
+        (LocalConfiguration.current.screenHeightDp * 0.44f).dp.coerceIn(300.dp, 460.dp)
 }
 
 @Composable

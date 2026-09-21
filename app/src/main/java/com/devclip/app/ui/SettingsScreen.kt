@@ -234,23 +234,6 @@ fun SettingsScreen(
             }
             item {
                 SliderRow(
-                    label = stringResource(R.string.bubble_opacity),
-                    value = OverlayController.bubbleAlpha(context).toFloat(),
-                    range = Prefs.MIN_ALPHA.toFloat()..100f,
-                    display = { "${it.toInt()}%" },
-                    onChange = { OverlayController.setBubbleAlpha(context, it.toInt()); revision++ }
-                )
-            }
-            item {
-                SwitchRow(
-                    label = stringResource(R.string.bubble_fade_idle),
-                    checked = OverlayController.bubbleIdleFade(context),
-                    onChange = { OverlayController.setBubbleIdleFade(context, it); revision++ }
-                )
-            }
-            item { Note(stringResource(R.string.bubble_fade_idle_note)) }
-            item {
-                SliderRow(
                     label = stringResource(R.string.bubble_tuck),
                     value = OverlayController.tuckDelay(context).toFloat(),
                     range = 0f..Prefs.MAX_TUCK_DELAY_SEC.toFloat(),

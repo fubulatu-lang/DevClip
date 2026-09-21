@@ -6,14 +6,19 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.devclip.app.DevClipEvents
 import com.devclip.app.DevClipTheme
 
 /**
@@ -139,8 +144,17 @@ fun DevClipComposeTheme(content: @Composable () -> Unit) {
     // Read through the same function the floating windows use, so the app and
     // the bubble cannot end up on different sides of a theme change.
     val context = LocalContext.current
-    val palette = DevClipTheme.colors(context)
-    val isDark = DevClipTheme.isDark(context)
+
+    // Both keys matter, and neither is optional. `themeRevision` catches the
+    // user choosing light or dark in Settings; `uiMode` catches the system
+    // changing underneath a preference set to follow it. Without them this
+    // read is invisible to Compose and the new colours wait for some
+    // unrelated recomposition to carry them in.
+    val revision by DevClipEvents.themeRevision.collectAsState()
+    val uiMode = LocalConfiguration.current.uiMode
+
+    val palette = remember(revision, uiMode) { DevClipTheme.colors(context) }
+    val isDark = remember(revision, uiMode) { DevClipTheme.isDark(context) }
 
     val colors = DevClipColors(
         bg = Color(palette.bg),

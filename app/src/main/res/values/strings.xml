@@ -83,9 +83,6 @@
 
     <string name="settings_bubble">Bubble</string>
     <string name="bubble_size">Size</string>
-    <string name="bubble_opacity">Opacity</string>
-    <string name="bubble_fade_idle">Fade when idle</string>
-    <string name="bubble_fade_idle_note">On, the bubble rests at that opacity and turns solid the moment you touch it. Off, it stays there.</string>
     <string name="bubble_tuck">Tuck away after</string>
     <string name="bubble_tuck_note">The bubble becomes a slim handle on the screen edge when you have not used it. Touch the handle to bring it back.</string>
     <string name="bubble_autostart">Start after reboot</string>
