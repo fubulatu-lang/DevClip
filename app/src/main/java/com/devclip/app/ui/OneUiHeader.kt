@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -149,7 +150,7 @@ fun OneUiHeader(
     val titleBand = bar + ((state.expandedHeight - bar) - bar) * f
 
     val titleSize = DevClipTheme.Text.TITLE +
-        (DevClipTheme.Text.DISPLAY - DevClipTheme.Text.TITLE) * f
+        (DevClipTheme.Text.HERO - DevClipTheme.Text.TITLE) * f
 
     // Collapsed, the title shares its row with the navigation icon and the
     // actions and has to clear both. Open, it is alone on its band and sits
@@ -182,7 +183,19 @@ fun OneUiHeader(
                     start = navReserve + (Space.keyline - navReserve) * f,
                     end = actionReserve + (Space.keyline - actionReserve) * f
                 ),
-            contentAlignment = Alignment.CenterStart
+            // Travels as the bar opens. Collapsed it is left-aligned, sharing
+            // its row with the navigation icon and the actions; open it is
+            // alone on a band of its own, and left-aligned there just looks
+            // dropped in a corner. A bias rather than two alignments, because
+            // the point is the journey: the title has to move *with* the
+            // finger, not jump when the drag ends.
+            //
+            // -1 is start, 0 is centre. The padding is symmetrical by the
+            // time f reaches 1, so centring inside it is centring on screen.
+            contentAlignment = BiasAlignment(
+                horizontalBias = -1f + f,
+                verticalBias = 0f
+            )
         ) {
             Text(
                 text = title,
