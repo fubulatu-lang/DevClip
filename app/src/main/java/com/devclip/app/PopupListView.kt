@@ -92,14 +92,18 @@ class PopupListView(context: Context) : LinearLayout(context) {
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         rows.orientation = VERTICAL
-        // 8dp at the sides, not 16. This window is a few hundred dp wide and
-        // every dp of inset is a dp the clip text does not get — the keyline
-        // that makes a full screen readable just makes a small floating one
-        // narrow. Vertical stays as it was: that is the gap between rows, not
-        // wasted margin.
+        // 4dp at the sides. This window is a few hundred dp wide and every dp
+        // of inset is a dp the clip text does not get — the keyline that makes
+        // a full screen readable just makes a small floating one narrow.
+        //
+        // The bottom is 16dp and that is not symmetry, it is what buys the
+        // 4dp. This view clips to a 26dp corner radius, so within 26dp of the
+        // bottom the container's own edge curves inward — about 7dp at 8dp
+        // up, which would slice the corner off a row inset only 4. Pushing
+        // the last row 16dp clear drops that curve to roughly 2dp.
         rows.setPadding(
-            dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM),
-            dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM)
+            dp(DevClipTheme.Spacing.XS), dp(DevClipTheme.Spacing.SM),
+            dp(DevClipTheme.Spacing.XS), dp(DevClipTheme.Spacing.LG)
         )
         scroller.isFillViewport = true
         // No explicit params: a ScrollView is a FrameLayout underneath and
@@ -245,11 +249,14 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val armed = armedId == clip.id
         // A ring rather than a colour swap: the row has to stay readable while
         // it says the next tap will paste it.
-        // Tighter at the sides than top and bottom. The row is short and wide,
-        // so horizontal padding costs text and vertical padding buys the
-        // separation that makes one row read as distinct from the next.
-        val padX = dp(DevClipTheme.Spacing.SM)
-        val padY = dp(DevClipTheme.Spacing.MD)
+        // The card's own gaps, kept small. Everything in this window is at the
+        // reduced type scale already, so padding sized for a full-screen row
+        // reads here as a card mostly made of air. Still tighter at the sides
+        // than top and bottom: horizontal padding costs text, vertical
+        // padding buys the separation that makes one row read as distinct
+        // from the next.
+        val padX = dp(6)
+        val padY = dp(DevClipTheme.Spacing.SM)
         val card = LinearLayout(context).apply {
             orientation = HORIZONTAL
             background = GradientDrawable().apply {
@@ -274,8 +281,10 @@ class PopupListView(context: Context) : LinearLayout(context) {
                 setColor(palette.surfaceSunken)
             }
         }
-        card.addView(badge, LayoutParams(dp(24), dp(24)).apply {
-            rightMargin = dp(DevClipTheme.Spacing.MD)
+        // 20dp, not 24: at this window's type scale a two-digit number still
+        // fits, and the four dp go to the clip.
+        card.addView(badge, LayoutParams(dp(20), dp(20)).apply {
+            rightMargin = dp(DevClipTheme.Spacing.SM)
             topMargin = dp(2)
         })
 
@@ -303,7 +312,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
             )
             setTextColor(if (armed) palette.accent else palette.inkFaint)
             sp(this, DevClipTheme.MiniText.CAPTION)
-        }.also { it.setPadding(0, dp(DevClipTheme.Spacing.SM), 0, 0) })
+        }.also { it.setPadding(0, dp(DevClipTheme.Spacing.XS), 0, 0) })
 
         card.addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
 

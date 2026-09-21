@@ -172,6 +172,16 @@ object DevClipTheme {
      * shrinking it is the fastest way to stop looking like the system.
      */
     object Text {
+        /**
+         * The app bar's title when it has been pulled fully open.
+         *
+         * Larger than DISPLAY, and separate from it, because it is not a
+         * heading in a page — it is the whole content of an area the user
+         * deliberately opened, with nothing else in it. DISPLAY stays what it
+         * is: the size a heading takes when other things share the screen.
+         */
+        const val HERO = 56f
+
         const val DISPLAY = 34f
         const val TITLE = 18f
         const val BODY = 17f
