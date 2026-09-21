@@ -41,6 +41,35 @@
             </intent-filter>
         </activity>
 
+        <!--
+          "DevClip" in Android's text-selection menu.
+
+          The only route to a selection that works in every app. The bubble
+          reads the accessibility tree, and a selection inside a WebView -
+          Chrome, and every app that renders its text in one - is not in that
+          tree at all. ACTION_PROCESS_TEXT is handed the text by the system
+          instead, which has knowledge no app does.
+
+          noHistory and excludeFromRecents because it is not a screen: it
+          appears, saves, and is gone. A translucent theme so nothing of it is
+          ever drawn. An empty taskAffinity keeps it out of the launcher app's
+          task, so dismissing it never takes the clip list with it.
+        -->
+        <activity
+            android:name=".ProcessTextActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="@string/process_text_label"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <!-- Owns the bubble, the floating list and the drag-to-hide target. -->
         <service
             android:name=".OverlayService"

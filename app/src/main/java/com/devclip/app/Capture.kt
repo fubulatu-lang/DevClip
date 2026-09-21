@@ -67,6 +67,21 @@ object Capture {
             is SelectionCapture.Result.Password -> return Outcome.Password
             is SelectionCapture.Result.None -> return Outcome.NoSelection
         }
+        return save(context, text)
+    }
+
+    /**
+     * Saves text somebody has already read for us.
+     *
+     * Split out of [attempt] for the text-selection menu, which is handed the
+     * selection by Android itself and so needs everything from the database
+     * write onwards but none of the reading. That path exists because reading
+     * is the part that cannot be made to work everywhere: a selection inside
+     * a WebView — Chrome, and every app with a web view in it — is not in the
+     * accessibility tree in any form this can find.
+     */
+    fun save(context: Context, text: String): Outcome {
+        if (text.isEmpty()) return Outcome.NoSelection
 
         val helper = DevClipDatabaseHelper(context.applicationContext)
         val saved = try {
