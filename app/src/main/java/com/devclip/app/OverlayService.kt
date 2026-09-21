@@ -10,8 +10,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
-import android.graphics.drawable.GradientDrawable
-import android.graphics.drawable.LayerDrawable
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -123,7 +121,7 @@ class OverlayService : Service() {
      * never persisted.
      */
     private var tucked = false
-    private var handleView: View? = null
+    private var handleView: EdgeHandleView? = null
     private var handleParams: WindowManager.LayoutParams? = null
 
     private var dismissTarget: DismissTargetView? = null
@@ -137,6 +135,9 @@ class OverlayService : Service() {
 
     /** When an outside touch last closed the list. See [dismissByOutsideTouch]. */
     private var outsideDismissAt = 0L
+
+    /** The ring currently on the bubble, kept so its animator can be stopped. */
+    private var selectionRing: SelectionRingDrawable? = null
     private var popupVisible = false
 
     /**
@@ -239,19 +240,6 @@ class OverlayService : Service() {
         private const val SETTLE_DURATION_MS = 220L
 
         /**
-         * How long after the last touch the bubble drops to its faded level.
-         *
-         * Fixed rather than configurable. The setting the user wants control
-         * over is how see-through it becomes, not the handful of seconds
-         * before it gets there, and every extra dial is one more thing to
-         * explain in a settings screen.
-         */
-        private const val IDLE_FADE_DELAY_MS = 3000L
-
-        /** How long the bubble takes to fade, and to slide away or back. */
-        private const val FADE_DURATION_MS = 180L
-
-        /**
          * How long after a drag the parked position is written.
          *
          * A few quick drags in a row are one decision, and each write here is
@@ -285,7 +273,7 @@ class OverlayService : Service() {
         // thread is not optional — a window change from any other thread is a
         // crash.
         SelectionCapture.listener = { live ->
-            mainHandler.post { showSelectionRing(live) }
+            mainHandler.post { onSelectionChanged(live) }
         }
 
         // Arrives on the accessibility service's thread.
@@ -554,26 +542,51 @@ class OverlayService : Service() {
      * combination that survives any background: whichever half disappears,
      * the other is at full contrast against it.
      */
-    private fun selectionRing(): Drawable {
-        val stroke = dp(SELECTION_RING_DP)
-
-        val outline = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(stroke + dp(1), Color.argb(140, 0, 0, 0))
-        }
-        val ring = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.TRANSPARENT)
-            setStroke(stroke, Color.WHITE)
-        }
-        return LayerDrawable(arrayOf<Drawable>(outline, ring))
-    }
-
-    /** Advertise capture rather than hiding it behind a gesture nobody tried. */
+    /**
+     * Advertise capture rather than hiding it behind a gesture nobody tried.
+     *
+     * The ring pulses now. A static ring said "there is a selection"; a
+     * pulsing one says it while the user is looking somewhere else, which is
+     * where they are — reading the app underneath, not watching the bubble.
+     *
+     * The old drawable is stopped before the new one replaces it. Its animator
+     * repeats forever and would otherwise go on holding this view after the
+     * ring had been taken off it, once per selection, all day.
+     */
     private fun showSelectionRing(live: Boolean) {
         val view = bubbleView ?: return
-        view.background = if (live) selectionRing() else null
+        if (live && selectionRing != null) return
+
+        selectionRing?.stop()
+        selectionRing = null
+
+        if (!live) {
+            view.background = null
+            return
+        }
+
+        val ring = SelectionRingDrawable(
+            strokePx = dp(SELECTION_RING_DP).toFloat(),
+            outlinePx = dp(1).toFloat(),
+            animated = !animationsDisabled()
+        )
+        view.background = ring
+        ring.start()
+        selectionRing = ring
+    }
+
+    /**
+     * A selection appeared or went away.
+     *
+     * Both surfaces have to answer, because only one of them exists at a
+     * time. Tucked away, there is no bubble to put a ring on — and that is
+     * the case that mattered most: a 5dp line at the edge of somebody else's
+     * app gives no sign that DevClip has anything to offer, so the handle
+     * thickens and breathes instead.
+     */
+    private fun onSelectionChanged(live: Boolean) {
+        showSelectionRing(live)
+        handleView?.setHighlighted(live)
     }
 
     /**
@@ -642,9 +655,17 @@ class OverlayService : Service() {
     }
 
     /** The bubble is docked, so its x is decided by which edge, not by the drag. */
+    /**
+     * Flush against the edge, with no margin at all.
+     *
+     * There used to be 8dp of air, which is what made the bubble read as
+     * floating *near* the screen edge rather than attached to it — and it is
+     * 8dp of the app underneath that the bubble covers for no reason. One UI's
+     * own edge handle sits on the edge; so does this.
+     */
     private fun edgeX(area: SafeArea): Int =
-        if (edge == Prefs.EDGE_LEFT) area.left + dp(EDGE_MARGIN_DP)
-        else area.right - bubbleSizePx - dp(EDGE_MARGIN_DP)
+        if (edge == Prefs.EDGE_LEFT) area.left
+        else area.right - bubbleSizePx
 
     private fun yFromFraction(area: SafeArea): Int {
         val travel = (area.height - bubbleSizePx).coerceAtLeast(0)
@@ -770,7 +791,6 @@ class OverlayService : Service() {
     private fun rest() {
         if (resting) return
         resting = true
-        mainHandler.removeCallbacks(fadeToIdle)
         mainHandler.removeCallbacks(tuckAway)
         tucked = false
         removeHandle()
@@ -809,6 +829,13 @@ class OverlayService : Service() {
 
     private fun removeBubble() {
         bubbleAnimator?.cancel()
+        // The ring belongs to the view being taken away. Left behind it would
+        // keep an infinite animator running against a window that no longer
+        // exists — and, because showSelectionRing treats a ring it already
+        // holds as one that is already on screen, the bubble would come back
+        // from a tuck with no ring at all while a selection was still live.
+        selectionRing?.stop()
+        selectionRing = null
         bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) { } }
         bubbleView = null
         bubbleParams = null
@@ -825,72 +852,55 @@ class OverlayService : Service() {
      */
     private fun applySettings() {
         if (tucked) untuck()
-        applyBubbleAlpha(idle = false)
         popupView?.alpha = popupAlpha()
         // The list is built once and kept, so a theme changed while it is
-        // open has to be pushed into it rather than waited for.
+        // open has to be pushed into it rather than waited for. The handle
+        // reads the palette at construction for the same reason.
         popupContent?.applyTheme()
+        handleView?.applyTheme()
         scheduleIdle()
     }
 
     // ---- Transparency and tucking away ----
 
-    private val fadeToIdle = Runnable { applyBubbleAlpha(idle = true) }
     private val tuckAway = Runnable { tuck() }
-
-    /** The level the user set, as a fraction. */
-    private fun bubbleAlpha(): Float =
-        prefs().getInt(Prefs.KEY_BUBBLE_ALPHA, Prefs.DEFAULT_ALPHA)
-            .coerceIn(Prefs.MIN_ALPHA, 100) / 100f
-
-    private fun idleFadeEnabled(): Boolean =
-        prefs().getBoolean(Prefs.KEY_BUBBLE_IDLE_FADE, false)
-
-    /**
-     * Puts the bubble at the right opacity for what is happening.
-     *
-     * With idle fade off, the chosen level is simply how the bubble looks, all
-     * the time. With it on, the level is where the bubble *rests* and a touch
-     * brings it back to solid — which is the behaviour that makes a very
-     * transparent bubble usable at all, because you can see what you are
-     * about to press the moment you press it.
-     */
-    private fun applyBubbleAlpha(idle: Boolean) {
-        val view = bubbleView ?: return
-        val target = when {
-            !idleFadeEnabled() -> bubbleAlpha()
-            idle -> bubbleAlpha()
-            else -> 1f
-        }
-        if (view.alpha == target) return
-        if (animationsDisabled()) {
-            view.alpha = target
-        } else {
-            view.animate().alpha(target).setDuration(FADE_DURATION_MS).start()
-        }
-    }
 
     /**
      * Called whenever the user touches the bubble.
      *
-     * Restores full opacity and restarts both timers, so a bubble in use never
-     * fades or tucks itself out from under the finger using it.
+     * Stops the tuck timer, so a bubble in use never tucks itself out from
+     * under the finger using it.
+     *
+     * The bubble used to fade here too, back to an opacity the user had set
+     * on a slider. Both are gone. A bubble that sits over other people's apps
+     * at 40% is a bubble you cannot read and cannot reliably hit, and the
+     * setting existed to make the bubble less of an intrusion — which is what
+     * tucking it to the edge already does, properly, by getting out of the
+     * way entirely rather than by being hard to see.
      */
     private fun onBubbleInteraction() {
-        mainHandler.removeCallbacks(fadeToIdle)
         mainHandler.removeCallbacks(tuckAway)
-        applyBubbleAlpha(idle = false)
     }
 
-    /** Restarts the idle timers after an interaction has finished. */
+    /** Restarts the tuck timer after an interaction has finished. */
     private fun scheduleIdle() {
-        mainHandler.removeCallbacks(fadeToIdle)
         mainHandler.removeCallbacks(tuckAway)
         if (resting || tucked) return
-        if (idleFadeEnabled()) mainHandler.postDelayed(fadeToIdle, IDLE_FADE_DELAY_MS)
-        val delay = prefs().getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)
+        val delay = tuckDelaySeconds()
         if (delay > 0) mainHandler.postDelayed(tuckAway, delay * 1000L)
     }
+
+    /**
+     * Clamped on the way out, not only on the way in.
+     *
+     * The ceiling came down from 120 seconds to 20, and a value written under
+     * the old ceiling is still sitting in preferences. Reading it raw would
+     * leave somebody who once chose 90 seconds waiting 90 seconds, with a
+     * slider that cannot show them why.
+     */
+    private fun tuckDelaySeconds(): Int =
+        prefs().getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)
+            .coerceIn(0, Prefs.MAX_TUCK_DELAY_SEC)
 
     /**
      * Replaces the bubble with a slim handle on the screen edge.
@@ -951,6 +961,9 @@ class OverlayService : Service() {
             windowManager.addView(view, params)
             handleView = view
             handleParams = params
+            // The bubble may have tucked itself away with a selection already
+            // waiting, and nothing else will report it until the next one.
+            view.setHighlighted(SelectionCapture.hasLiveSelection)
         } catch (e: Exception) {
             // Losing the handle would leave no way back to the bubble at all,
             // so failing to place it undoes the tuck rather than stranding it.
@@ -1230,8 +1243,8 @@ class OverlayService : Service() {
         }
         bubbleView = bubble
         bubbleParams = params
+        bubble.alpha = 1f
         showSelectionRing(SelectionCapture.hasLiveSelection)
-        applyBubbleAlpha(idle = false)
         scheduleIdle()
     }
 

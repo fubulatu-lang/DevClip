@@ -57,6 +57,27 @@ object DevClipEvents {
     private val _bubbleResting = MutableStateFlow(false)
     val bubbleResting: StateFlow<Boolean> = _bubbleResting.asStateFlow()
 
+    /**
+     * Bumped whenever the theme preference changes.
+     *
+     * The Compose theme used to read the palette straight out of
+     * SharedPreferences during composition. Nothing about that read is
+     * observable, so changing the theme repainted nothing: the new colours
+     * appeared only when something else happened to recompose the whole tree
+     * — leaving the screen, rotating, reopening the app. It looked like a
+     * very slow theme switch and was actually no theme switch at all.
+     *
+     * A counter rather than the mode itself, because the answer also depends
+     * on the system's dark mode when the mode is "system", and this only has
+     * to say "ask again".
+     */
+    private val _themeRevision = MutableStateFlow(0)
+    val themeRevision: StateFlow<Int> = _themeRevision.asStateFlow()
+
+    fun emitThemeChanged() {
+        _themeRevision.value++
+    }
+
     fun emitClipsChanged(preview: String) {
         _clipsChanged.tryEmit(preview)
     }

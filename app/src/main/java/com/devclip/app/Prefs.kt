@@ -67,20 +67,22 @@ object Prefs {
     const val KEY_CONFIRM_BEFORE_PASTE = "confirm_before_paste"
 
     /**
-     * How opaque the bubble and the list are, as percentages.
+     * How opaque the floating list is, as a percentage.
+     *
+     * The list only; the bubble is always solid. A see-through bubble was a
+     * bubble you could not read and could not reliably hit, over an app whose
+     * colours DevClip does not control — and the job that setting was doing,
+     * making the bubble less of an intrusion, is done properly by tucking it
+     * to the edge.
      *
      * The floor is not zero. A window at zero opacity is invisible but still
      * takes touches, which is indistinguishable from a phone that has started
      * ignoring part of the screen — so the slider stops well before the point
-     * where the user could lose the bubble entirely.
+     * where the user could lose the list entirely.
      */
-    const val KEY_BUBBLE_ALPHA = "bubble_alpha"
     const val KEY_POPUP_ALPHA = "popup_alpha"
     const val MIN_ALPHA = 20
     const val DEFAULT_ALPHA = 100
-
-    /** Whether the chosen transparency applies only while the bubble is idle. */
-    const val KEY_BUBBLE_IDLE_FADE = "bubble_idle_fade"
 
     /**
      * Seconds of stillness before the bubble becomes an edge handle. 0 is off.
@@ -90,7 +92,17 @@ object Prefs {
      */
     const val KEY_TUCK_DELAY_SEC = "tuck_delay_sec"
     const val DEFAULT_TUCK_DELAY_SEC = 0
-    const val MAX_TUCK_DELAY_SEC = 120
+
+    /**
+     * Twenty seconds, not two minutes.
+     *
+     * The old ceiling was a range nobody could use: the difference between 90
+     * and 120 seconds is invisible, so most of the slider's travel chose
+     * between two settings that behave identically. Everything worth picking
+     * is in the first twenty seconds, and a value written under the old
+     * ceiling is clamped on the way out as well as the way in.
+     */
+    const val MAX_TUCK_DELAY_SEC = 20
 
     /**
      * The size the user last dragged the floating list to, in dp.

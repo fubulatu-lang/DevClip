@@ -208,17 +208,6 @@ object OverlayController {
         }
     }
 
-    fun setBubbleAlpha(context: Context, alpha: Int) {
-        prefs(context).edit()
-            .putInt(Prefs.KEY_BUBBLE_ALPHA, alpha.coerceIn(Prefs.MIN_ALPHA, 100)).apply()
-        applyAppearance(context)
-    }
-
-    fun setBubbleIdleFade(context: Context, enabled: Boolean) {
-        prefs(context).edit().putBoolean(Prefs.KEY_BUBBLE_IDLE_FADE, enabled).apply()
-        applyAppearance(context)
-    }
-
     fun setPopupAlpha(context: Context, alpha: Int) {
         prefs(context).edit()
             .putInt(Prefs.KEY_POPUP_ALPHA, alpha.coerceIn(Prefs.MIN_ALPHA, 100)).apply()
@@ -243,6 +232,9 @@ object OverlayController {
      */
     fun setThemeMode(context: Context, mode: String) {
         prefs(context).edit().putString(Prefs.KEY_THEME_MODE, mode).apply()
+        // The app's own screens, which read the palette during composition and
+        // would otherwise not notice until something else redrew them.
+        DevClipEvents.emitThemeChanged()
         applyAppearance(context)
     }
 
@@ -270,17 +262,12 @@ object OverlayController {
     fun bubbleSize(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_BUBBLE_SIZE_DP, Prefs.DEFAULT_BUBBLE_SIZE_DP)
 
-    fun bubbleAlpha(context: Context): Int =
-        prefs(context).getInt(Prefs.KEY_BUBBLE_ALPHA, Prefs.DEFAULT_ALPHA)
-
-    fun bubbleIdleFade(context: Context): Boolean =
-        prefs(context).getBoolean(Prefs.KEY_BUBBLE_IDLE_FADE, false)
-
     fun popupAlpha(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_POPUP_ALPHA, Prefs.DEFAULT_ALPHA)
 
     fun tuckDelay(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)
+            .coerceIn(0, Prefs.MAX_TUCK_DELAY_SEC)
 
     fun closeOnOutsideTouch(context: Context): Boolean =
         prefs(context).getBoolean(Prefs.KEY_CLOSE_ON_OUTSIDE_TOUCH, true)
