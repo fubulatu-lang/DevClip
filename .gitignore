@@ -3,6 +3,9 @@
 build/
 local.properties
 
+# Kotlin's build-session state, written by any local Gradle run.
+.kotlin/
+
 # Android Studio / IntelliJ
 .idea/
 *.iml

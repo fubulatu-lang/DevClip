@@ -122,6 +122,17 @@ object Prefs {
     const val THEME_LIGHT = "light"
     const val THEME_DARK = "dark"
 
+    /**
+     * Whether touching outside the floating list closes it.
+     *
+     * On by default, because that is what every other dropdown and sheet on
+     * the phone does and a finger arrives expecting it. A setting all the
+     * same: this list floats over other people's apps, so "outside" is
+     * somewhere the user may have meant to touch for another reason
+     * entirely, and losing the list mid-paste is worth being able to prevent.
+     */
+    const val KEY_CLOSE_ON_OUTSIDE_TOUCH = "close_on_outside_touch"
+
     const val KEY_POPUP_WIDTH_DP = "popup_width_dp"
     const val KEY_POPUP_HEIGHT_DP = "popup_height_dp"
 }

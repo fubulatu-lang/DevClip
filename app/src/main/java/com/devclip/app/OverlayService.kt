@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -133,6 +134,9 @@ class OverlayService : Service() {
     private var popupContent: PopupListView? = null
     private var popupView: ResizableFrame? = null
     private var popupParams: WindowManager.LayoutParams? = null
+
+    /** When an outside touch last closed the list. See [dismissByOutsideTouch]. */
+    private var outsideDismissAt = 0L
     private var popupVisible = false
 
     /**
@@ -205,6 +209,15 @@ class OverlayService : Service() {
          * time the window is placed, so a size dragged on a tablet cannot
          * strand the window off the edge of a phone.
          */
+        /**
+         * How long after an outside-touch dismissal the bubble ignores its
+         * own tap. See `dismissByOutsideTouch`.
+         *
+         * Long enough to cover a press and release on the bubble, short
+         * enough that a second, deliberate tap still opens the list.
+         */
+        private const val OUTSIDE_DISMISS_GRACE_MS = 400L
+
         private const val LIST_MIN_WIDTH_DP = 220
         private const val LIST_MIN_HEIGHT_DP = 160
         private const val LIST_MAX_WIDTH_DP = 560
@@ -814,6 +827,9 @@ class OverlayService : Service() {
         if (tucked) untuck()
         applyBubbleAlpha(idle = false)
         popupView?.alpha = popupAlpha()
+        // The list is built once and kept, so a theme changed while it is
+        // open has to be pushed into it rather than waited for.
+        popupContent?.applyTheme()
         scheduleIdle()
     }
 
@@ -1272,7 +1288,15 @@ class OverlayService : Service() {
                 toast(getString(R.string.devclip_capture_failed))
             }
             is Capture.Outcome.NoSelection -> {
-                if (popupVisible) hidePopup() else showPopup()
+                val justDismissed =
+                    SystemClock.uptimeMillis() - outsideDismissAt < OUTSIDE_DISMISS_GRACE_MS
+                when {
+                    popupVisible -> hidePopup()
+                    // The press that opened this tap already closed the list.
+                    // Opening it again here would undo what the user did.
+                    justDismissed -> outsideDismissAt = 0L
+                    else -> showPopup()
+                }
             }
         }
     }
@@ -1318,6 +1342,9 @@ class OverlayService : Service() {
                     FrameLayout.LayoutParams.MATCH_PARENT
                 )
             )
+            // Posted for the same reason as the two above: this tears down
+            // the window the event is being dispatched inside.
+            onOutsideTouch = { mainHandler.post { this@OverlayService.dismissByOutsideTouch() } }
             onResizeStart = { this@OverlayService.beginPopupResize() }
             onResizeEnd = { this@OverlayService.endPopupResize() }
             resizeListener = ResizableFrame.ResizeListener { l, t, r, b, dx, dy ->
@@ -1469,6 +1496,9 @@ class OverlayService : Service() {
         val view = ensurePopupView() ?: return
         // Every open, not just the first: a clip captured while the list was
         // closed has to be in it when it opens, and the list is cheap to fill.
+        // The theme is re-read for the same reason — this view outlives every
+        // screen that can change it.
+        popupContent?.applyTheme()
         refreshPopupContent()
         view.alpha = popupAlpha()
         if (popupWidthPx == 0 || popupHeightPx == 0) loadPopupSize()
@@ -1481,7 +1511,13 @@ class OverlayService : Service() {
 
         val params = WindowManager.LayoutParams(
             popupWidthPx, popupHeightPx, overlayType,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            // WATCH_OUTSIDE_TOUCH is what makes tap-to-dismiss possible at
+            // all: this window never takes focus, so without it a touch
+            // beyond its edges is something DevClip is never told about.
+            // The touch still goes through to the app underneath — the
+            // window only gets told it happened.
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH,
             PixelFormat.TRANSLUCENT
         ).apply { gravity = Gravity.TOP or Gravity.START }
 
@@ -1508,6 +1544,24 @@ class OverlayService : Service() {
         val view = popupView ?: return
         val params = popupParams ?: return
         try { windowManager.updateViewLayout(view, params) } catch (e: Exception) { }
+    }
+
+    /**
+     * Closes the list because the user touched something else.
+     *
+     * The timestamp is not bookkeeping. Tapping the bubble to close the list
+     * produces *both* events: an outside touch on the way down, which closes
+     * the list, and then the bubble's own tap on the way up, which sees a
+     * closed list and opens it again. The list would shut and reopen under
+     * the finger and look like the tap had done nothing. So the bubble asks
+     * whether an outside touch just closed it, and treats that as the close
+     * the tap was for.
+     */
+    private fun dismissByOutsideTouch() {
+        if (!popupVisible) return
+        if (!prefs().getBoolean(Prefs.KEY_CLOSE_ON_OUTSIDE_TOUCH, true)) return
+        outsideDismissAt = SystemClock.uptimeMillis()
+        hidePopup()
     }
 
     private fun hidePopup() {

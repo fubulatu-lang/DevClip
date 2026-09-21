@@ -11,7 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,15 +24,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -91,34 +92,40 @@ fun SettingsScreen(
     @Suppress("UNUSED_EXPRESSION") revision
     @Suppress("UNUSED_EXPRESSION") tick
 
-    Scaffold(
-        containerColor = colors.bg,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
-                navigationIcon = {
-                    IconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(MinTouchTarget)
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.back),
-                            tint = colors.ink
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = colors.bg,
-                    titleContentColor = colors.ink
-                )
-            )
-        }
-    ) { padding ->
-        LazyColumn(
+    val header = rememberOneUiHeaderState()
+
+    // Edge to edge, so the bars are this screen's to account for. The colour
+    // goes under them; only the content is inset.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(colors.bg)
+    ) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .windowInsetsPadding(WindowInsets.systemBars)
+                .nestedScroll(header.nestedScrollConnection)
+        ) {
+        OneUiHeader(
+            title = stringResource(R.string.settings_title),
+            state = header,
+            navigationIcon = {
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier.size(MinTouchTarget)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = stringResource(R.string.back),
+                        tint = colors.ink
+                    )
+                }
+            }
+        )
+
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
                 start = Space.keyline,
                 end = Space.keyline,
@@ -278,6 +285,16 @@ fun SettingsScreen(
                     onChange = { OverlayController.setConfirmBeforePaste(context, it); revision++ }
                 )
             }
+            item {
+                SwitchRow(
+                    label = stringResource(R.string.list_close_outside),
+                    checked = OverlayController.closeOnOutsideTouch(context),
+                    onChange = {
+                        OverlayController.setCloseOnOutsideTouch(context, it); revision++
+                    }
+                )
+            }
+            item { Note(stringResource(R.string.list_close_outside_note)) }
             item { Note(stringResource(R.string.list_resize_note)) }
 
             // ---- History ----
@@ -314,7 +331,7 @@ fun SettingsScreen(
             // ---- Appearance ----
             item { SectionHeader(stringResource(R.string.settings_appearance)) }
             item {
-                val mode = themeMode(context)
+                val mode = OverlayController.themeMode(context)
                 ChipRow(
                     label = stringResource(R.string.theme),
                     options = listOf(Prefs.THEME_SYSTEM, Prefs.THEME_LIGHT, Prefs.THEME_DARK),
@@ -328,24 +345,16 @@ fun SettingsScreen(
                             }
                         )
                     },
-                    onSelect = { setThemeMode(context, it); revision++ }
+                    onSelect = { OverlayController.setThemeMode(context, it); revision++ }
                 )
             }
+        }
         }
     }
 }
 
 /** The clip limits offered. 0 means no limit. */
 private val KEEP_OPTIONS = listOf(100, 500, 1000, 0)
-
-private fun themeMode(context: android.content.Context): String =
-    context.getSharedPreferences(Prefs.NAME, android.content.Context.MODE_PRIVATE)
-        .getString(Prefs.KEY_THEME_MODE, Prefs.THEME_SYSTEM) ?: Prefs.THEME_SYSTEM
-
-private fun setThemeMode(context: android.content.Context, mode: String) {
-    context.getSharedPreferences(Prefs.NAME, android.content.Context.MODE_PRIVATE)
-        .edit().putString(Prefs.KEY_THEME_MODE, mode).apply()
-}
 
 @Composable
 private fun stringResourceNever() = stringResource(R.string.never)

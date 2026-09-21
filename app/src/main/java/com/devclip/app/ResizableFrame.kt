@@ -31,6 +31,29 @@ class ResizableFrame(context: Context) : FrameLayout(context) {
     var onResizeEnd: (() -> Unit)? = null
     var resizeListener: ResizeListener? = null
 
+    /**
+     * A touch that landed outside this window entirely.
+     *
+     * Only ever delivered when the window was added with
+     * FLAG_WATCH_OUTSIDE_TOUCH. The touch still reaches whatever is
+     * underneath — this is a copy, not an interception, which is what makes
+     * it safe to watch for on a window floating over other people's apps.
+     */
+    var onOutsideTouch: (() -> Unit)? = null
+
+    /**
+     * dispatch rather than onTouchEvent: an ACTION_OUTSIDE event carries
+     * coordinates outside this view's bounds, so the ordinary hit-testing a
+     * ViewGroup does on the way down has nothing to hand it to.
+     */
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_OUTSIDE) {
+            onOutsideTouch?.invoke()
+            return true
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
     private val edgeSlop = (EDGE_DP * context.resources.displayMetrics.density).toInt()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
