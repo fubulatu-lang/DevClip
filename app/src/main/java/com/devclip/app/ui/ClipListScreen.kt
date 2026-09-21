@@ -1,5 +1,6 @@
 package com.devclip.app.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -196,8 +197,11 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
  * Tap pastes, hold edits — the same pair the floating list uses for the same
  * reason: pasting is what this is for, and editing is the occasional thing
  * that should not be one mis-tap away.
+ *
+ * combinedClickable is the only way to have both from one modifier, and it
+ * is still a foundation API behind an opt-in.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ClipRow(
     clip: DevClipDatabaseHelper.Clip,
