@@ -1,11 +1,11 @@
 name: APK
 
-# Builds an installable APK here, rather than fetching one EAS built.
+# Builds an installable APK.
 #
-# This is the pipeline the project needs before it can stop being an Expo
-# project: EAS cannot build a plain Android app, so the way to install has to
-# exist somewhere else first. It works against the current Expo setup today
-# and needs only its build command changed once the conversion happens.
+# This existed before the conversion so that dropping Expo never left the
+# project unable to reach the phone — EAS cannot build a plain Android app.
+# The conversion has happened, and all it cost this file was the Node setup
+# and the prebuild step.
 #
 # Every push to main refreshes a single release tagged `latest`, so there is
 # one permanent URL to download the current build from — which matters when
@@ -37,13 +37,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -55,12 +48,7 @@ jobs:
         with:
           packages: ''
 
-      - name: Prebuild the Android project
-        run: npx expo prebuild --platform android --no-install
-
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
       # Android refuses to update an installed app whose signature does not
       # match, so the key this is signed with decides whether a new build
@@ -91,7 +79,6 @@ jobs:
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        working-directory: android
         run: |
           set -euo pipefail
           if [ "${{ steps.signing.outputs.signed }}" = "true" ]; then
@@ -110,7 +97,7 @@ jobs:
         id: apk
         run: |
           set -euo pipefail
-          APK=$(find android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          APK=$(find app/build/outputs/apk/release -name '*.apk' | head -1)
           [ -n "$APK" ] || { echo "::error::No APK was produced"; exit 1; }
           # An APK is a zip. A truncated or wrong-shaped file is not.
           unzip -l "$APK" | grep -q AndroidManifest.xml

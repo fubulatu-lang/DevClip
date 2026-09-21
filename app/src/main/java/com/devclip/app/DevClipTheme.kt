@@ -115,11 +115,25 @@ object DevClipTheme {
         scrim = Color.argb(51, 0, 0, 0)
     )
 
-    fun colors(context: Context): Colors {
-        val night = context.resources.configuration.uiMode and
-            Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-        return if (night) dark else light
+    /**
+     * Whether this surface should be drawn dark.
+     *
+     * The stored preference wins over the system, and "system" defers to it.
+     * Every surface asks this one function — the launcher app, the bubble,
+     * the floating list — so a theme chosen in Settings reaches the windows a
+     * service draws, which hold no reference to the app and may outlive it.
+     */
+    fun isDark(context: Context): Boolean {
+        val prefs = context.getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+        return when (prefs.getString(Prefs.KEY_THEME_MODE, Prefs.THEME_SYSTEM)) {
+            Prefs.THEME_LIGHT -> false
+            Prefs.THEME_DARK -> true
+            else -> context.resources.configuration.uiMode and
+                Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        }
     }
+
+    fun colors(context: Context): Colors = if (isDark(context)) dark else light
 
     /**
      * One UI spacing: a 2dp-resolution scale, not a strict 8pt grid.

@@ -140,9 +140,7 @@ fun DevClipComposeTheme(content: @Composable () -> Unit) {
     // the bubble cannot end up on different sides of a theme change.
     val context = LocalContext.current
     val palette = DevClipTheme.colors(context)
-    val isDark = context.resources.configuration.uiMode and
-        android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-        android.content.res.Configuration.UI_MODE_NIGHT_YES
+    val isDark = DevClipTheme.isDark(context)
 
     val colors = DevClipColors(
         bg = Color(palette.bg),

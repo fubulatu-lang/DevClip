@@ -99,6 +99,19 @@ object Prefs {
      * is: a pixel size stops meaning anything the moment the window changes
      * shape, and this has to survive a rotation and a reboot.
      */
+    /**
+     * Light, dark, or whatever the system is doing.
+     *
+     * Here rather than in the app, because the floating windows have to agree
+     * with it and they are drawn by a service that may be the only thing
+     * running. An app-held preference would leave the bubble on one theme and
+     * the app on another.
+     */
+    const val KEY_THEME_MODE = "theme_mode"
+    const val THEME_SYSTEM = "system"
+    const val THEME_LIGHT = "light"
+    const val THEME_DARK = "dark"
+
     const val KEY_POPUP_WIDTH_DP = "popup_width_dp"
     const val KEY_POPUP_HEIGHT_DP = "popup_height_dp"
 }

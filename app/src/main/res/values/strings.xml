@@ -41,4 +41,75 @@
     <string name="devclip_error_place_window">DevClip couldn’t place its window on screen.</string>
     <string name="devclip_error_open_window">DevClip couldn’t open its window.</string>
     <string name="devclip_error_tap">DevClip couldn’t handle that tap.</string>
+
+    <!-- The clip list. -->
+    <string name="clips_title">Clips</string>
+    <string name="clips_loading">Opening your clips…</string>
+    <string name="clips_empty">No clips yet. Highlight some text and tap the bubble</string>
+    <string name="clips_no_matches">Nothing matches that</string>
+    <string name="search_placeholder">Search title or text</string>
+    <string name="paste_done">Pasted</string>
+
+    <!-- Editing a clip. -->
+    <string name="edit_title_label">Title</string>
+    <string name="edit_title_placeholder">Optional</string>
+    <string name="edit_content_label">Text</string>
+    <string name="edit_save">Save</string>
+    <string name="edit_delete">Delete</string>
+
+    <!-- Settings. -->
+    <string name="settings_title">Settings</string>
+    <string name="back">Back</string>
+    <string name="never">Never</string>
+    <string name="no_limit">No limit</string>
+
+    <!-- Status: whether DevClip is actually working, not whether its
+         switches are on. The distinction is the point of the section. -->
+    <string name="settings_status">Status</string>
+    <string name="status_capture">Text capture</string>
+    <string name="status_working">Working</string>
+    <string name="status_granted_not_running">Switched on, but not running. Turn it off and on again</string>
+    <string name="status_off">Off</string>
+    <string name="status_on">On</string>
+    <string name="status_bubble">Floating bubble</string>
+    <string name="status_battery">Battery</string>
+    <string name="status_restricted">Restricted — this can stop text capture</string>
+    <string name="status_unrestricted">Unrestricted</string>
+    <string name="status_samsung_note">On Samsung phones, also check Settings › Battery › Background usage limits and keep DevClip out of Sleeping and Deep sleeping apps. Android gives apps no way to read or change that list.</string>
+
+    <string name="settings_bubble">Bubble</string>
+    <string name="bubble_size">Size</string>
+    <string name="bubble_opacity">Opacity</string>
+    <string name="bubble_fade_idle">Fade when idle</string>
+    <string name="bubble_fade_idle_note">On, the bubble rests at that opacity and turns solid the moment you touch it. Off, it stays there.</string>
+    <string name="bubble_tuck">Tuck away after</string>
+    <string name="bubble_tuck_note">The bubble becomes a slim handle on the screen edge when you have not used it. Touch the handle to bring it back.</string>
+    <string name="bubble_autostart">Start after reboot</string>
+
+    <string name="settings_list">Clip list</string>
+    <string name="list_opacity">Opacity</string>
+    <string name="list_confirm_paste">Confirm before paste</string>
+    <string name="list_resize_note">Drag any edge or corner of the floating list to resize it. DevClip remembers the size.</string>
+
+    <string name="settings_history">History</string>
+    <string name="history_keep">Keep at most</string>
+    <string name="history_export">Export a backup</string>
+    <string name="history_import">Import a backup</string>
+    <string name="history_clear">Delete all clips</string>
+
+    <string name="settings_appearance">Appearance</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">Auto</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+
+    <!-- Backup. -->
+    <string name="backup_export_failed">Could not write that file. Try again</string>
+    <string name="backup_import_failed">Could not read that backup. Try again</string>
+    <string name="backup_imported">Added %1$d, skipped %2$d you already had</string>
+    <string name="backup_cleared">All clips deleted</string>
+    <plurals name="exported">
+        <item quantity="one">Exported %d clip</item>
+        <item quantity="other">Exported %d clips</item>
+    </plurals>
 </resources>

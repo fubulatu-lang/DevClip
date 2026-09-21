@@ -12,76 +12,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  typecheck:
-    name: Typecheck
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          # Matches the Node the project is developed against; Expo 57 and
-          # React Native 0.86 both require Node 20 or newer.
-          node-version: 22
-          cache: npm
-
-      # ci, not install: install the lockfile exactly, and fail loudly if
-      # package.json and package-lock.json have drifted apart.
-      - run: npm ci
-
-      - run: npx tsc --noEmit
-
   android:
     name: Android compile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      # Expo SDK 57 and React Native 0.86 both build against JDK 17.
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
       # packages: '' or the action installs the obsolete `tools` SDK package
-      # by default, which Google no longer publishes — sdkmanager exits 1 on
-      # "Failed to find package 'tools'" and the job dies before it has
-      # compiled anything. The runner image already carries the SDK and its
-      # accepted licences; all this step needs to do is point at them.
+      # by default and sdkmanager exits 1 on it. The runner image already
+      # carries the SDK and its accepted licences.
       - uses: android-actions/setup-android@v3
         with:
           packages: ''
 
-      # The android/ project is generated, not committed. This is the step
-      # that runs plugins/withDevClipNative.js, which copies every .kt file
-      # and the accessibility config into it — so without a prebuild there is
-      # no Kotlin anywhere for a compiler to see.
-      - name: Prebuild the Android project
-        run: npx expo prebuild --platform android --no-install
-
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          build-root-directory: android
 
-      # compileReleaseKotlin, not assembleRelease. Compiling is what catches
-      # the class of error this job exists for, it needs no signing key, and
-      # it costs a fraction of a full build. It is also the exact task that
-      # failed on EAS in September, with four unresolved references that
-      # nothing in this repo could have caught: the checks above read the
-      # TypeScript and never the Kotlin, so a compile error reached a real
-      # build untouched.
+      # No prebuild any more. The Android project is the repository now, not
+      # something generated from an app.json by a plugin on every build.
       #
-      # It depends on the resource step, so a string referenced from Kotlin
-      # but never added to the config plugin fails here too.
-      - name: Compile the Kotlin
-        working-directory: android
+      # compileReleaseKotlin rather than a full assemble: compiling is what
+      # catches the class of error this job exists for, it needs no signing
+      # key, and it costs a fraction of the time. It depends on resource
+      # processing, so a string referenced from Kotlin but never declared
+      # fails here too.
+      - name: Compile
         run: ./gradlew :app:compileReleaseKotlin --no-daemon
 
   one-ui:
@@ -94,10 +53,14 @@ jobs:
         with:
           python-version: '3.x'
 
-      # Advisory only. The scanner covers the mechanically checkable subset of
-      # the One UI rules — hardcoded colours, off-scale spacing, missing
-      # reduced-motion guards. Structure, copy and icon metaphors still need a
-      # human read, so a finding here is a prompt to look, not a gate.
-      - name: Scan src for One UI violations
-        run: python3 .claude/one-ui/scripts/oneui_scan.py src
+      # Pointed at the Kotlin and the resources, which is where the interface
+      # lives now. It used to scan src/, and src/ was the React Native app —
+      # so after the conversion it would have passed by finding nothing to
+      # look at, which is worse than failing.
+      #
+      # Advisory. The scanner covers the mechanically checkable subset —
+      # hard-coded colours, off-scale spacing, missing reduced-motion guards.
+      # Structure, copy and icon metaphors need a human read.
+      - name: Scan for One UI violations
+        run: python3 .claude/one-ui/scripts/oneui_scan.py app/src/main
         continue-on-error: true

@@ -171,6 +171,28 @@ class DevClipDatabaseHelper(context: Context) :
         0
     }
 
+    /**
+     * Inserts a clip from a backup, title and all.
+     *
+     * Separate from [insertClip], which exists for capture: that one refuses
+     * a duplicate of the clip at the top, which is the double-tap guard, and
+     * carries no title because a captured selection has none. An import has
+     * already done its own de-duplication against the whole table.
+     */
+    fun insertImported(title: String?, content: String) {
+        try {
+            val db = writableDatabase
+            val nextOrder = db.rawQuery("SELECT MAX(sort_order) FROM clips;", null)
+                .use { if (it.moveToFirst() && !it.isNull(0)) it.getInt(0) + 1 else 0 }
+            db.execSQL(
+                "INSERT INTO clips (title, content, created_at, sort_order) VALUES (?, ?, ?, ?);",
+                arrayOf<Any?>(title, content, System.currentTimeMillis(), nextOrder)
+            )
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not import a clip", e)
+        }
+    }
+
     /** Shared cursor walk for every read that returns clips. */
     private fun read(sql: String, args: Array<String>?): List<Clip> = try {
         readableDatabase.rawQuery(sql, args).use { cursor ->
