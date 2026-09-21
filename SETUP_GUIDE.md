@@ -48,16 +48,22 @@ and every install means: export a backup, uninstall, install, import the
 backup. It works, but it is tedious and one forgotten export loses
 everything.
 
-**With the project keystore stored as a secret**, builds agree with each
-other and with the app already on your phone, and installing is just
-installing.
+**With the project keystore stored as a secret**, every build agrees with
+every other build, and installing is just installing.
+
+**One catch, once.** The copy on your phone right now was built before the
+secrets existed, so it carries one of those throwaway keys. The first
+build after the secrets are added will therefore still disagree with it,
+and still need an uninstall — export a backup first. Every build after
+that one installs straight over the top. It is one more uninstall, not
+none, and then never again.
 
 ### Setting it up
 
-The keystore you want already exists — EAS has been signing with it. On
-expo.dev, open the project, go to **Credentials → Android**, and download
-the keystore file. That page also shows the keystore password, key alias
-and key password.
+The keystore you want already exists — EAS signed the original app with
+it. On expo.dev, open the project, go to **Credentials → Android**, and
+download the keystore file. That page also shows the keystore password,
+key alias and key password.
 
 Then add four repository secrets on github.com, under
 **Settings → Secrets and variables → Actions**:
@@ -91,14 +97,16 @@ which build is on your phone.
 
 ## 5. What runs before a build
 
-Three checks run on every pull request, and the first two also gate merges:
+Two checks run on every pull request, and the first one gates merges:
 
-- **Typecheck** — the TypeScript compiles.
 - **Android compile** — the Kotlin compiles. This one exists because
   nothing used to check it: native code reached a real build untouched,
   and a compile error once got as far as EAS before anything noticed.
 - **One UI conformance** — a scan for hard-coded colours and off-scale
   spacing. Advisory; it reports rather than blocks.
+
+There used to be a third, a TypeScript typecheck. There is no TypeScript
+in this repository any more, so there is nothing for it to check.
 
 ## 6. Turning on the real features
 
