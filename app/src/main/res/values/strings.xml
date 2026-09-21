@@ -112,4 +112,28 @@
         <item quantity="one">Exported %d clip</item>
         <item quantity="other">Exported %d clips</item>
     </plurals>
+
+    <string name="devclip_error_no_overlay_permission">DevClip needs permission to display over other apps before it can show the bubble</string>
+
+    <!-- Setup. Each body says what the permission buys the user, not what the
+         permission is called, and why Android will look alarmed about it. -->
+    <string name="setup_heading">Set up DevClip</string>
+    <string name="setup_sub">Three permissions, and DevClip works from anywhere on your phone. You can skip and grant them later.</string>
+    <string name="setup_capture">Text capture</string>
+    <string name="setup_capture_body">Lets DevClip read the text you have highlighted, so tapping the bubble saves it. Android shows a broad warning for this — it is what makes capture possible at all.</string>
+    <string name="setup_bubble">Floating bubble</string>
+    <string name="setup_bubble_body">Lets DevClip draw its bubble over other apps. Without it there is no bubble, and DevClip is a list you have to open.</string>
+    <string name="setup_notifications">Notifications</string>
+    <string name="setup_notifications_body">One quiet, ongoing notification while the bubble runs. It is also how you bring the bubble back after hiding it.</string>
+    <string name="setup_enable">Enable</string>
+    <string name="setup_done">Done</string>
+    <string name="setup_continue">Start using DevClip</string>
+    <string name="setup_skip">Skip for now</string>
+    <string name="setup_skip_note">DevClip will say what it cannot do without these. Settings has them whenever you want.</string>
+
+    <string name="status_overlay">Display over other apps</string>
+    <string name="status_notifications">Notifications</string>
+    <string name="status_granted">Granted</string>
+    <string name="status_not_granted">Not granted</string>
+    <string name="status_blocked_no_overlay">Needs permission to display over other apps</string>
 </resources>

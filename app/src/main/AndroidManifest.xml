@@ -14,6 +14,12 @@
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- Without this declared, ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS is
+         refused by the system and the button that raises it does nothing at
+         all. Battery optimisation is what unbinds the accessibility service,
+         so the button mattering is the point. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"

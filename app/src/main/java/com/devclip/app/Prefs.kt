@@ -100,6 +100,16 @@ object Prefs {
      * shape, and this has to survive a rotation and a reboot.
      */
     /**
+     * Whether setup has been shown.
+     *
+     * Shown once after install and then never again on its own, however the
+     * permissions stand. A screen the user has already worked through is not
+     * worth repeating; a permission that has since been revoked is surfaced
+     * in Settings under Status instead.
+     */
+    const val KEY_HAS_ONBOARDED = "has_onboarded"
+
+    /**
      * Light, dark, or whatever the system is doing.
      *
      * Here rather than in the app, because the floating windows have to agree

@@ -77,11 +77,19 @@ fun SettingsScreen(
 
     BackHandler(onBack = onBack)
 
-    // Read once per composition rather than held in state: these are
-    // SharedPreferences and system facts, and the screen is re-entered rather
-    // than lived in. `revision` forces a re-read after anything writes.
+    // Two reasons to re-read. `revision` covers this screen's own writes;
+    // `tick` covers everything it does not own — a permission switch in
+    // Android's settings, a service the system binds, a battery restriction.
+    // None of those notify anybody, and most can only be changed by leaving,
+    // so coming back is the only signal there is.
+    //
+    // Without the tick, granting a permission and returning left Status
+    // showing what it had read before the user left: the section built to
+    // stop this app lying about whether capture works, lying about it.
     var revision by remember { mutableStateOf(0) }
+    val tick by rememberResumeTick()
     @Suppress("UNUSED_EXPRESSION") revision
+    @Suppress("UNUSED_EXPRESSION") tick
 
     Scaffold(
         containerColor = colors.bg,
@@ -138,16 +146,57 @@ fun SettingsScreen(
                 )
             }
             item {
+                // The permission, separate from the running state below it.
+                // Nothing in the app requested this, so on a fresh install
+                // the bubble could never appear — and starting it anyway
+                // crashed DevClip rather than saying why.
+                val granted = OverlayController.isOverlayGranted(context)
+                StatusRow(
+                    label = stringResource(R.string.status_overlay),
+                    ok = granted,
+                    detail = stringResource(
+                        if (granted) R.string.status_granted else R.string.status_not_granted
+                    ),
+                    onClick = { OverlayController.requestOverlay(context) }
+                )
+            }
+            item {
                 val running = OverlayController.isBubbleRunning(context)
+                val canStart = OverlayController.isOverlayGranted(context)
                 StatusRow(
                     label = stringResource(R.string.status_bubble),
                     ok = running,
-                    detail = stringResource(if (running) R.string.status_on else R.string.status_off),
+                    detail = stringResource(
+                        when {
+                            running -> R.string.status_on
+                            !canStart -> R.string.status_blocked_no_overlay
+                            else -> R.string.status_off
+                        }
+                    ),
                     onClick = {
-                        if (running) OverlayController.stopBubble(context)
-                        else OverlayController.startBubble(context)
+                        when {
+                            running -> OverlayController.stopBubble(context)
+                            // Send them to the permission rather than to a
+                            // service that cannot place a window.
+                            !canStart -> OverlayController.requestOverlay(context)
+                            else -> OverlayController.startBubble(context)
+                        }
                         revision++
                     }
+                )
+            }
+            item {
+                val granted = OverlayController.isNotificationGranted(context)
+                StatusRow(
+                    label = stringResource(R.string.status_notifications),
+                    ok = granted,
+                    detail = stringResource(
+                        if (granted) R.string.status_granted else R.string.status_not_granted
+                    ),
+                    // Android offers this dialog once and never again, so
+                    // after a refusal the app-details screen is the only
+                    // route left.
+                    onClick = { OverlayController.openAppSettings(context) }
                 )
             }
             item {
