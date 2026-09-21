@@ -1197,7 +1197,21 @@ class OverlayService : Service() {
             }
         }
 
-        windowManager.addView(bubble, params)
+        // Guarded, like every other addView here. This one was not, and a
+        // TYPE_APPLICATION_OVERLAY window added without the "display over
+        // other apps" permission throws BadTokenException — which killed the
+        // service, and the service dying took the app down with it. Tapping
+        // Start closed DevClip and said nothing about a permission.
+        try {
+            windowManager.addView(bubble, params)
+        } catch (e: Exception) {
+            fail(getString(R.string.devclip_error_no_overlay_permission), e)
+            // Nothing was added, so the service has no bubble to own. Stop
+            // rather than sit running with an empty notification.
+            prefs().edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, false).apply()
+            stopSelf()
+            return
+        }
         bubbleView = bubble
         bubbleParams = params
         showSelectionRing(SelectionCapture.hasLiveSelection)

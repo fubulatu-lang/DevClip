@@ -1,5 +1,6 @@
 package com.devclip.app
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -14,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.devclip.app.ui.ClipListScreen
 import com.devclip.app.ui.DevClipComposeTheme
+import com.devclip.app.ui.SetupScreen
 import com.devclip.app.ui.SettingsScreen
 import com.devclip.app.ui.Snack
 import kotlinx.coroutines.launch
@@ -43,7 +45,16 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
 
-                var screen by remember { mutableStateOf(Screen.Clips) }
+                // Setup is shown once, after install. Whether the
+                // permissions are granted does not decide it: a screen the
+                // user has already worked through is not worth repeating,
+                // and a permission revoked later is surfaced under Status in
+                // Settings instead.
+                var screen by remember {
+                    mutableStateOf(
+                        if (hasOnboarded()) Screen.Clips else Screen.Setup
+                    )
+                }
                 var message by remember { mutableStateOf<String?>(null) }
 
                 // The user picks the file each time rather than DevClip
@@ -78,6 +89,12 @@ class MainActivity : ComponentActivity() {
                 }
 
                 when (screen) {
+                    Screen.Setup -> SetupScreen(
+                        onDone = {
+                            markOnboarded()
+                            screen = Screen.Clips
+                        }
+                    )
                     Screen.Clips -> ClipListScreen(
                         onOpenSettings = { screen = Screen.Settings }
                     )
@@ -106,5 +123,12 @@ class MainActivity : ComponentActivity() {
      * dependency would buy a back stack this does not have and route parsing
      * it does not need; each screen answers its own back press.
      */
-    private enum class Screen { Clips, Settings }
+    private fun prefs() = getSharedPreferences(Prefs.NAME, Context.MODE_PRIVATE)
+
+    private fun hasOnboarded() = prefs().getBoolean(Prefs.KEY_HAS_ONBOARDED, false)
+
+    private fun markOnboarded() =
+        prefs().edit().putBoolean(Prefs.KEY_HAS_ONBOARDED, true).apply()
+
+    private enum class Screen { Setup, Clips, Settings }
 }

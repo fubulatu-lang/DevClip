@@ -162,12 +162,23 @@ object OverlayController {
     fun isBubbleRunning(context: Context): Boolean =
         prefs(context).getBoolean(Prefs.KEY_BUBBLE_RUNNING, false)
 
-    fun startBubble(context: Context) {
+    /**
+     * Starts the bubble, or reports that it cannot.
+     *
+     * Returns false when the overlay permission is missing. The service
+     * cannot place a window without it, and starting anyway is what used to
+     * crash the app: the window add threw, the service died, and DevClip
+     * closed with no explanation. Asking first means the caller can send the
+     * user somewhere useful instead.
+     */
+    fun startBubble(context: Context): Boolean {
+        if (!isOverlayGranted(context)) return false
         prefs(context).edit().putBoolean(Prefs.KEY_BUBBLE_RUNNING, true).apply()
         // WAKE rather than a bare start: a plain start on a service already
         // up reaches onStartCommand with nothing to act on, so pressing Start
         // while the bubble was merely hidden used to do nothing visible.
         send(context, OverlayService.ACTION_WAKE)
+        return true
     }
 
     fun stopBubble(context: Context) {
