@@ -16,8 +16,13 @@ android {
         // without.
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        // Bumped per release, by hand. versionCode is what Android compares
+        // when deciding whether an install is an update; versionName is what
+        // the APK is named after and what Settings shows, so the file on the
+        // phone and the file on the release page can be told apart without
+        // opening either.
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
