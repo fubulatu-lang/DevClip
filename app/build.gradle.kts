@@ -22,6 +22,23 @@ android {
 
     buildTypes {
         release {
+            /*
+             * Without this, AGP emits an UNSIGNED release APK and Android
+             * refuses to install it at all — "package appears to be invalid",
+             * with nothing to suggest the signature is what is missing.
+             *
+             * The Expo-generated build file carried `signingConfigs.debug`
+             * here and it was not obvious why until it was gone. It is the
+             * fallback that makes a build with no keystore installable: the
+             * key is throwaway and regenerated per CI run, so such a build
+             * will not install over a previous one, but it does install.
+             *
+             * `-Pandroid.injected.signing.*` overrides this entirely, so a
+             * build with the real keystore in secrets is signed with that and
+             * this line never applies.
+             */
+            signingConfig = signingConfigs.getByName("debug")
+
             // Off for now. The accessibility service, the overlay service and
             // the boot receiver are all reached by name from the system rather
             // than from code, and turning shrinking on without keep rules

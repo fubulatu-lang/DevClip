@@ -68,7 +68,7 @@ jobs:
           set -euo pipefail
           if [ -z "${KEYSTORE_BASE64}" ]; then
             echo "signed=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret. Building with a throwaway debug key — this APK will not install over an existing DevClip. Export a backup before installing it."
+            echo "::warning::No ANDROID_KEYSTORE_BASE64 secret. Building with the throwaway debug key Gradle generates per run — this APK installs, but not over an existing DevClip, because the key differs every time. Export a backup and uninstall first."
           else
             echo "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/devclip.keystore"
             echo "signed=true" >> "$GITHUB_OUTPUT"
@@ -101,6 +101,21 @@ jobs:
           [ -n "$APK" ] || { echo "::error::No APK was produced"; exit 1; }
           # An APK is a zip. A truncated or wrong-shaped file is not.
           unzip -l "$APK" | grep -q AndroidManifest.xml
+
+          # And it has to be signed. An unsigned APK is a perfectly valid zip
+          # that Android refuses to install — "package appears to be invalid",
+          # which says nothing about signatures and sends you looking in the
+          # wrong place entirely. One shipped that way, so this is checked
+          # here rather than discovered on a phone.
+          #
+          # v2 and above put the signature in the APK Signing Block, which is
+          # not a zip entry, so its magic is what to look for. v1 would also
+          # leave META-INF/*.RSA, but v1 alone is not enough on modern Android
+          # and minSdk 24 means AGP may not write it at all.
+          if ! grep -qa 'APK Sig Block 42' "$APK"; then
+            echo "::error::The APK is unsigned and will not install. Check the release signingConfig in app/build.gradle.kts."
+            exit 1
+          fi
           cp "$APK" "DevClip.apk"
           {
             echo "path=DevClip.apk"
