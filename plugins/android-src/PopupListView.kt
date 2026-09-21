@@ -83,7 +83,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
         orientation = VERTICAL
         background = GradientDrawable().apply {
             shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(DevClipTheme.RADIUS_CONTAINER).toFloat()
+            cornerRadius = dp(DevClipTheme.Radius.CONTAINER).toFloat()
             setColor(palette.bg)
             setStroke(dp(1), palette.border)
         }
@@ -96,8 +96,8 @@ class PopupListView(context: Context) : LinearLayout(context) {
 
         rows.orientation = VERTICAL
         rows.setPadding(
-            dp(DevClipTheme.SPACE_LG), dp(DevClipTheme.SPACE_SM),
-            dp(DevClipTheme.SPACE_LG), dp(DevClipTheme.SPACE_SM)
+            dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM),
+            dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM)
         )
         scroller.isFillViewport = true
         // No explicit params: a ScrollView is a FrameLayout underneath and
@@ -120,8 +120,8 @@ class PopupListView(context: Context) : LinearLayout(context) {
             gravity = Gravity.CENTER_VERTICAL
             setBackgroundColor(palette.surface)
             setPadding(
-                dp(DevClipTheme.SPACE_LG), dp(DevClipTheme.SPACE_SM),
-                dp(DevClipTheme.SPACE_SM), dp(DevClipTheme.SPACE_SM)
+                dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM),
+                dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM)
             )
         }
 
@@ -132,13 +132,13 @@ class PopupListView(context: Context) : LinearLayout(context) {
             }
         }
         header.addView(dot, LayoutParams(dp(8), dp(8)).apply {
-            rightMargin = dp(DevClipTheme.SPACE_SM)
+            rightMargin = dp(DevClipTheme.Spacing.SM)
         })
 
         val title = TextView(context).apply {
             text = context.getString(R.string.devclip_popup_title)
             setTextColor(palette.ink)
-            sp(this, DevClipTheme.TEXT_BODY_SP)
+            sp(this, DevClipTheme.MiniText.BODY)
             maxLines = 1
         }
         header.addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
@@ -162,11 +162,10 @@ class PopupListView(context: Context) : LinearLayout(context) {
     }
 
     /**
-     * A 40dp round tap target.
-     *
-     * The icon inside is 18dp; the target around it is not, because a control
-     * in a floating window over somebody else's app is the last place to make
-     * a touch target the size of its artwork.
+     * A 48dp round tap target, which is One UI's floor. The icon inside is
+     * 18dp; the target around it is not, because a control in a floating
+     * window over somebody else's app is the last place to make a touch
+     * target the size of its artwork.
      */
     private fun iconButton(icon: StrokeIcon, labelRes: Int, action: () -> Unit): View {
         val view = StrokeIconView(context, icon, palette.inkSoft).apply {
@@ -179,7 +178,8 @@ class PopupListView(context: Context) : LinearLayout(context) {
                 setColor(Color.TRANSPARENT)
             }
         }
-        view.layoutParams = LayoutParams(dp(40), dp(40))
+        view.layoutParams =
+            LayoutParams(dp(DevClipTheme.MIN_TOUCH_TARGET), dp(DevClipTheme.MIN_TOUCH_TARGET))
         return view
     }
 
@@ -209,9 +209,9 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val text = TextView(context).apply {
             text = context.getString(R.string.devclip_popup_empty)
             setTextColor(palette.inkFaint)
-            sp(this, DevClipTheme.TEXT_CAPTION_SP)
+            sp(this, DevClipTheme.MiniText.CAPTION)
             gravity = Gravity.CENTER
-            setPadding(dp(DevClipTheme.SPACE_LG), dp(40), dp(DevClipTheme.SPACE_LG), dp(40))
+            setPadding(dp(DevClipTheme.Spacing.LG), dp(40), dp(DevClipTheme.Spacing.LG), dp(40))
         }
         return text
     }
@@ -220,12 +220,12 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val armed = armedId == clip.id
         // A ring rather than a colour swap: the row has to stay readable while
         // it says the next tap will paste it.
-        val pad = dp(DevClipTheme.SPACE_MD)
+        val pad = dp(DevClipTheme.Spacing.MD)
         val card = LinearLayout(context).apply {
             orientation = HORIZONTAL
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(DevClipTheme.RADIUS_MD).toFloat()
+                cornerRadius = dp(DevClipTheme.Radius.MD).toFloat()
                 setColor(palette.surface)
                 if (armed) setStroke(dp(2), palette.accent)
             }
@@ -237,16 +237,16 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val badge = TextView(context).apply {
             text = position.toString()
             setTextColor(palette.inkSoft)
-            sp(this, DevClipTheme.TEXT_CAPTION_SP)
+            sp(this, DevClipTheme.MiniText.CAPTION)
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(DevClipTheme.RADIUS_SM).toFloat()
+                cornerRadius = dp(DevClipTheme.Radius.SM).toFloat()
                 setColor(palette.surfaceSunken)
             }
         }
         card.addView(badge, LayoutParams(dp(24), dp(24)).apply {
-            rightMargin = dp(DevClipTheme.SPACE_MD)
+            rightMargin = dp(DevClipTheme.Spacing.MD)
             topMargin = dp(2)
         })
 
@@ -256,7 +256,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
             column.addView(TextView(context).apply {
                 text = clip.title
                 setTextColor(palette.ink)
-                sp(this, DevClipTheme.TEXT_BODY_SP)
+                sp(this, DevClipTheme.MiniText.BODY)
                 maxLines = 1
             })
         }
@@ -264,7 +264,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
         column.addView(TextView(context).apply {
             text = clip.content
             setTextColor(palette.inkSoft)
-            sp(this, DevClipTheme.TEXT_SECONDARY_SP)
+            sp(this, DevClipTheme.MiniText.SECONDARY)
             maxLines = 2
         })
 
@@ -273,8 +273,8 @@ class PopupListView(context: Context) : LinearLayout(context) {
                 if (armed) R.string.devclip_popup_armed else R.string.devclip_popup_tap_to_paste
             )
             setTextColor(if (armed) palette.accent else palette.inkFaint)
-            sp(this, DevClipTheme.TEXT_CAPTION_SP)
-        }.also { it.setPadding(0, dp(DevClipTheme.SPACE_SM), 0, 0) })
+            sp(this, DevClipTheme.MiniText.CAPTION)
+        }.also { it.setPadding(0, dp(DevClipTheme.Spacing.SM), 0, 0) })
 
         card.addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
 
@@ -286,7 +286,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
         card.setOnClickListener { onRowTapped(clip) }
 
         val params = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-        params.bottomMargin = dp(DevClipTheme.SPACE_SM)
+        params.bottomMargin = dp(DevClipTheme.Spacing.SM)
         card.layoutParams = params
         return card
     }

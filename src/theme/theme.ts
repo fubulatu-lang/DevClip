@@ -1,16 +1,27 @@
 import { Platform } from 'react-native';
 
 /**
- * DevClip visual language — Samsung One UI, in the app icon's colours
+ * DevClip visual language — Samsung One UI, in monochrome
  *
  * Colour is role-based, not palette-based. Depth comes from rounded
  * containers and a background tone shift, never from large blurred shadows.
  *
- * The hues come from the app icon: its slate #345065 and its blue #3498DB.
- * Both are used darkened — the icon blue is only 3.15:1 under white text and
- * 3.02:1 as text, so taken literally it would fail WCAG AA everywhere it
- * matters. Every pair below is measured.
+ * There is no accent. One UI expects one taken from the user's wallpaper
+ * palette; DevClip has none at all — black on white, white on black, and
+ * nothing between them carrying meaning. A clipboard manager floats over
+ * other people's apps all day and has no business competing with them for
+ * attention. The app icon is where the colour lives.
+ *
+ * The three functional colours survive that, because One UI does not permit
+ * otherwise: success, caution and error must be distinguishable, and colour
+ * must never be the only thing distinguishing them. They are the sole hues
+ * here and they are never decorative. Every pair below is measured against
+ * its background for WCAG AA.
+ *
  * Type is deliberately large: 17sp body is the One UI default, not 13sp.
+ *
+ * Mirrored by DevClipTheme.kt, which the floating windows draw with. Change
+ * one, change the other — until the launcher app is native too.
  *
  * Token values trace to the One UI design guidelines and the
  * tribalfs/oneui-design library resources. Values marked (derived) are
@@ -46,18 +57,22 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
-  bg: '#F4F7F9',
-  surface: '#FFFFFF',
-  surfaceSunken: '#E8EDF1',
-  border: 'rgba(27,42,53,0.10)',
-  borderStrong: 'rgba(27,42,53,0.20)',
-  ink: '#1B2A35',
-  inkSoft: '#46606F',
-  inkFaint: '#5A6E7D',
-  inkDisabled: '#93A4B0',
-  accent: '#1D6FA9',
-  accentSoft: '#E4F0F8',
-  accentPressed: '#175A8A',
+  // White page, cards stepping down to near-white. One UI separates surfaces
+  // by tone rather than shadow, and from true white the only way is darker.
+  bg: '#FFFFFF',
+  surface: '#F7F7F7',
+  surfaceSunken: '#EDEDED',
+  border: 'rgba(0,0,0,0.12)',
+  borderStrong: 'rgba(0,0,0,0.22)',
+  ink: '#252525',
+  inkSoft: '#3B3B3B',
+  inkFaint: '#505050',
+  inkDisabled: '#8C8C8C',
+  // Ink at full strength. Anything marked with it must also differ in weight,
+  // fill or position — colour alone never conveys state.
+  accent: '#252525',
+  accentSoft: '#EDEDED',
+  accentPressed: '#000000',
   onAccent: '#FFFFFF',
   danger: '#C62F26',
   dangerSoft: '#FBEAE9',
@@ -65,31 +80,34 @@ export const lightColors: ThemeColors = {
   successSoft: '#E6F4EC',
   warning: '#A65A00',
   warningSoft: '#FDF0E3',
-  divider: 'rgba(27,42,53,0.10)',
+  divider: 'rgba(0,0,0,0.08)',
   scrim: 'rgba(0,0,0,0.2)',
 };
 
 export const darkColors: ThemeColors = {
-  bg: '#16242E',
-  surface: '#243F4F',
-  surfaceSunken: '#2E4E61',
-  border: 'rgba(255,255,255,0.12)',
-  borderStrong: 'rgba(255,255,255,0.22)',
-  ink: '#F2F6F8',
-  inkSoft: '#D4DFE6',
-  inkFaint: '#9DB3C0',
-  inkDisabled: '#5E7686',
-  accent: '#5FB0E8',
-  accentSoft: '#123243',
-  accentPressed: '#88C6F0',
-  onAccent: '#0E1A22',
+  // True black, not a dark grey and not a tinted navy. It is what One UI
+  // does, it is what an OLED panel wants, and it is the background a floating
+  // window can sit on without announcing itself. Cards step up from it.
+  bg: '#000000',
+  surface: '#121212',
+  surfaceSunken: '#1C1C1C',
+  border: 'rgba(255,255,255,0.15)',
+  borderStrong: 'rgba(255,255,255,0.26)',
+  ink: '#FAFAFA',
+  inkSoft: '#E5E5E5',
+  inkFaint: '#B0B0B0',
+  inkDisabled: '#808080',
+  accent: '#FAFAFA',
+  accentSoft: '#1C1C1C',
+  accentPressed: '#FFFFFF',
+  onAccent: '#000000',
   danger: '#FF8A80',
-  dangerSoft: '#3A2323',
+  dangerSoft: '#2A1A1A',
   success: '#4FD18B',
-  successSoft: '#123326',
+  successSoft: '#0F2419',
   warning: '#FFB84D',
-  warningSoft: '#3A2A14',
-  divider: 'rgba(255,255,255,0.12)',
+  warningSoft: '#2A1F12',
+  divider: 'rgba(255,255,255,0.11)',
   scrim: 'rgba(0,0,0,0.2)',
 };
 

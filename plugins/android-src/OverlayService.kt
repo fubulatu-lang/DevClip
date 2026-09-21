@@ -17,8 +17,6 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
-import android.util.TypedValue
-import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
@@ -247,13 +245,6 @@ class OverlayService : Service() {
          * a disk write.
          */
         private const val POSITION_WRITE_DELAY_MS = 400L
-
-        /**
-         * Used when the app theme has no colorAccent to resolve. Matches the
-         * dark-theme accent in src/theme/theme.ts, which is the lighter of the
-         * two and therefore the one that survives a dark background.
-         */
-        private const val DEFAULT_ACCENT = 0xFF5FB0E8.toInt()
 
         private val overlayType =
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -540,31 +531,28 @@ class OverlayService : Service() {
     /**
      * The ring drawn around the bubble while a selection is live.
      *
-     * Two strokes, not one. The bubble floats over whatever app the user is
-     * in, so a single accent-coloured ring is legible against some backgrounds
-     * and invisible against others. A dark hairline outside the accent ring
-     * gives it an edge on a light background, and the accent gives it one on a
-     * dark background.
+     * Black and white, always, whatever the theme. It used to be the theme's
+     * accent over a dark hairline, which worked until the design system went
+     * monochrome and "accent" became near-black in light mode — a black ring
+     * on a dark app underneath is no ring at all.
+     *
+     * The bubble floats over other people's apps and DevClip has no say in
+     * what is behind it. A dark stroke outside a white one is the one
+     * combination that survives any background: whichever half disappears,
+     * the other is at full contrast against it.
      */
     private fun selectionRing(): Drawable {
         val stroke = dp(SELECTION_RING_DP)
-        val accent = TypedValue().let { value ->
-            val themed = ContextThemeWrapper(this, applicationInfo.theme)
-            if (themed.theme.resolveAttribute(android.R.attr.colorAccent, value, true) &&
-                value.type >= TypedValue.TYPE_FIRST_COLOR_INT &&
-                value.type <= TypedValue.TYPE_LAST_COLOR_INT
-            ) value.data else DEFAULT_ACCENT
-        }
 
         val outline = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(stroke + dp(1), Color.argb(90, 0, 0, 0))
+            setStroke(stroke + dp(1), Color.argb(140, 0, 0, 0))
         }
         val ring = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.TRANSPARENT)
-            setStroke(stroke, accent)
+            setStroke(stroke, Color.WHITE)
         }
         return LayerDrawable(arrayOf<Drawable>(outline, ring))
     }
