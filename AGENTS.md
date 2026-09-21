@@ -37,6 +37,26 @@ Spacing, radii, type and motion follow the published One UI values. A 4dp
 button radius or a 13sp body size is the clearest sign something has drifted
 back towards Material.
 
+## Every change that ships bumps the version
+
+Both numbers in `app/build.gradle.kts`, in the same commit as the change
+itself — never as a follow-up, because a follow-up is a thing that gets
+forgotten and then the APK on the phone and the APK on the release page
+share a name while being different software.
+
+- `versionName` is what the user reads. Bump the **minor** for a new
+  feature, the **patch** for a fix or an adjustment to one that exists.
+- `versionCode` goes up by one every single time, whichever the above was.
+  It is the only number Android compares when deciding whether an install
+  is an update, and it must never repeat or go backwards.
+
+The workflow reads `versionName` out of that file to name the APK, so the
+name on the release page cannot disagree with what is inside it. Settings
+shows the installed version at the bottom of the list, read from the
+package manager. Those two are how the user answers "is the thing I
+installed the thing I downloaded", and they are only worth anything if the
+number actually moves.
+
 ## Two things that are easy to get wrong
 
 **The accessibility permission switch and the accessibility service running
