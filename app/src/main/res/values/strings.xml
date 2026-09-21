@@ -48,6 +48,10 @@
     <string name="clips_empty">No clips yet. Highlight some text and tap the bubble</string>
     <string name="clips_no_matches">Nothing matches that</string>
     <string name="search_placeholder">Search title or text</string>
+    <string name="search_open">Search</string>
+    <string name="search_close">Leave search</string>
+    <string name="search_clear">Clear search</string>
+    <string name="more_options">More options</string>
     <string name="paste_done">Pasted</string>
 
     <!-- Editing a clip. -->
@@ -89,6 +93,8 @@
     <string name="settings_list">Clip list</string>
     <string name="list_opacity">Opacity</string>
     <string name="list_confirm_paste">Confirm before paste</string>
+    <string name="list_close_outside">Close when I tap outside</string>
+    <string name="list_close_outside_note">Tapping anywhere off the floating list closes it. The tap still reaches the app underneath either way.</string>
     <string name="list_resize_note">Drag any edge or corner of the floating list to resize it. DevClip remembers the size.</string>
 
     <string name="settings_history">History</string>
@@ -118,7 +124,12 @@
     <!-- Setup. Each body says what the permission buys the user, not what the
          permission is called, and why Android will look alarmed about it. -->
     <string name="setup_heading">Set up DevClip</string>
-    <string name="setup_sub">Three permissions, and DevClip works from anywhere on your phone. You can skip and grant them later.</string>
+    <string name="setup_sub">Five steps, in this order, and DevClip works from anywhere on your phone. You can skip and come back to them later.</string>
+    <string name="setup_restricted">Allow restricted settings</string>
+    <string name="setup_restricted_body">Android greys out the next step for apps installed outside the Play Store. In App info, open the menu at the top right and choose Allow restricted settings. Skip this if step 2 is not greyed out.</string>
+    <string name="setup_open">Open</string>
+    <string name="setup_battery">Unrestricted battery</string>
+    <string name="setup_battery_body">Stops Android putting DevClip to sleep. Asleep, it is unplugged from text capture while the switch still reads as on, which looks exactly like the feature being broken.</string>
     <string name="setup_capture">Text capture</string>
     <string name="setup_capture_body">Lets DevClip read the text you have highlighted, so tapping the bubble saves it. Android shows a broad warning for this — it is what makes capture possible at all.</string>
     <string name="setup_bubble">Floating bubble</string>

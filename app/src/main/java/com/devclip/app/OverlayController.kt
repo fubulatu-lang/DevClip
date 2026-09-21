@@ -232,6 +232,27 @@ object OverlayController {
         applyAppearance(context)
     }
 
+    /**
+     * Light, dark or system, for the app and the floating windows alike.
+     *
+     * Written here rather than by the settings screen because the service
+     * has to be told. It draws windows of its own from the same palette, and
+     * it reads that palette when a window is built — so a theme changed
+     * while the bubble is running reached the app and left the floating list
+     * on the old one until the next reboot.
+     */
+    fun setThemeMode(context: Context, mode: String) {
+        prefs(context).edit().putString(Prefs.KEY_THEME_MODE, mode).apply()
+        applyAppearance(context)
+    }
+
+    fun themeMode(context: Context): String =
+        prefs(context).getString(Prefs.KEY_THEME_MODE, Prefs.THEME_SYSTEM) ?: Prefs.THEME_SYSTEM
+
+    fun setCloseOnOutsideTouch(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(Prefs.KEY_CLOSE_ON_OUTSIDE_TOUCH, enabled).apply()
+    }
+
     fun setConfirmBeforePaste(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(Prefs.KEY_CONFIRM_BEFORE_PASTE, enabled).apply()
     }
@@ -260,6 +281,9 @@ object OverlayController {
 
     fun tuckDelay(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)
+
+    fun closeOnOutsideTouch(context: Context): Boolean =
+        prefs(context).getBoolean(Prefs.KEY_CLOSE_ON_OUTSIDE_TOUCH, true)
 
     fun confirmBeforePaste(context: Context): Boolean =
         prefs(context).getBoolean(Prefs.KEY_CONFIRM_BEFORE_PASTE, true)

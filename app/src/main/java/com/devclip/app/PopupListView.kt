@@ -45,8 +45,9 @@ class PopupListView(context: Context) : LinearLayout(context) {
     /** Close this window. The bubble stays. */
     var onClose: (() -> Unit)? = null
 
-    private val palette = DevClipTheme.colors(context)
+    private var palette = DevClipTheme.colors(context)
     private val rows = LinearLayout(context)
+    private var header: View? = null
     private val scroller = ScrollView(context)
     private val handler = Handler(Looper.getMainLooper())
 
@@ -81,18 +82,14 @@ class PopupListView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = dp(DevClipTheme.Radius.CONTAINER).toFloat()
-            setColor(palette.bg)
-            setStroke(dp(1), palette.border)
-        }
+        background = surface()
         // A rounded background alone does not clip children on a plain
         // LinearLayout; without this the first row's corners square off the
         // container they sit in.
         clipToOutline = true
 
-        addView(buildHeader(), LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        header = buildHeader()
+        addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         rows.orientation = VERTICAL
         rows.setPadding(
@@ -109,46 +106,66 @@ class PopupListView(context: Context) : LinearLayout(context) {
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
+    private fun surface(): GradientDrawable = GradientDrawable().apply {
+        shape = GradientDrawable.RECTANGLE
+        cornerRadius = dp(DevClipTheme.Radius.CONTAINER).toFloat()
+        setColor(palette.bg)
+        setStroke(dp(1), palette.border)
+    }
+
+    /**
+     * Re-reads the theme and redraws in it.
+     *
+     * This window is built once and kept for the life of the service, which
+     * outlives every screen that can change the theme. Without this, the
+     * palette read when the service started was the palette the list kept:
+     * switch DevClip to dark in Settings and the app went dark while the
+     * floating list stayed white over the top of it, until the phone was
+     * rebooted or the bubble stopped and started.
+     *
+     * Called on every open rather than only on a change, because a theme set
+     * to follow the system can move without anything telling this service,
+     * and rebuilding one header and a handful of rows costs nothing next to
+     * the window it is already placing.
+     */
+    fun applyTheme() {
+        palette = DevClipTheme.colors(context)
+        background = surface()
+        header?.let { removeView(it) }
+        val rebuilt = buildHeader()
+        header = rebuilt
+        addView(rebuilt, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        redraw()
+    }
+
     private fun sp(view: TextView, value: Float) =
         view.setTextSize(TypedValue.COMPLEX_UNIT_SP, value)
 
     // ---- Header ----
 
     private fun buildHeader(): View {
-        val header = LinearLayout(context).apply {
+        // No title and no dot. A window that appeared out of the bubble the
+        // user just tapped does not need to introduce itself, and the row it
+        // cost was a row of clips — which is the only thing this surface is
+        // for. What is left is two controls and the rule under them.
+        //
+        // No padding above or below either: the row is exactly one touch
+        // target tall. That is as slim as it goes without shrinking the
+        // targets themselves, and a control floating over somebody else's app
+        // is the last place to do that — a missed Close here taps whatever is
+        // underneath, in an app DevClip does not own.
+        val bar = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(palette.surface)
-            setPadding(
-                dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM),
-                dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM)
-            )
+            gravity = Gravity.CENTER_VERTICAL or Gravity.END
+            setBackgroundColor(palette.bg)
         }
 
-        val dot = View(context).apply {
-            background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(palette.accent)
-            }
-        }
-        header.addView(dot, LayoutParams(dp(8), dp(8)).apply {
-            rightMargin = dp(DevClipTheme.Spacing.SM)
-        })
-
-        val title = TextView(context).apply {
-            text = context.getString(R.string.devclip_popup_title)
-            setTextColor(palette.ink)
-            sp(this, DevClipTheme.MiniText.BODY)
-            maxLines = 1
-        }
-        header.addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-
-        header.addView(
+        bar.addView(
             iconButton(StrokeIcon.EXPAND, R.string.devclip_popup_open_full) {
                 onOpenFullApp?.invoke()
             }
         )
-        header.addView(
+        bar.addView(
             iconButton(StrokeIcon.CLOSE, R.string.devclip_popup_close) {
                 onClose?.invoke()
             }
@@ -156,7 +173,10 @@ class PopupListView(context: Context) : LinearLayout(context) {
 
         val divider = View(context).apply { setBackgroundColor(palette.divider) }
         val wrap = LinearLayout(context).apply { orientation = VERTICAL }
-        wrap.addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        wrap.addView(
+            bar,
+            LayoutParams(LayoutParams.MATCH_PARENT, dp(DevClipTheme.MIN_TOUCH_TARGET))
+        )
         wrap.addView(divider, LayoutParams(LayoutParams.MATCH_PARENT, dp(1)))
         return wrap
     }
