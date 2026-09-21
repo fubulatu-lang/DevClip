@@ -47,6 +47,9 @@
     <string name="clips_loading">Opening your clips…</string>
     <string name="clips_empty">No clips yet. Highlight some text and tap the bubble</string>
     <string name="clips_no_matches">Nothing matches that</string>
+    <!-- Shown in Android's Copy / Share / ... menu. Kept to one word: that
+         menu truncates hard, and anything longer reads as "DevCl...". -->
+    <string name="process_text_label">DevClip</string>
     <string name="search_placeholder">Search title or text</string>
     <string name="search_open">Search</string>
     <string name="search_close">Leave search</string>

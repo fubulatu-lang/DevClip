@@ -57,8 +57,13 @@ object SelectionCapture {
     /** How deep the node walk goes before giving up. */
     private const val MAX_DEPTH = 60
 
-    /** How many nodes the walk will visit before giving up. */
-    private const val MAX_NODES = 3_000
+    /**
+     * How many nodes the walk will visit before giving up.
+     *
+     * A shared budget across every window, not a per-window one, so widening
+     * the search to all of them cannot multiply the work a tap costs.
+     */
+    private const val MAX_NODES = 4_000
 
     @Volatile
     private var remembered: Remembered? = null
@@ -174,18 +179,38 @@ object SelectionCapture {
      * holding is now a way to crash, not a way to save memory.
      */
     private fun liveRead(service: ClipboardAccessibilityService): Result {
-        val root = try {
-            service.rootInActiveWindow
+        // Every window, not only the active one. A selection does not always
+        // live in the window that has focus: a read-only page under a
+        // floating selection toolbar, or a split-screen half the user is
+        // reading rather than typing in, both put the text somewhere
+        // rootInActiveWindow does not reach. The active window still goes
+        // first, because it is nearly always the answer.
+        val roots = ArrayList<AccessibilityNodeInfo>()
+        try {
+            service.rootInActiveWindow?.let { roots.add(it) }
         } catch (e: Exception) {
-            null
-        } ?: return Result.None
+            // No active window is an ordinary state, not a failure.
+        }
+        try {
+            for (window in service.windows) {
+                val root = try { window.root } catch (e: Exception) { null } ?: continue
+                if (roots.none { it == root }) roots.add(root)
+            }
+        } catch (e: Exception) {
+            // windows needs flagRetrieveInteractiveWindows, which this service
+            // declares — but a service can be queried before it is fully
+            // connected, and the active window alone is still a usable answer.
+        }
+        if (roots.isEmpty()) return Result.None
 
         // A plain list with a read cursor rather than a Deque: this is a
         // bounded walk, and the cursor costs nothing next to the tree.
         val queue = ArrayList<AccessibilityNodeInfo>()
         val depths = ArrayList<Int>()
-        queue.add(root)
-        depths.add(0)
+        for (root in roots) {
+            queue.add(root)
+            depths.add(0)
+        }
         var cursor = 0
         var sawPassword = false
 
@@ -205,7 +230,13 @@ object SelectionCapture {
                         // password is the answer and the caller says so.
                         sawPassword = true
                     } else {
-                        val selected = slice(node.text?.toString(), from, to)
+                        // contentDescription as well as text: a node that
+                        // draws its own text — an image with a caption, a
+                        // custom view — carries it there instead, and the
+                        // selection indices are into whichever one it has.
+                        val whole = node.text?.toString()
+                            ?: node.contentDescription?.toString()
+                        val selected = slice(whole, from, to)
                         if (!selected.isNullOrEmpty()) return Result.Text(selected)
                     }
                 }

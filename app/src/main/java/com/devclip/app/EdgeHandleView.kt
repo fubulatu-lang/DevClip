@@ -4,6 +4,7 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
@@ -42,6 +43,21 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
         color = palette.inkFaint
     }
 
+    /**
+     * The dark edge under the white bar.
+     *
+     * The same problem the bubble's ring has, for the same reason: this floats
+     * over other people's apps and DevClip has no say in what is behind it. A
+     * white bar pulsing on a white page is a bar pulsing out of existence. A
+     * dark edge under it means whichever half disappears, the other is at full
+     * contrast.
+     */
+    private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.BLACK
+    }
+
+    private val outlineRect = RectF()
+
     private val rect = RectF()
 
     private var highlighted = false
@@ -55,13 +71,17 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
         const val BAR_WIDTH_DP = 5
 
         /** Drawn thickness while there is a selection waiting to be saved. */
-        const val HIGHLIGHT_BAR_WIDTH_DP = 11
+        const val HIGHLIGHT_BAR_WIDTH_DP = 16
+
+        /** The dark edge drawn around the highlighted bar. */
+        private const val OUTLINE_DP = 1.5f
 
         /**
          * Width of the window behind it, which is the actual touch target.
          *
-         * Comfortably wider than the highlighted bar, so thickening never
-         * reaches the edge of its own window and gets squared off.
+         * Comfortably wider than the highlighted bar and its outline, so
+         * thickening never reaches the edge of its own window and gets
+         * squared off.
          */
         const val TOUCH_WIDTH_DP = 28
 
@@ -83,7 +103,10 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
     fun setHighlighted(on: Boolean) {
         if (highlighted == on) return
         highlighted = on
-        barPaint.color = if (on) palette.ink else palette.inkFaint
+        // White while it matters, and white regardless of theme: this is
+        // drawn over another app, so the thing it has to stand out from is
+        // that app, not DevClip's own palette.
+        barPaint.color = if (on) Color.WHITE else palette.inkFaint
         if (on) startPulse() else stopPulse()
         invalidate()
     }
@@ -91,7 +114,7 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
     /** Re-reads the theme. The service outlives every screen that can change it. */
     fun applyTheme() {
         palette = DevClipTheme.colors(context)
-        barPaint.color = if (highlighted) palette.ink else palette.inkFaint
+        barPaint.color = if (highlighted) Color.WHITE else palette.inkFaint
         invalidate()
     }
 
@@ -142,17 +165,38 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
         val bar = (if (highlighted) HIGHLIGHT_BAR_WIDTH_DP else BAR_WIDTH_DP) * density
         val radius = bar / 2f
 
-        barPaint.alpha =
-            if (highlighted) (MIN_ALPHA + (255 - MIN_ALPHA) * phase).toInt() else 255
+        val alpha = if (highlighted) (MIN_ALPHA + (255 - MIN_ALPHA) * phase).toInt() else 255
+        barPaint.alpha = alpha
+
+        // Room for the outline at top and bottom. Without it the bar fills
+        // the window's full height, the outline is drawn past the edge of
+        // that window, and the rounded caps come back squared off.
+        val inset = if (highlighted) OUTLINE_DP * density else 0f
 
         // Overhang the outer edge by the corner radius so that rounding falls
         // off-screen: the bar reads as growing out of the edge rather than
         // floating beside it.
         if (onLeftEdge) {
-            rect.set(-radius, 0f, bar, height.toFloat())
+            rect.set(-radius, inset, bar, height - inset)
         } else {
-            rect.set(width - bar, 0f, width + radius, height.toFloat())
+            rect.set(width - bar, inset, width + radius, height - inset)
         }
+
+        if (highlighted) {
+            // Under the bar and slightly proud of it on the three sides that
+            // are on screen. The outer side needs none: it is off the edge of
+            // the display.
+            val out = OUTLINE_DP * density
+            outlineRect.set(
+                rect.left - if (onLeftEdge) 0f else out,
+                rect.top - out,
+                rect.right + if (onLeftEdge) out else 0f,
+                rect.bottom + out
+            )
+            outlinePaint.alpha = (alpha * 0.5f).toInt()
+            canvas.drawRoundRect(outlineRect, radius + out, radius + out, outlinePaint)
+        }
+
         canvas.drawRoundRect(rect, radius, radius, barPaint)
     }
 }
