@@ -100,27 +100,95 @@ class DevClipDatabaseHelper(context: Context) :
      */
     fun listClips(limit: Int): List<Clip> {
         if (limit <= 0) return emptyList()
-        return try {
-            readableDatabase.rawQuery(
-                "SELECT id, title, content FROM clips ORDER BY created_at DESC, id DESC LIMIT ?;",
-                arrayOf(limit.toString())
-            ).use { cursor ->
-                val out = ArrayList<Clip>(cursor.count)
-                while (cursor.moveToNext()) {
-                    out.add(
-                        Clip(
-                            id = cursor.getLong(0),
-                            title = if (cursor.isNull(1)) null else cursor.getString(1),
-                            content = cursor.getString(2)
-                        )
-                    )
-                }
-                out
-            }
+        return read(
+            "SELECT id, title, content FROM clips ORDER BY created_at DESC, id DESC LIMIT ?;",
+            arrayOf(limit.toString())
+        )
+    }
+
+    /**
+     * The clips whose title or text contains [query], newest first.
+     *
+     * LIKE with the wildcards escaped. Without the escape a search for "50%"
+     * or "snake_case" matches far more than it should, because % and _ mean
+     * something to SQLite and nothing to the person typing them.
+     *
+     * The ESCAPE clause below carries ONE backslash. It sits in a raw string,
+     * where a backslash is already literal, and SQLite rejects an escape that
+     * is not a single character. The doubled backslashes in the replaces
+     * above are a different thing entirely: those are ordinary string
+     * literals, where two characters are needed to mean one backslash.
+     */
+    fun searchClips(query: String): List<Clip> {
+        if (query.isBlank()) return listClips(Int.MAX_VALUE)
+        val escaped = query
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        val pattern = "%$escaped%"
+        return read(
+            """
+            SELECT id, title, content FROM clips
+            WHERE title LIKE ? ESCAPE '\' OR content LIKE ? ESCAPE '\'
+            ORDER BY created_at DESC, id DESC;
+            """.trimIndent(),
+            arrayOf(pattern, pattern)
+        )
+    }
+
+    fun updateClip(id: Long, content: String, title: String?) {
+        try {
+            writableDatabase.execSQL(
+                "UPDATE clips SET content = ?, title = ? WHERE id = ?;",
+                arrayOf<Any?>(content, title, id)
+            )
         } catch (e: Exception) {
-            android.util.Log.e("DevClip", "Could not read the clip history", e)
-            emptyList()
+            android.util.Log.e("DevClip", "Could not update a clip", e)
         }
+    }
+
+    fun deleteClip(id: Long) {
+        try {
+            writableDatabase.execSQL("DELETE FROM clips WHERE id = ?;", arrayOf<Any>(id))
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not delete a clip", e)
+        }
+    }
+
+    fun deleteAllClips() {
+        try {
+            writableDatabase.execSQL("DELETE FROM clips;")
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not clear the clip history", e)
+        }
+    }
+
+    fun countClips(): Int = try {
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM clips;", null).use {
+            if (it.moveToFirst()) it.getInt(0) else 0
+        }
+    } catch (e: Exception) {
+        0
+    }
+
+    /** Shared cursor walk for every read that returns clips. */
+    private fun read(sql: String, args: Array<String>?): List<Clip> = try {
+        readableDatabase.rawQuery(sql, args).use { cursor ->
+            val out = ArrayList<Clip>(cursor.count)
+            while (cursor.moveToNext()) {
+                out.add(
+                    Clip(
+                        id = cursor.getLong(0),
+                        title = if (cursor.isNull(1)) null else cursor.getString(1),
+                        content = cursor.getString(2)
+                    )
+                )
+            }
+            out
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("DevClip", "Could not read the clip history", e)
+        emptyList()
     }
 
     /**

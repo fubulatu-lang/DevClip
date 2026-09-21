@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Every string the app shows.
+
+  The block below was generated from the NATIVE_STRINGS array in the old Expo
+  config plugin, which is where these lived while the manifest and resources
+  were generated on every build rather than committed. They are ordinary
+  resources now.
+-->
+<resources>
+    <string name="app_name">DevClip</string>
+
+    <string name="devclip_accessibility_description">Lets DevClip read the text you have highlighted, so tapping its bubble saves it, and paste a saved clip back into the field you were using.</string>
+    <string name="devclip_capture_saved">Saved “%1$s”</string>
+    <string name="devclip_capture_saved_no_clipboard">Saved “%1$s” — Android wouldn’t put it on the clipboard, but DevClip has it.</string>
+    <string name="devclip_capture_saved_large">Saved %1$d characters. Android limits how much it hands between apps, so a selection this big may have arrived cut short — DevClip saved all of what it got.</string>
+    <string name="devclip_capture_duplicate">That’s already the clip at the top.</string>
+    <string name="devclip_capture_password">Skipped that one — it looks like a password field.</string>
+    <string name="devclip_capture_failed">DevClip couldn’t save that. Try again.</string>
+    <string name="devclip_popup_title">DevClip</string>
+    <string name="devclip_popup_open_full">Open the full app</string>
+    <string name="devclip_popup_close">Close DevClip</string>
+    <string name="devclip_popup_empty">No clips yet</string>
+    <string name="devclip_popup_tap_to_paste">Tap to paste</string>
+    <string name="devclip_popup_armed">Tap again to paste</string>
+    <string name="devclip_paste_copied_only">Couldn’t paste automatically, so it’s on your clipboard — paste it manually.</string>
+    <string name="devclip_handle_description">Show the DevClip bubble</string>
+    <string name="devclip_notification_channel">DevClip bubble</string>
+    <string name="devclip_notification_channel_description">A silent, ongoing notification while the DevClip bubble is running.</string>
+    <string name="devclip_notification_title">DevClip is running</string>
+    <string name="devclip_notification_text_awake">Tap the bubble to save what you’ve highlighted.</string>
+    <string name="devclip_notification_text_resting">Bubble hidden.</string>
+    <string name="devclip_notification_hide">Hide bubble</string>
+    <string name="devclip_notification_show">Show bubble</string>
+    <string name="devclip_notification_turn_off">Turn off</string>
+    <string name="devclip_bubble_hidden">Bubble hidden. Bring it back from the notification, or from inside DevClip.</string>
+    <string name="devclip_bubble_hidden_no_notification">Bubble hidden. Bring it back from inside DevClip.</string>
+    <string name="devclip_error_no_app">DevClip couldn’t reach the app to draw its window.</string>
+    <string name="devclip_error_start_app">DevClip couldn’t start the app behind its window.</string>
+    <string name="devclip_error_build_window">DevClip couldn’t build its window.</string>
+    <string name="devclip_error_place_window">DevClip couldn’t place its window on screen.</string>
+    <string name="devclip_error_open_window">DevClip couldn’t open its window.</string>
+    <string name="devclip_error_tap">DevClip couldn’t handle that tap.</string>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The window theme, not the app's design system — that is DevClipTheme.kt and
+  the Compose theme built on it. All this has to do is set the colour the
+  window is painted before anything is drawn into it, so launching does not
+  flash a colour the app never uses.
+
+  No action bar: Compose draws its own app bar, and the platform one would sit
+  above it.
+-->
+<resources>
+    <style name="Theme.DevClip" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Light window, so the system draws its icons dark. -->
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
