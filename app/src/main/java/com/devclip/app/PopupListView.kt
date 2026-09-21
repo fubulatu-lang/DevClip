@@ -92,9 +92,14 @@ class PopupListView(context: Context) : LinearLayout(context) {
         addView(header, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
 
         rows.orientation = VERTICAL
+        // 8dp at the sides, not 16. This window is a few hundred dp wide and
+        // every dp of inset is a dp the clip text does not get — the keyline
+        // that makes a full screen readable just makes a small floating one
+        // narrow. Vertical stays as it was: that is the gap between rows, not
+        // wasted margin.
         rows.setPadding(
-            dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM),
-            dp(DevClipTheme.Spacing.LG), dp(DevClipTheme.Spacing.SM)
+            dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM),
+            dp(DevClipTheme.Spacing.SM), dp(DevClipTheme.Spacing.SM)
         )
         scroller.isFillViewport = true
         // No explicit params: a ScrollView is a FrameLayout underneath and
@@ -240,7 +245,11 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val armed = armedId == clip.id
         // A ring rather than a colour swap: the row has to stay readable while
         // it says the next tap will paste it.
-        val pad = dp(DevClipTheme.Spacing.MD)
+        // Tighter at the sides than top and bottom. The row is short and wide,
+        // so horizontal padding costs text and vertical padding buys the
+        // separation that makes one row read as distinct from the next.
+        val padX = dp(DevClipTheme.Spacing.SM)
+        val padY = dp(DevClipTheme.Spacing.MD)
         val card = LinearLayout(context).apply {
             orientation = HORIZONTAL
             background = GradientDrawable().apply {
@@ -249,7 +258,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
                 setColor(palette.surface)
                 if (armed) setStroke(dp(2), palette.accent)
             }
-            setPadding(pad, pad, pad, pad)
+            setPadding(padX, padY, padX, padY)
             isClickable = true
             isFocusable = true
         }
