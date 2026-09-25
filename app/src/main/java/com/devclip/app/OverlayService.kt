@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.drawable.Drawable
 import android.os.Build
@@ -97,10 +96,10 @@ class OverlayService : Service() {
      * split-screen, a foldable opening. A fraction lands in the same relative
      * place on any of them.
      *
-     * They live in SharedPreferences, not in a JS store, because the service
-     * needs them at startup and can be started by BootReceiver long before any
-     * React context exists. There is deliberately no setting for either:
-     * dragging the bubble is the only way to move it.
+     * They live in SharedPreferences because the service needs them at
+     * startup and can be started by BootReceiver before the app has ever
+     * been opened. There is deliberately no setting for either: dragging the
+     * bubble is the only way to move it.
      */
     private var edge = Prefs.EDGE_RIGHT
     private var yFraction = Prefs.DEFAULT_Y_FRACTION
@@ -160,17 +159,6 @@ class OverlayService : Service() {
     companion object {
         const val CHANNEL_ID = "devclip_overlay_channel"
         const val NOTIFICATION_ID = 1001
-        /**
-         * Closes the floating list. The bubble stays where it is.
-         *
-         * Named for the window it closes, not just "hide": hiding the
-         * *bubble* is a separate thing the service is about to grow, and one
-         * constant called ACTION_HIDE would be read as whichever the reader
-         * had in mind.
-         */
-        const val ACTION_HIDE_POPUP = "com.devclip.app.ACTION_HIDE_POPUP"
-        const val ACTION_OPEN_FULL = "com.devclip.app.ACTION_OPEN_FULL"
-
         /** Hide the bubble. The service keeps running and keeps its notification. */
         const val ACTION_REST = "com.devclip.app.ACTION_REST"
 
@@ -188,8 +176,8 @@ class OverlayService : Service() {
          * Re-read the appearance settings and apply them.
          *
          * One action rather than one per setting. The values live in
-         * SharedPreferences because the service needs them at startup, long
-         * before any React context exists — so the writer has already written
+         * SharedPreferences because the service needs them at startup, before
+         * the app has necessarily been opened — so the writer has already written
          * them by the time this arrives, and every extra action would only be
          * a second copy of a number the service can already see.
          */
@@ -329,8 +317,6 @@ class OverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_HIDE_POPUP -> hidePopup()
-            ACTION_OPEN_FULL -> openFullApp()
             ACTION_REST -> rest()
             ACTION_WAKE -> wake()
             ACTION_STOP -> turnOff()
@@ -731,8 +717,10 @@ class OverlayService : Service() {
         val fromY = params.y
         bubbleAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = SETTLE_DURATION_MS
-            // One UI's standard curve, the same one the JS side animates on.
-            interpolator = PathInterpolator(0.4f, 0f, 0.2f, 1f)
+            // One UI's standard curve.
+            interpolator = DevClipTheme.Easing.STANDARD.let {
+                PathInterpolator(it[0], it[1], it[2], it[3])
+            }
             addUpdateListener { animation ->
                 val t = animation.animatedValue as Float
                 params.x = (fromX + (targetX - fromX) * t).toInt()
@@ -801,7 +789,6 @@ class OverlayService : Service() {
         hidePopup()
         removeBubble()
         refreshNotification()
-        DevClipEvents.emitBubbleState(true)
 
         // A Toast, not a message in a window: the windows were just torn down.
         // The copy has to adapt, because with notifications blocked there is
@@ -821,7 +808,6 @@ class OverlayService : Service() {
         removeHandle()
         addBubble()
         refreshNotification()
-        DevClipEvents.emitBubbleState(false)
     }
 
     private fun turnOff() {

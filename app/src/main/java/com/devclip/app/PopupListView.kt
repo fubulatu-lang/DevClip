@@ -81,7 +81,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
          */
         const val MAX_ROWS = 50
 
-        /** How long an armed row stays armed. Matches src/store/pasteArmStore.ts. */
+        /** How long an armed row stays armed. */
         private const val ARM_TIMEOUT_MS = 2000L
     }
 

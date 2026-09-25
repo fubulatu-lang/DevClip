@@ -109,7 +109,7 @@ object Capture {
         val onClipboard = writeClipboard(context, text)
         val preview = preview(text)
 
-        DevClipEvents.emitClipsChanged(preview)
+        DevClipEvents.emitClipsChanged()
 
         val message = when {
             !onClipboard -> context.getString(R.string.devclip_capture_saved_no_clipboard, preview)
