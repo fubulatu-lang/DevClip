@@ -208,24 +208,13 @@ object DevClipTheme {
         val CAPTION = shrink(Text.CAPTION)
     }
 
-    /** One UI's real easing curves, as cubic bezier control points. */
+    /**
+     * One UI's standard easing curve, as cubic bezier control points. The
+     * rest of One UI's curves and its duration scale are in TOKENS.md, to be
+     * added here when something animates on them.
+     */
     object Easing {
-        val SINE_IN_OUT = floatArrayOf(0.33f, 0f, 0.67f, 1f)
         val STANDARD = floatArrayOf(0.4f, 0f, 0.2f, 1f)
-        val EMPHASIZED_DECELERATE = floatArrayOf(0.22f, 0.25f, 0f, 1f)
-        val BACK_GESTURE = floatArrayOf(0.1f, 0.1f, 0f, 1f)
-        val DRAWER_SETTLE = floatArrayOf(0f, 0f, 0f, 1f)
-    }
-
-    /** Nothing routine exceeds 500ms. */
-    object Duration {
-        const val INSTANT = 100L
-        const val SHORT = 120L
-        const val STANDARD = 167L
-        const val MEDIUM = 200L
-        const val EMPHASIZED = 260L
-        const val LONG = 400L
-        const val EXTENDED = 500L
     }
 
     /** One UI symbol sizes. 24dp is the default for a standalone symbol. */

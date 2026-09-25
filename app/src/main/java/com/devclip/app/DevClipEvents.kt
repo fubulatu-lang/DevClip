@@ -14,8 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * Two things need it:
  *
  *  - the bubble captures a clip, and any list on screen has to show it;
- *  - the bubble is hidden, tucked away or brought back, and the app has to
- *    say which.
+ *  - the theme changes, and every screen has to repaint in it.
  *
  * This used to be a bridge into JavaScript, and every emit was allowed to be
  * a no-op because there was frequently no React instance to receive it — the
@@ -32,8 +31,8 @@ import kotlinx.coroutines.flow.asStateFlow
 object DevClipEvents {
 
     /**
-     * A clip was captured. Carries the preview, for anything that wants to
-     * say what was saved.
+     * A clip was captured. Carries nothing: the database is where the clip
+     * is, and the only thing a listener does is read it again.
      *
      * A buffer with drop-oldest rather than a suspend: this is emitted from
      * the accessibility service's thread and from the foreground service, and
@@ -41,21 +40,12 @@ object DevClipEvents {
      * the newest prompt is the one worth keeping — they all mean the same
      * thing, which is "go and read the table".
      */
-    private val _clipsChanged = MutableSharedFlow<String>(
+    private val _clipsChanged = MutableSharedFlow<Unit>(
         replay = 0,
         extraBufferCapacity = 8,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
-    val clipsChanged: SharedFlow<String> = _clipsChanged.asSharedFlow()
-
-    /**
-     * Whether the bubble is currently hidden.
-     *
-     * State, not an event: a screen that opens needs the answer now, not the
-     * next time it changes.
-     */
-    private val _bubbleResting = MutableStateFlow(false)
-    val bubbleResting: StateFlow<Boolean> = _bubbleResting.asStateFlow()
+    val clipsChanged: SharedFlow<Unit> = _clipsChanged.asSharedFlow()
 
     /**
      * Bumped whenever the theme preference changes.
@@ -78,11 +68,7 @@ object DevClipEvents {
         _themeRevision.value++
     }
 
-    fun emitClipsChanged(preview: String) {
-        _clipsChanged.tryEmit(preview)
-    }
-
-    fun emitBubbleState(resting: Boolean) {
-        _bubbleResting.value = resting
+    fun emitClipsChanged() {
+        _clipsChanged.tryEmit(Unit)
     }
 }

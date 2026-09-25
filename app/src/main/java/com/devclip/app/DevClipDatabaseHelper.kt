@@ -112,8 +112,7 @@ class DevClipDatabaseHelper(context: Context) :
     /**
      * The newest [limit] clips, newest first.
      *
-     * Ordered by `created_at DESC, id DESC` to match the JS side exactly —
-     * two clips captured inside the same millisecond would otherwise come back
+     * Ordered by `created_at DESC, id DESC` everywhere — two clips captured inside the same millisecond would otherwise come back
      * in whatever order SQLite felt like, and the row numbers would swap
      * between reads of the same data.
      *

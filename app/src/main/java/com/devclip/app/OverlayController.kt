@@ -186,11 +186,8 @@ object OverlayController {
         context.stopService(Intent(context, OverlayService::class.java))
     }
 
-    fun hideBubble(context: Context) = send(context, OverlayService.ACTION_REST)
 
-    fun showBubble(context: Context) = send(context, OverlayService.ACTION_WAKE)
 
-    fun hidePopup(context: Context) = send(context, OverlayService.ACTION_HIDE_POPUP)
 
     // ---- Settings the service reads ----
 

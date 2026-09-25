@@ -17,7 +17,6 @@
     <string name="devclip_capture_duplicate">That’s already the clip at the top.</string>
     <string name="devclip_capture_password">Skipped that one — it looks like a password field.</string>
     <string name="devclip_capture_failed">DevClip couldn’t save that. Try again.</string>
-    <string name="devclip_popup_title">DevClip</string>
     <string name="devclip_popup_open_full">Open the full app</string>
     <string name="devclip_popup_close">Close DevClip</string>
     <string name="devclip_popup_empty">No clips yet</string>
@@ -42,9 +41,6 @@
     <string name="devclip_notification_turn_off">Turn off</string>
     <string name="devclip_bubble_hidden">Bubble hidden. Bring it back from the notification, or from inside DevClip.</string>
     <string name="devclip_bubble_hidden_no_notification">Bubble hidden. Bring it back from inside DevClip.</string>
-    <string name="devclip_error_no_app">DevClip couldn’t reach the app to draw its window.</string>
-    <string name="devclip_error_start_app">DevClip couldn’t start the app behind its window.</string>
-    <string name="devclip_error_build_window">DevClip couldn’t build its window.</string>
     <string name="devclip_error_place_window">DevClip couldn’t place its window on screen.</string>
     <string name="devclip_error_open_window">DevClip couldn’t open its window.</string>
     <string name="devclip_error_tap">DevClip couldn’t handle that tap.</string>

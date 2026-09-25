@@ -39,8 +39,7 @@ object Prefs {
      * has to survive all three plus a reboot.
      *
      * There is deliberately no setting for either. Dragging the bubble is the
-     * only way to move it, which is why these are read by the service and
-     * never written by it from JS.
+     * only way to move it, which is why only the service writes these.
      */
     const val KEY_BUBBLE_EDGE = "bubble_edge"
     const val KEY_BUBBLE_Y_FRACTION = "bubble_y_fraction"
@@ -61,8 +60,8 @@ object Prefs {
     /**
      * Tap-to-arm, mirrored for the floating list.
      *
-     * The list is native now and opens with no React context behind it, so a
-     * setting it obeys has to live where it can read it.
+     * The floating list is drawn by the service, which may be running with
+     * the app closed, so a setting it obeys has to live where it can read it.
      */
     const val KEY_CONFIRM_BEFORE_PASTE = "confirm_before_paste"
 
