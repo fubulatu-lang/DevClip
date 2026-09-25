@@ -1,156 +1,199 @@
 # One UI in DevClip
 
-DevClip follows the Samsung One UI design system. This file is the contract:
-it records the tokens, the conventions and the deliberate divergences, so the
-system holds rather than drifting back.
+DevClip follows the Samsung One UI design system, in monochrome. This file is
+the contract: it records the tokens, the conventions and the deliberate
+divergences, so the system holds rather than drifting back.
 
-The baseline audit that started this work is in `ONE-UI-AUDIT.md`. Re-run a
-conformance check any time with `/one-ui:audit`, or the mechanical subset with
-`python3 .claude/one-ui/scripts/oneui_scan.py src`.
+The values live in `app/src/main/java/com/devclip/app/DevClipTheme.kt`. The
+Compose theme (`ui/Theme.kt`) converts them into Compose types rather than
+restating them, and the floating windows read them directly — so the app, the
+bubble and the floating list cannot disagree. Where the numbers come from is
+in `.claude/one-ui/reference/TOKENS.md`.
+
+`ONE-UI-AUDIT.md` is a historical report from the React Native version.
+Re-run a conformance check with `/one-ui:audit`, or the mechanical subset with
+`python3 .claude/one-ui/scripts/oneui_scan.py app/src/main` — CI runs the
+latter on every pull request, advisory rather than blocking.
 
 ---
 
 ## The one rule
 
-**Never write a literal.** No hex, no font size, no spacing number, no icon
-size, no duration in a component file. Everything comes from
-`src/theme/theme.ts` through `useTheme()`. If a value you need isn't there,
-add it to the token layer — don't inline it.
+**Never write a literal.** No colour, font size, spacing number, radius, icon
+size or duration in a screen or view. Everything comes from `DevClipTheme` —
+in Compose through `Tokens.colors`, `Space`, `Radius` and
+`MaterialTheme.typography`; in views through `DevClipTheme.colors(context)`
+and the nested objects. If a value you need isn't there, add it to the token
+layer, don't inline it.
 
-As of the redesign, no colour literal exists anywhere outside `theme.ts`, and
-no font size or icon size exists outside it either. Keep it that way.
+Two standing exceptions, both in the token layer's orbit:
+
+- `res/values/colors.xml` paints the window before any Kotlin runs, and must
+  agree with `bg`.
+- `DevClipTheme.Overlay` holds the colours drawn over other apps (below). They
+  are fixed on purpose, and named so they are exceptions rather than strays.
 
 ## Tokens
-
-All in `src/theme/theme.ts`, reached via `useTheme()`.
 
 ### Colour — roles, not a palette
 
 Colour is semantic. `ink` is "primary text", not "near-black" — it resolves
-differently in light and dark, and every consumer gets that for free.
+differently in light and dark, and every consumer gets that for free. Light
+and dark follow the Settings choice, which defaults to following the system.
 
-| Role | Use |
-|---|---|
-| `bg` / `surface` / `surfaceSunken` | Page ground, card, inset control |
-| `ink` / `inkSoft` / `inkFaint` | Primary, secondary, tertiary text — all ≥ 4.5:1 |
-| `inkDisabled` | **Disabled states only.** 3.22:1, deliberately below AA |
-| `accent` / `accentPressed` / `accentSoft` / `onAccent` | Primary action; `onAccent` is what sits on top of an accent fill |
-| `danger` / `success` / `warning` (+ `*Soft`) | The three One UI functional colours. **Never decorative** |
-| `divider` / `border` / `borderStrong` | Separation |
-| `scrim` | Modal dim, One UI's 20% black |
+| Role | Light | Dark | Use |
+|---|---|---|---|
+| `bg` | `#FFFFFF` | `#000000` | The page. True white, true black |
+| `surface` | `#F7F7F7` | `#121212` | Cards and rows, separated from `bg` by tone |
+| `surfaceSunken` | `#EDEDED` | `#1C1C1C` | Wells, badges, unselected chips |
+| `ink` | `#252525` | `#FAFAFA` | Primary text and icons |
+| `inkSoft` | `#3B3B3B` | `#E5E5E5` | Secondary text |
+| `inkFaint` | `#505050` | `#B0B0B0` | Tertiary text, notes, metadata |
+| `inkDisabled` | `#8C8C8C` | `#808080` | **Disabled only.** Below AA by design |
+| `accent` / `onAccent` | `#252525` / `#FFFFFF` | `#FAFAFA` / `#000000` | Selected and primary. Ink at full strength — no hue |
+| `accentSoft` | `#EDEDED` | `#1C1C1C` | A selected background that steps back |
+| `success` | `#0F7A4A` | `#4FD18B` | Working, done |
+| `warning` | `#A65A00` | `#FFB84D` | Something is wrong and needs the user |
+| `danger` | `#C62F26` | `#FF8A80` | Destructive actions, errors |
+| `border` / `divider` | 12% / 8% black | 15% / 11% white | Separation |
+| `scrim` | 20% black | 20% black | One UI's modal dim |
 
-Every text pair is verified against WCAG 2.1 AA. Two values deliberately
-diverge from the published One UI tokens because the published ones fail:
-`inkFaint` is `#6E6E6E` rather than `#8C8C8C` (3.22:1), and `accent` is
-`#0072DE` rather than `#0381FE` (3.42:1 under white button text).
+Measured on `surface`, the text roles run from 14.3:1 (`ink`) to 7.5:1
+(`inkFaint`) in light and 18.0:1 to 8.6:1 in dark. The functional colours are
+5.0:1 or better as text on `surface` in light and 8.2:1 or better in dark, and
+still pass AA on `surfaceSunken`. `inkDisabled` is 3.14:1 in light and is
+never used for text anyone needs to read.
 
 **If you change a colour, re-check contrast.** Both directions — as text on a
 ground, and as a ground under `onAccent`.
 
+**The functional colours are never decorative, and never alone.** Success is
+paired with "Working", "Granted" or "Done"; caution with the words that say
+what is wrong; danger with a verb like "Delete". Under Settings › Status the
+mark differs in shape as well: a filled dot for working, a filled caution dot
+for a problem, and a hollow ring — no colour at all — for something the user
+switched off on purpose.
+
+### Floating over other apps — `DevClipTheme.Overlay`
+
+The bubble's selection ring, the edge handle and the drag-to-hide target sit
+on a background nobody controls. They use a fixed white and black together —
+a dark stroke outside a white one — so whichever the app underneath swallows,
+the other survives. The hide target is a 210-alpha near-black circle over a
+gradient scrim, and turns light-theme `danger` (and grows) when the bubble is
+over it.
+
 ### Spacing — and the keyline
 
-`xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24`, plus **`keyline: 24`**.
+`XS 4 · SM 8 · MD 12 · LG 16 · XL 20`, plus **`KEYLINE 24`**.
 
-`keyline` is not a synonym for `xxl`. It means "distance from the screen
-edge", and One UI requires 24dp minimum there to clear curved edges and the
-Reject/Grip touch-blocking zones. Conflating the two is what caused the
-original keyline violation. **Any component that touches a screen edge uses
-`spacing.keyline` for that margin.**
+`KEYLINE` is not a synonym for a large gap. It means "distance from the
+screen edge", and One UI requires at least 24dp there to clear curved edges
+and the touch-blocking zones a hand wrapped round the phone creates. **Any
+component that touches a screen edge uses the keyline — or the adaptive
+margin, which is never less.**
+
+### Adaptive margins — `DevClipTheme.Breakpoint`
+
+From One UI's `AdaptiveCoordinatorLayout`, applied by `rememberWindowLayout()`:
+
+| Window width | Side margin | Clip columns |
+|---|---|---|
+| `< 589dp` | 24dp keyline | 1 |
+| `589–959dp` | 5% of width, if the window is ≥ 412dp tall | 2 |
+| `≥ 960dp` | 12.5% of width, if the window is ≥ 412dp tall | 2 |
+
+Never below the keyline. Columns depend on width alone, so a phone on its
+side gets two columns on the keyline.
 
 ### Type — bigger than you think
 
-`display 34 · title 18 · body 17 · button 17 · secondary 15 · caption 13 · micro 12`
+`HERO 56 · DISPLAY 34 · TITLE 18 · BODY 17 · BUTTON 17 · SECONDARY 15 · CAPTION 13 · MICRO 12`, all in sp.
 
-Spread a role, don't pick a number: `{ ...text.body, color: colors.ink }`.
+In Compose these are Material's slots: `displaySmall` is `DISPLAY`,
+`titleMedium` `TITLE`, `bodyLarge` `BODY`, `labelLarge` `BUTTON`,
+`bodyMedium` `SECONDARY`, `bodySmall` `CAPTION`, `labelSmall` `MICRO`. `HERO`
+is only the pull-down app bar's title when fully open.
 
-One UI's scale is deliberately larger than Material's — that is a defining
-characteristic, not an accident. **Body text is 17sp.** The pre-redesign app
-ran at 10–13sp almost everywhere and read as a different design system
-entirely.
+The floating list uses `MiniText`: the same roles at 85%, never below
+`MICRO`. Relative, so it follows the user's font scale.
 
+One UI's scale is deliberately larger than Material's. **Body text is 17sp.**
 The app uses the **system font**, which resolves to SamsungOne / One UI Sans
-on Samsung devices. Weight comes from `fontWeight`, never a family name.
+on Samsung devices. Weight comes from `FontWeight`, never a family name.
 
-### Radius, icons, motion
+### Radius, icons, touch, motion
 
-- **Radius** — `xs 4 · sm 8 · md 12 · lg 22 · container 26 · pill 999`.
-  Buttons are pills. A 4dp or 8dp radius button reads as Material.
-- **Icons** — `icon.sm 18` (inside a compact container), `icon.md 24` (the
-  One UI default), `icon.lg 48` (illustration), `icon.stroke 1.5` **for
-  everything**. Symbols take the *text* colour; accent is for state only.
-- **Motion** — `easing.standard` etc. are the real One UI beziers;
-  `duration.*` runs 100–500ms. Nothing routine exceeds 500ms.
+- **Radius** — `XS 4 · SM 8 · MD 12 · LG 22 · PILL 26 · CONTAINER 26`.
+  Buttons are pills; cards are `MD`; sheets, dialogs and the floating list are
+  `CONTAINER`. A 4dp or 8dp button reads as Material.
+- **Icons** — `SM 18` (sharing a row with text, and the floating list's
+  drawn glyphs), `MD 24` (standalone), `LG 48`, stroke `1.8dp`. Icons take the
+  text colour; there is no accent to give them.
+- **Touch** — `MIN_TOUCH_TARGET 48`. A control may be drawn smaller; its
+  target may not.
+- **Badges** — `Badge.MIN 28`, `Badge.MINI_MIN 20` for the floating list.
+  Minimums, never fixed sizes: the number inside grows with the font.
+- **Motion** — `Easing.STANDARD` (0.4, 0, 0.2, 1) and the other real One UI
+  curves; `Duration` runs 100–500ms. Nothing routine exceeds 500ms.
 
 ## Conventions
 
-**Depth is tone, not shadow.** Cards separate by surface colour plus a 12dp
-radius and carry no shadow at all. `shadow.floating` exists for genuinely
-floating surfaces and is deliberately tiny. Large blurred shadows read as
-Material.
+**Depth is tone, not shadow.** Cards separate by surface tone plus a 12dp
+radius and carry no shadow. Only the bubble, which genuinely floats, has
+elevation (6dp). Large blurred shadows read as Material.
 
-**Structure: viewing area on top, interaction area at the bottom.** What the
-user reads goes up top; what they touch goes within thumb reach. Capture lives
-in a pinned bottom action bar for exactly this reason — don't move a primary
-action back into the header.
+**Viewing area on top, interaction area within reach.** What the user reads
+goes up top; what they touch goes where a thumb is. Pulling down at the top of
+a screen opens the app bar and brings its controls down with it — a reach
+affordance, not a scroll effect. Setup's buttons sit at the bottom.
 
-**Every touch target is 48dp.** A control may *look* smaller: a 40dp chip with
-`hitSlop: {top: 4, bottom: 4}` is correct, a 40dp chip without it is not.
+**`heightIn(min = …)` and `sizeIn(min…)`, never a fixed height, on anything
+containing text**, so it grows at 200% font scale instead of clipping.
 
-**`minHeight`, never `height`, on anything containing text**, so it grows at
-200% font scale instead of clipping.
+**All copy lives in `res/values/strings.xml`.** Sentence case. Verbs on
+buttons ("Paste", "Delete all", "Undo") — never "OK" or "Yes". Errors say
+what to do next.
 
-**All copy lives in `src/strings.ts`.** Sentence case. Verbs on buttons
-("Paste", "Clear all") — never "OK"/"Yes". Errors say what to do next.
+**Every animation checks `ANIMATOR_DURATION_SCALE`.** The bubble's settle,
+its tap flash, the selection ring's pulse and the edge handle's breath all
+hold still when animations are off; the haptic still fires.
 
-**Every animation consults `useReduceMotion()`.** What respecting it means
-varies: a transform is skipped, a screen transition becomes an instant cut.
+**Accessibility is not a later pass.**
 
-**Accessibility is not a later pass.** Icon-only controls need an
-`accessibilityLabel`; toggles need `accessibilityRole="switch"` and
-`accessibilityState={{ checked }}`; segmented options need a real name, not an
-abbreviation — TalkBack must say "Bubble size: Small", never "S". Decorative
-icons are hidden with `importantForAccessibility="no"`. **A gesture is never
-the only route to an action** — long press is a shortcut, and there is always
-a button that does the same thing.
+- Icon-only controls have a content description that says what they do
+  ("Edit clip 3", "Close DevClip").
+- A control and its label are one node: switch rows use `toggleable` with
+  `Role.Switch`; sliders carry their label and their value in the units on
+  screen; choice chips are a `selectableGroup` of `Role.RadioButton`.
+- Gestures carry labels: a clip row says "paste" and "edit"; the bubble's
+  click and long click are named accessibility actions.
+- Status messages are live regions.
+- Section titles are headings.
+- **A gesture is never the only route to an action.** Long press is a
+  shortcut, and there is always a visible control that does the same thing.
+
+**Destruction.** Deleting one clip is immediate and offers Undo. Deleting all
+of them is the one decision the app asks about first, in a dialog whose
+buttons are the verbs.
 
 ## Deliberate divergences
 
 | Divergence | Why it stays |
 |---|---|
-| Fixed Samsung-blue accent | One UI derives accent from the wallpaper at runtime. DevClip pins it for brand identity and deterministic contrast. A system-accent opt-in would be the conformant version. |
-| `inkFaint` / `accent` darker than the published tokens | The published values fail WCAG AA. Accessibility wins. |
-| Physical press compression | Kept from the original design, but re-timed onto the One UI standard curve and now guarded by reduce-motion. |
-| Flat header instead of a large collapsing title | The popup is 300–360dp wide. A One UI large title needs room it doesn't have. `text.display` is used on the full-screen onboarding, where it fits. |
-| Full-screen onboarding, not a permission sheet | Android permission flows are system-presented; the custom screen bridges them. |
+| No accent at all | One UI derives an accent from the wallpaper. DevClip floats over other apps all day and should not compete with them; the icon is where its colour lives. Contrast is deterministic as a result. |
+| `inkDisabled` (published tertiary `#8C8C8C`) used for disabled only | At 3.14:1 it fails WCAG AA as text. `inkFaint` uses the published secondary `#505050` instead. |
+| Pull-down app bar built by hand | Material's `LargeTopAppBar` collapses on scroll but cannot open from a list already at the top, which is the One UI gesture. `OneUiHeader` does both. |
+| Toasts from the services | The overlay service has no Activity to host a snack, and the windows it would draw one in have often just been torn down. The launcher app uses snacks. |
+| Views, not Compose, for the floating windows | A service-owned window has no lifecycle owner, and Compose without one renders nothing. |
 
 ## Known gaps
 
-- **`STR-02` / `STR-06`** — the header still presents the settings gear, the
-  bubble toggle and three view tabs as co-equal. Separating them properly
-  means lifting bubble state out of `PopupScreen`, which is a refactor, not a
-  restyle.
-- **`LAY-05`** — "Full app" mode sends `match_parent` but renders the same
-  single-column layout. No 589/960dp adaptation yet.
-- **`MOT-11`** — no predictive back. React Native 0.86 has no stable API for
-  driving back-gesture progress.
-- **`A11Y-12`** — the search field's placeholder is its only visible label.
-  Needs a manual check that TalkBack announces the `accessibilityLabel` on
-  focus.
-
-## Needs human eyes
-
-Static analysis and typecheck cannot settle these. **None of this has run on a
-real device yet.**
-
-1. **Nested `Pressable`** — the clip card's "more options" button sits inside
-   the card's own `Pressy`. Confirm tapping ⋮ does not also paste.
-2. **Vertical fit at 300×400dp** — header + search + chips + a pinned bottom
-   bar leaves little room for cards. If it is too tight, hide the bubble
-   toggle at that size.
-3. **200% font scale** on every screen, especially the floating list, which
-   runs its type 15% below the full app's tokens.
-4. **TalkBack pass** — card announcements, the segmented groups, the error
-   banner's live region.
-5. **Dark mode on AMOLED** — the ground is now true black.
-6. **Onboarding heading at 34sp** wraps in a narrow popup. Intentional; may
-   read as too large.
+- **Predictive back** — the app handles Back on every screen, but has not
+  opted in to the predictive back animation.
+- **Expanded height limit** — One UI's expanded margin also stops above
+  1919dp of height. DevClip does not apply that ceiling; no device it runs on
+  comes near it.
+- **Nothing has been verified on a screen reader or at 200% font scale on a
+  device.** The semantics above are in the code; a TalkBack pass on the
+  phone is what proves them.
