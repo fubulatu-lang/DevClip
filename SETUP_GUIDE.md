@@ -1,6 +1,6 @@
 # DevClip — Setup Guide (phone only)
 
-No terminal, no computer, no Expo Go. Just github.com, with one step near
+No terminal, no computer. Just github.com, with one step near
 the end that is worth a computer if you can reach one — explained honestly
 where it comes up.
 
@@ -11,13 +11,6 @@ where it comes up.
 Every push to `main` builds an installable APK on GitHub Actions and
 attaches it to a release tagged `latest`. Nothing to click and nothing to
 trigger.
-
-> An earlier version of this guide told you to check for a file called
-> `.eas/workflows/build.yml`, and said that file was what made builds
-> automatic. **That file was never in the repository.** Builds were not
-> automatic, and pushes did not produce new APKs — which is why the app on
-> the phone could sit weeks behind the code. `.github/workflows/apk.yml`
-> is the real thing, and it is committed.
 
 ## 2. Getting the app on your phone
 
@@ -99,14 +92,10 @@ which build is on your phone.
 
 Two checks run on every pull request, and the first one gates merges:
 
-- **Android compile** — the Kotlin compiles. This one exists because
-  nothing used to check it: native code reached a real build untouched,
-  and a compile error once got as far as EAS before anything noticed.
+- **Android compile** — the Kotlin compiles, and every string it
+  references exists.
 - **One UI conformance** — a scan for hard-coded colours and off-scale
   spacing. Advisory; it reports rather than blocks.
-
-There used to be a third, a TypeScript typecheck. There is no TypeScript
-in this repository any more, so there is nothing for it to check.
 
 ## 6. Turning on the real features
 

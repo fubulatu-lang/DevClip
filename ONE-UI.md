@@ -10,8 +10,7 @@ restating them, and the floating windows read them directly — so the app, the
 bubble and the floating list cannot disagree. Where the numbers come from is
 in `.claude/one-ui/reference/TOKENS.md`.
 
-`ONE-UI-AUDIT.md` is a historical report from the React Native version.
-Re-run a conformance check with `/one-ui:audit`, or the mechanical subset with
+Run a conformance check with `/one-ui:audit`, or the mechanical subset with
 `python3 .claude/one-ui/scripts/oneui_scan.py app/src/main` — CI runs the
 latter on every pull request, advisory rather than blocking.
 
@@ -134,8 +133,10 @@ on Samsung devices. Weight comes from `FontWeight`, never a family name.
   target may not.
 - **Badges** — `Badge.MIN 28`, `Badge.MINI_MIN 20` for the floating list.
   Minimums, never fixed sizes: the number inside grows with the font.
-- **Motion** — `Easing.STANDARD` (0.4, 0, 0.2, 1) and the other real One UI
-  curves; `Duration` runs 100–500ms. Nothing routine exceeds 500ms.
+- **Motion** — `Easing.STANDARD` (0.4, 0, 0.2, 1), One UI's standard curve.
+  Its other curves and its 100–500ms duration scale are in `TOKENS.md`; add
+  them to `DevClipTheme` when something animates on them. Nothing routine
+  exceeds 500ms.
 
 ## Conventions
 
