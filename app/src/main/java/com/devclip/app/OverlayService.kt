@@ -30,6 +30,8 @@ import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -1141,6 +1143,40 @@ class OverlayService : Service() {
             }
         }
 
+        // What TalkBack gets, and it used to get nothing. Everything below is
+        // a raw touch listener, which a screen reader never drives: it
+        // activates a view by performing a click, and there was no click to
+        // perform, so the one way into DevClip did nothing at all. The two
+        // listeners here exist only for that route. A finger never reaches
+        // them — the touch listener consumes every event first — so a tap
+        // still runs exactly once.
+        bubble.contentDescription = getString(R.string.devclip_bubble_description)
+        bubble.setOnClickListener {
+            try {
+                onBubbleTapped()
+            } catch (e: Exception) {
+                fail(getString(R.string.devclip_error_tap), e)
+            }
+        }
+        bubble.setOnLongClickListener {
+            try {
+                if (!popupVisible) showPopup()
+            } catch (e: Exception) {
+                fail(getString(R.string.devclip_error_open_window), e)
+            }
+            true
+        }
+        // Say what each does, rather than TalkBack's generic "double-tap to
+        // activate". Null commands keep the listeners above as the handlers.
+        ViewCompat.replaceAccessibilityAction(
+            bubble, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK,
+            getString(R.string.devclip_bubble_tap_action), null
+        )
+        ViewCompat.replaceAccessibilityAction(
+            bubble, AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK,
+            getString(R.string.devclip_bubble_long_action), null
+        )
+
         // actionMasked, not action: getAction() packs the pointer index into
         // its high bits, so a second finger landing on the bubble makes the
         // raw value stop matching ACTION_UP.
@@ -1344,7 +1380,7 @@ class OverlayService : Service() {
             // hide gesture already avoids this way.
             onOpenFullApp = { mainHandler.post { this@OverlayService.openFullApp() } }
             onClose = { mainHandler.post { this@OverlayService.hidePopup() } }
-            onPaste = { text -> this@OverlayService.pasteFromPopup(text) }
+            onPaste = { clip -> this@OverlayService.pasteFromPopup(fullText(clip)) }
         }
 
         val frame = ResizableFrame(this).apply {
@@ -1389,13 +1425,35 @@ class OverlayService : Service() {
         val limit = prefs().getInt(Prefs.KEY_MAX_CLIPS, Prefs.DEFAULT_MAX_CLIPS)
             .let { if (it <= 0) PopupListView.MAX_ROWS else min(it, PopupListView.MAX_ROWS) }
 
+        // Previews, like the full app: the list shows two lines of each clip
+        // and a clip can be most of a megabyte. The paste reads the whole
+        // one back by id.
         val helper = DevClipDatabaseHelper(applicationContext)
         val clips = try {
-            helper.listClips(limit)
+            helper.listClips(limit, ClipRepository.PREVIEW_CHARS)
         } finally {
             try { helper.close() } catch (e: Exception) { }
         }
         content.render(clips, prefs().getBoolean(Prefs.KEY_CONFIRM_BEFORE_PASTE, true))
+    }
+
+    /**
+     * The whole of a clip the floating list is showing a preview of.
+     *
+     * On the main thread, like the read that listed it: one row by primary
+     * key, in answer to a tap. If it has gone since the list was drawn, the
+     * preview is still better than pasting nothing.
+     */
+    private fun fullText(clip: DevClipDatabaseHelper.Clip): String {
+        if (clip.complete) return clip.content
+        val helper = DevClipDatabaseHelper(applicationContext)
+        return try {
+            helper.getClip(clip.id)?.content ?: clip.content
+        } catch (e: Exception) {
+            clip.content
+        } finally {
+            try { helper.close() } catch (e: Exception) { }
+        }
     }
 
     /**

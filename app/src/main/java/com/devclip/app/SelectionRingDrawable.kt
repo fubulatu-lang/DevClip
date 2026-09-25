@@ -2,7 +2,6 @@ package com.devclip.app
 
 import android.animation.ValueAnimator
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.ColorFilter
 import android.graphics.Paint
 import android.graphics.PixelFormat
@@ -36,12 +35,12 @@ class SelectionRingDrawable(
 
     private val white = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.WHITE
+        color = DevClipTheme.Overlay.LIGHT
     }
 
     private val dark = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
-        color = Color.BLACK
+        color = DevClipTheme.Overlay.DARK
     }
 
     /** 0 is the quiet end of the breath, 1 the full one. */

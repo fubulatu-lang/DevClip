@@ -2,6 +2,7 @@ package com.devclip.app.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,11 +16,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -40,7 +47,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import com.devclip.app.OverlayController
 import com.devclip.app.Prefs
 import com.devclip.app.R
@@ -93,6 +104,12 @@ fun SettingsScreen(
     @Suppress("UNUSED_EXPRESSION") tick
 
     val header = rememberOneUiHeaderState()
+    val layout = rememberWindowLayout()
+
+    // Deleting every clip is the one thing on this screen that cannot be
+    // taken back, and it sat one tap from Import. A dialog is right here and
+    // nowhere else in the app: this is a decision, not news.
+    var confirmingClear by remember { mutableStateOf(false) }
 
     // Edge to edge, so the bars are this screen's to account for. The colour
     // goes under them; only the content is inset.
@@ -127,8 +144,8 @@ fun SettingsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = Space.keyline,
-                end = Space.keyline,
+                start = layout.margin,
+                end = layout.margin,
                 bottom = Space.keyline
             ),
             verticalArrangement = Arrangement.spacedBy(Space.xs)
@@ -140,7 +157,7 @@ fun SettingsScreen(
                 val switchedOn = OverlayController.isAccessibilityEnabled(context)
                 StatusRow(
                     label = stringResource(R.string.status_capture),
-                    ok = working,
+                    health = if (working) Health.Ok else Health.Problem,
                     // The case worth naming. Switched on but not running is
                     // not "off" — it is the failure that looks like success,
                     // and the user needs telling which one they have.
@@ -160,7 +177,7 @@ fun SettingsScreen(
                 val granted = OverlayController.isOverlayGranted(context)
                 StatusRow(
                     label = stringResource(R.string.status_overlay),
-                    ok = granted,
+                    health = if (granted) Health.Ok else Health.Problem,
                     detail = stringResource(
                         if (granted) R.string.status_granted else R.string.status_not_granted
                     ),
@@ -172,7 +189,14 @@ fun SettingsScreen(
                 val canStart = OverlayController.isOverlayGranted(context)
                 StatusRow(
                     label = stringResource(R.string.status_bubble),
-                    ok = running,
+                    // Stopped because the user stopped it is a choice, not a
+                    // fault. Caution is for something that is wrong; a bubble
+                    // switched off on purpose gets the neutral mark.
+                    health = when {
+                        running -> Health.Ok
+                        !canStart -> Health.Problem
+                        else -> Health.Idle
+                    },
                     detail = stringResource(
                         when {
                             running -> R.string.status_on
@@ -196,7 +220,7 @@ fun SettingsScreen(
                 val granted = OverlayController.isNotificationGranted(context)
                 StatusRow(
                     label = stringResource(R.string.status_notifications),
-                    ok = granted,
+                    health = if (granted) Health.Ok else Health.Problem,
                     detail = stringResource(
                         if (granted) R.string.status_granted else R.string.status_not_granted
                     ),
@@ -210,7 +234,7 @@ fun SettingsScreen(
                 val optimised = OverlayController.isBatteryOptimised(context)
                 StatusRow(
                     label = stringResource(R.string.status_battery),
-                    ok = !optimised,
+                    health = if (optimised) Health.Problem else Health.Ok,
                     detail = stringResource(
                         if (optimised) R.string.status_restricted else R.string.status_unrestricted
                     ),
@@ -307,7 +331,7 @@ fun SettingsScreen(
                 ActionRow(
                     label = stringResource(R.string.history_clear),
                     destructive = true,
-                    onClick = onClearAll
+                    onClick = { confirmingClear = true }
                 )
             }
 
@@ -342,6 +366,76 @@ fun SettingsScreen(
         }
         }
     }
+
+    if (confirmingClear) {
+        ConfirmClearDialog(
+            onConfirm = {
+                confirmingClear = false
+                onClearAll()
+            },
+            onDismiss = { confirmingClear = false }
+        )
+    }
+}
+
+/**
+ * "Delete all clips?", asked once.
+ *
+ * The verbs are the answer — "Delete all" and "Cancel", never "OK" — so the
+ * button says what pressing it does. Delete is the filled one because it is
+ * the action the user came here for; the danger colour on its label says
+ * what kind of action that is, and the words say it too.
+ */
+@Composable
+private fun ConfirmClearDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val colors = Tokens.colors
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = colors.surface,
+        shape = RoundedCornerShape(Radius.container),
+        title = {
+            Text(
+                text = stringResource(R.string.history_clear_confirm_title),
+                style = MaterialTheme.typography.titleMedium,
+                color = colors.ink
+            )
+        },
+        text = {
+            Text(
+                text = stringResource(R.string.history_clear_confirm_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.inkSoft
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                modifier = Modifier.heightIn(min = MinTouchTarget),
+                shape = RoundedCornerShape(Radius.pill),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = colors.surfaceSunken,
+                    contentColor = colors.danger
+                )
+            ) {
+                Text(
+                    text = stringResource(R.string.history_clear_confirm),
+                    style = MaterialTheme.typography.labelLarge
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                modifier = Modifier.heightIn(min = MinTouchTarget)
+            ) {
+                Text(
+                    text = stringResource(R.string.cancel),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = colors.ink
+                )
+            }
+        }
+    )
 }
 
 /**
@@ -375,33 +469,46 @@ private fun SectionHeader(text: String) {
         text = text,
         style = MaterialTheme.typography.titleMedium,
         color = Tokens.colors.ink,
-        modifier = Modifier.padding(top = Space.xl, bottom = Space.sm)
+        // A heading to TalkBack as well as to the eye, so the rotor can jump
+        // section to section instead of row by row down a long screen.
+        modifier = Modifier
+            .padding(top = Space.xl, bottom = Space.sm)
+            .semantics { heading() }
     )
 }
+
+/** How a status row reads: working, wrong, or off because the user chose it. */
+private enum class Health { Ok, Problem, Idle }
 
 /**
  * A fact and what to do about it.
  *
  * The dot is never the only signal — the words beside it say the same thing,
  * because One UI does not allow colour alone to carry meaning and because a
- * green dot means nothing to someone who cannot see it as green.
+ * green dot means nothing to someone who cannot see it as green. The three
+ * states differ in shape as well: filled for working, filled in caution for
+ * a problem, and a hollow ring for off-by-choice, which is not a colour at
+ * all and so cannot be mistaken for either.
  */
 @Composable
-private fun StatusRow(label: String, ok: Boolean, detail: String, onClick: () -> Unit) {
+private fun StatusRow(label: String, health: Health, detail: String, onClick: () -> Unit) {
     val colors = Tokens.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface, RoundedCornerShape(Radius.md))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = MinTouchTarget)
             .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        val dot = Modifier.size(StatusDot)
         Box(
-            modifier = Modifier
-                .size(10.dp)
-                .background(if (ok) colors.success else colors.warning, CircleShape)
+            modifier = when (health) {
+                Health.Ok -> dot.background(colors.success, CircleShape)
+                Health.Problem -> dot.background(colors.warning, CircleShape)
+                Health.Idle -> dot.border(StatusRing, colors.inkFaint, CircleShape)
+            }
         )
         Column(modifier = Modifier.padding(start = Space.md).weight(1f)) {
             Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.ink)
@@ -410,6 +517,14 @@ private fun StatusRow(label: String, ok: Boolean, detail: String, onClick: () ->
     }
 }
 
+/**
+ * A labelled switch, as one control.
+ *
+ * The whole row toggles, and TalkBack hears "Start after reboot, on,
+ * switch" as one thing. The switch used to be its own target with the label
+ * a separate piece of text beside it, so the screen reader announced "On,
+ * switch" with no word for what was on.
+ */
 @Composable
 private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     val colors = Tokens.colors
@@ -417,6 +532,7 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface, RoundedCornerShape(Radius.md))
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onChange)
             .heightIn(min = MinTouchTarget)
             .padding(horizontal = Space.lg, vertical = Space.sm),
         verticalAlignment = Alignment.CenterVertically
@@ -429,7 +545,9 @@ private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
         )
         Switch(
             checked = checked,
-            onCheckedChange = onChange,
+            // Null: the row owns the toggle. A second handler here would be a
+            // second focus stop saying the same thing without the label.
+            onCheckedChange = null,
             colors = SwitchDefaults.colors(
                 checkedThumbColor = colors.onAccent,
                 checkedTrackColor = colors.accent,
@@ -457,6 +575,7 @@ private fun SliderRow(
             .background(colors.surface, RoundedCornerShape(Radius.md))
             .padding(horizontal = Space.lg, vertical = Space.md)
     ) {
+        val shown = display(live)
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = label,
@@ -464,9 +583,15 @@ private fun SliderRow(
                 color = colors.ink,
                 modifier = Modifier.weight(1f)
             )
-            Text(display(live), style = MaterialTheme.typography.bodySmall, color = colors.inkSoft)
+            Text(shown, style = MaterialTheme.typography.bodySmall, color = colors.inkSoft)
         }
         Slider(
+            // Named, and read out in the units on screen. Unlabelled, TalkBack
+            // said "56 percent, slider" for a bubble size in dp.
+            modifier = Modifier.semantics {
+                contentDescription = label
+                stateDescription = shown
+            },
             value = live,
             onValueChange = { live = it },
             // Written on release, not on every pixel of the drag: each change
@@ -509,8 +634,13 @@ private fun <T> ChipRow(
             .padding(horizontal = Space.lg, vertical = Space.md)
     ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, color = colors.ink)
+        // A group of radio buttons, to TalkBack: "Dark, selected, 3 of 3".
+        // The fill was the only thing marking the choice, which a screen
+        // reader cannot see.
         Row(
-            modifier = Modifier.padding(top = Space.md),
+            modifier = Modifier
+                .padding(top = Space.md)
+                .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(Space.sm)
         ) {
             options.forEach { option ->
@@ -522,7 +652,11 @@ private fun <T> ChipRow(
                             // Pills, as One UI has them.
                             RoundedCornerShape(Radius.pill)
                         )
-                        .clickable { onSelect(option) }
+                        .selectable(
+                            selected = active,
+                            role = Role.RadioButton,
+                            onClick = { onSelect(option) }
+                        )
                         .heightIn(min = MinTouchTarget)
                         .padding(horizontal = Space.lg, vertical = Space.md),
                     contentAlignment = Alignment.Center
@@ -547,7 +681,7 @@ private fun ActionRow(label: String, destructive: Boolean = false, onClick: () -
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface, RoundedCornerShape(Radius.md))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .heightIn(min = MinTouchTarget)
             .padding(horizontal = Space.lg, vertical = Space.md),
         verticalAlignment = Alignment.CenterVertically

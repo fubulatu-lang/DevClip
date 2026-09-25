@@ -60,7 +60,7 @@ class DismissTargetView(context: Context) : View(context) {
         style = Paint.Style.STROKE
         strokeWidth = dp(2.5f)
         strokeCap = Paint.Cap.ROUND
-        color = Color.WHITE
+        color = DevClipTheme.Overlay.LIGHT
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -69,7 +69,7 @@ class DismissTargetView(context: Context) : View(context) {
         // middle of somebody else's app reads as a rendering fault.
         scrimPaint.shader = LinearGradient(
             0f, h * 0.55f, 0f, h.toFloat(),
-            Color.TRANSPARENT, Color.argb(150, 0, 0, 0),
+            Color.TRANSPARENT, DevClipTheme.Overlay.DISMISS_SCRIM,
             Shader.TileMode.CLAMP
         )
     }
@@ -80,7 +80,7 @@ class DismissTargetView(context: Context) : View(context) {
 
         val radius = if (engaged) radiusPx * 1.15f else radiusPx
         circlePaint.color =
-            if (engaged) Color.argb(255, 198, 47, 38) else Color.argb(210, 40, 40, 40)
+            if (engaged) DevClipTheme.Overlay.DISMISS_ENGAGED else DevClipTheme.Overlay.DISMISS_IDLE
         canvas.drawCircle(circleCenterX, circleCenterY, radius, circlePaint)
 
         val arm = radius * 0.32f

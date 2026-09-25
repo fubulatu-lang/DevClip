@@ -30,17 +30,47 @@ object ClipRepository {
             }
         }
 
+    /**
+     * How much of each clip a list reads.
+     *
+     * Enough to fill three lines of the widest card with room to spare, and
+     * nowhere near the megabyte a single clip can be. The floating list reads
+     * the same amount for the same reason.
+     */
+    const val PREVIEW_CHARS = 400
+
+    /** The list, as previews. Paste and edit go back for the whole clip with [get]. */
     suspend fun load(context: Context, query: String): List<DevClipDatabaseHelper.Clip> =
         withDb(context) { db ->
-            if (query.isBlank()) db.listClips(Int.MAX_VALUE) else db.searchClips(query)
+            if (query.isBlank()) db.listClips(Int.MAX_VALUE, PREVIEW_CHARS)
+            else db.searchClips(query, PREVIEW_CHARS)
         }
+
+    /** One clip in full, or null if it was deleted while the list was showing. */
+    suspend fun get(context: Context, id: Long): DevClipDatabaseHelper.Clip? =
+        withDb(context) { it.getClip(id) }
 
     suspend fun count(context: Context): Int = withDb(context) { it.countClips() }
 
     suspend fun update(context: Context, id: Long, content: String, title: String?) =
         withDb(context) { it.updateClip(id, content, title) }
 
-    suspend fun delete(context: Context, id: Long) = withDb(context) { it.deleteClip(id) }
+    /**
+     * Deletes a clip and hands back everything needed to undo it.
+     *
+     * Read before the delete, in the same call, so the undo restores what was
+     * actually removed rather than what the screen last showed — which may
+     * have been a preview, or an edit ago.
+     */
+    suspend fun delete(context: Context, id: Long): DevClipDatabaseHelper.StoredClip? =
+        withDb(context) { db ->
+            val stored = db.getStoredClip(id)
+            db.deleteClip(id)
+            stored
+        }
+
+    suspend fun restore(context: Context, clip: DevClipDatabaseHelper.StoredClip): Boolean =
+        withDb(context) { it.restoreClip(clip) }
 
     suspend fun clearAll(context: Context) = withDb(context) { it.deleteAllClips() }
 

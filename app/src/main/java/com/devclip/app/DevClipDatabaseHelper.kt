@@ -6,13 +6,13 @@ import android.database.sqlite.SQLiteOpenHelper
 import java.io.File
 
 /**
- * Writes directly into the same SQLite file that the JS side opens via
- * expo-sqlite's `openDatabaseSync('devclip.db')`. expo-sqlite stores its
- * databases at: <filesDir>/SQLite/<name> — see
- * node_modules/expo-sqlite/android/.../SQLiteModule.kt (DATABASE_DIRECTORY).
+ * The clip history: one SQLite file, one flat `clips` table.
  *
- * Keep DB_NAME and the `clips` table schema below in sync with
- * src/db/database.ts on the JS side. If you change one, change both.
+ * It lives at `<filesDir>/SQLite/devclip.db`, which is where expo-sqlite kept
+ * it when the app was React Native. The path stays because moving it would
+ * orphan every clip saved before the conversion; nothing else about Expo
+ * survives. The capture path in the services and the launcher app both open
+ * this same file — it is the whole contract between them.
  */
 class DevClipDatabaseHelper(context: Context) :
     SQLiteOpenHelper(context, resolveDbPath(context), null, DB_VERSION) {
@@ -82,8 +82,32 @@ class DevClipDatabaseHelper(context: Context) :
         }
     }
 
-    /** One row of the clip list, as the floating list needs it. */
-    data class Clip(val id: Long, val title: String?, val content: String)
+    /**
+     * One row of a clip list.
+     *
+     * [content] is the whole text unless the row was read as a preview, in
+     * which case it is the start of it and [complete] is false. Anything that
+     * leaves the list — a paste, an edit — reads the clip again by id with
+     * [getClip] rather than trusting a preview to be all of it.
+     */
+    data class Clip(
+        val id: Long,
+        val title: String?,
+        val content: String,
+        val complete: Boolean = true
+    )
+
+    /**
+     * Everything stored for one clip, as [restoreClip] needs it to put a
+     * deleted clip back exactly where it was.
+     */
+    data class StoredClip(
+        val id: Long,
+        val title: String?,
+        val content: String,
+        val createdAt: Long,
+        val sortOrder: Int
+    )
 
     /**
      * The newest [limit] clips, newest first.
@@ -98,12 +122,68 @@ class DevClipDatabaseHelper(context: Context) :
      * be the user's full limit and this runs on the main thread when the
      * bubble is tapped.
      */
-    fun listClips(limit: Int): List<Clip> {
+    fun listClips(limit: Int, previewChars: Int? = null): List<Clip> {
         if (limit <= 0) return emptyList()
         return read(
-            "SELECT id, title, content FROM clips ORDER BY created_at DESC, id DESC LIMIT ?;",
+            "SELECT id, title, ${contentColumns(previewChars)} FROM clips " +
+                "ORDER BY created_at DESC, id DESC LIMIT ?;",
             arrayOf(limit.toString())
         )
+    }
+
+    /**
+     * The content columns for a read: the whole text, or its first
+     * [previewChars] characters and whether that was all of it.
+     *
+     * A list shows three lines of each clip, and a clip can be most of a
+     * megabyte. Reading every one in full put the whole history in memory,
+     * laid out and described to TalkBack, to show the top of each.
+     */
+    private fun contentColumns(previewChars: Int?): String =
+        if (previewChars == null) "content, 1"
+        else "substr(content, 1, $previewChars), length(content) <= $previewChars"
+
+    /** One clip in full, or null if it has gone. */
+    fun getClip(id: Long): Clip? =
+        read("SELECT id, title, content, 1 FROM clips WHERE id = ?;", arrayOf(id.toString()))
+            .firstOrNull()
+
+    /** One clip with everything [restoreClip] needs, or null if it has gone. */
+    fun getStoredClip(id: Long): StoredClip? = try {
+        readableDatabase.rawQuery(
+            "SELECT id, title, content, created_at, sort_order FROM clips WHERE id = ?;",
+            arrayOf(id.toString())
+        ).use { c ->
+            if (!c.moveToFirst()) null
+            else StoredClip(
+                id = c.getLong(0),
+                title = if (c.isNull(1)) null else c.getString(1),
+                content = c.getString(2),
+                createdAt = c.getLong(3),
+                sortOrder = c.getInt(4)
+            )
+        }
+    } catch (e: Exception) {
+        android.util.Log.e("DevClip", "Could not read a clip", e)
+        null
+    }
+
+    /**
+     * Puts a deleted clip back: same id, same timestamp, so it returns to the
+     * same place in the list rather than arriving at the top as if captured
+     * just now. OR IGNORE because an id that has somehow been taken since is
+     * a clip that exists, and overwriting it would lose that one instead.
+     */
+    fun restoreClip(clip: StoredClip): Boolean = try {
+        writableDatabase.execSQL(
+            "INSERT OR IGNORE INTO clips (id, title, content, created_at, sort_order) " +
+                "VALUES (?, ?, ?, ?, ?);",
+            arrayOf<Any?>(clip.id, clip.title, clip.content, clip.createdAt, clip.sortOrder)
+        )
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("DevClip", "Could not restore a clip", e)
+        false
     }
 
     /**
@@ -119,8 +199,8 @@ class DevClipDatabaseHelper(context: Context) :
      * above are a different thing entirely: those are ordinary string
      * literals, where two characters are needed to mean one backslash.
      */
-    fun searchClips(query: String): List<Clip> {
-        if (query.isBlank()) return listClips(Int.MAX_VALUE)
+    fun searchClips(query: String, previewChars: Int? = null): List<Clip> {
+        if (query.isBlank()) return listClips(Int.MAX_VALUE, previewChars)
         val escaped = query
             .replace("\\", "\\\\")
             .replace("%", "\\%")
@@ -128,7 +208,7 @@ class DevClipDatabaseHelper(context: Context) :
         val pattern = "%$escaped%"
         return read(
             """
-            SELECT id, title, content FROM clips
+            SELECT id, title, ${contentColumns(previewChars)} FROM clips
             WHERE title LIKE ? ESCAPE '\' OR content LIKE ? ESCAPE '\'
             ORDER BY created_at DESC, id DESC;
             """.trimIndent(),
@@ -202,7 +282,8 @@ class DevClipDatabaseHelper(context: Context) :
                     Clip(
                         id = cursor.getLong(0),
                         title = if (cursor.isNull(1)) null else cursor.getString(1),
-                        content = cursor.getString(2)
+                        content = cursor.getString(2),
+                        complete = cursor.getInt(3) != 0
                     )
                 )
             }

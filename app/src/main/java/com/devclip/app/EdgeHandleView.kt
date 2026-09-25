@@ -4,7 +4,6 @@ import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.view.View
@@ -53,7 +52,7 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
      * contrast.
      */
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.BLACK
+        color = DevClipTheme.Overlay.DARK
     }
 
     private val outlineRect = RectF()
@@ -106,7 +105,7 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
         // White while it matters, and white regardless of theme: this is
         // drawn over another app, so the thing it has to stand out from is
         // that app, not DevClip's own palette.
-        barPaint.color = if (on) Color.WHITE else palette.inkFaint
+        barPaint.color = if (on) DevClipTheme.Overlay.LIGHT else palette.inkFaint
         if (on) startPulse() else stopPulse()
         invalidate()
     }
@@ -114,7 +113,7 @@ class EdgeHandleView(context: Context, private val onLeftEdge: Boolean) : View(c
     /** Re-reads the theme. The service outlives every screen that can change it. */
     fun applyTheme() {
         palette = DevClipTheme.colors(context)
-        barPaint.color = if (highlighted) Color.WHITE else palette.inkFaint
+        barPaint.color = if (highlighted) DevClipTheme.Overlay.LIGHT else palette.inkFaint
         invalidate()
     }
 
