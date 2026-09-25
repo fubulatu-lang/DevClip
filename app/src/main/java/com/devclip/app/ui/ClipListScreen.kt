@@ -16,14 +16,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
@@ -37,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,13 +54,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import com.devclip.app.ClipRepository
 import com.devclip.app.DevClipDatabaseHelper
 import com.devclip.app.DevClipEvents
 import com.devclip.app.OverlayController
 import com.devclip.app.R
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -82,9 +87,10 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
     var clips by remember { mutableStateOf<List<DevClipDatabaseHelper.Clip>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<DevClipDatabaseHelper.Clip?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
+    var message by remember { mutableStateOf<SnackMessage?>(null) }
 
     val header = rememberOneUiHeaderState()
+    val layout = rememberWindowLayout()
 
     // While searching, back means "leave search". Without this it means
     // "leave DevClip", which is a long way to fall out of a text field.
@@ -98,8 +104,14 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
         loaded = true
     }
 
-    // Re-reads whenever the query changes, and once on arrival.
-    LaunchedEffect(query) { reload() }
+    // Re-reads whenever the query changes, and once on arrival. A typed
+    // query waits for a pause first: every keystroke was a full-table LIKE,
+    // and the results of "d", "de" and "dev" are not worth reading on the
+    // way to "devclip". Relaunching the effect cancels the wait.
+    LaunchedEffect(query) {
+        if (query.isNotBlank()) delay(SEARCH_SETTLE_MS)
+        reload()
+    }
 
     // A capture while this screen is open has to appear in it. The event is
     // only a prompt to look — the database is what is true.
@@ -179,27 +191,55 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
                     modifier = Modifier.fillMaxSize()
                 )
             } else {
-                LazyColumn(
+                // Two columns once the window is wide enough to give each a
+                // readable measure, rather than one card stretched across a
+                // tablet. The margin follows One UI's adaptive rule; below
+                // 589dp both are exactly what they always were.
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(layout.columns),
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
-                        start = Space.keyline,
-                        end = Space.keyline,
+                        start = layout.margin,
+                        end = layout.margin,
                         top = Space.sm,
                         bottom = Space.keyline
                     ),
-                    verticalArrangement = Arrangement.spacedBy(Space.sm)
+                    verticalArrangement = Arrangement.spacedBy(Space.sm),
+                    horizontalArrangement = Arrangement.spacedBy(Space.sm)
                 ) {
                     itemsIndexed(clips, key = { _, clip -> clip.id }) { index, clip ->
                         ClipRow(
                             clip = clip,
                             position = index + 1,
                             onPaste = {
-                                val pasted = OverlayController.paste(clip.content)
-                                message = context.getString(
-                                    if (pasted) R.string.paste_done else R.string.devclip_paste_copied_only
-                                )
+                                scope.launch {
+                                    // The row holds a preview. What goes into
+                                    // somebody's text field is the whole clip.
+                                    val full = ClipRepository.get(context, clip.id)
+                                    message = SnackMessage(
+                                        context.getString(
+                                            when {
+                                                full == null -> R.string.clip_gone
+                                                OverlayController.paste(full.content) ->
+                                                    R.string.paste_done
+                                                else -> R.string.devclip_paste_copied_only
+                                            }
+                                        )
+                                    )
+                                    if (full == null) reload()
+                                }
                             },
-                            onEdit = { editing = clip }
+                            onEdit = {
+                                scope.launch {
+                                    val full = ClipRepository.get(context, clip.id)
+                                    if (full == null) {
+                                        message = SnackMessage(context.getString(R.string.clip_gone))
+                                        reload()
+                                    } else {
+                                        editing = full
+                                    }
+                                }
+                            }
                         )
                     }
                 }
@@ -220,18 +260,59 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
             },
             onDelete = {
                 scope.launch {
-                    ClipRepository.delete(context, clip.id)
+                    val removed = ClipRepository.delete(context, clip.id)
                     editing = null
                     reload()
+                    // Delete is immediate and Undo is how it is taken back:
+                    // news with a way out, not a question asked beforehand.
+                    // "Never lose a clip" has to include the one deleted by a
+                    // thumb that meant Save.
+                    message = SnackMessage(
+                        text = context.getString(R.string.clip_deleted),
+                        actionLabel = removed?.let { context.getString(R.string.undo) },
+                        onAction = removed?.let { stored ->
+                            {
+                                scope.launch {
+                                    val back = ClipRepository.restore(context, stored)
+                                    reload()
+                                    if (!back) {
+                                        message = SnackMessage(
+                                            context.getString(R.string.clip_restore_failed)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    )
                 }
             }
         )
     }
 
+    // Keyed on the message itself, not its words: two deletes in a row say
+    // the same thing, and without the key the second would inherit the
+    // first one's timer — and the Undo would vanish early.
     message?.let {
-        Snack(text = it, onDismiss = { message = null })
+        key(it) {
+            Snack(
+                text = it.text,
+                actionLabel = it.actionLabel,
+                onAction = it.onAction,
+                onDismiss = { message = null }
+            )
+        }
     }
 }
+
+/** What the snack says, and the one thing it offers to do about it, if any. */
+data class SnackMessage(
+    val text: String,
+    val actionLabel: String? = null,
+    val onAction: (() -> Unit)? = null
+)
+
+/** How long typing has to pause before a search runs. */
+private const val SEARCH_SETTLE_MS = 150L
 
 /**
  * One clip.
@@ -239,6 +320,12 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
  * Tap pastes, hold edits — the same pair the floating list uses for the same
  * reason: pasting is what this is for, and editing is the occasional thing
  * that should not be one mis-tap away.
+ *
+ * Hold is a shortcut, not the way in. The pencil at the end of the row does
+ * the same thing where it can be seen: a long press nobody discovers is an
+ * edit feature that does not exist, and TalkBack users met it only as
+ * "double-tap and hold", with no word for what holding would do. Both
+ * gestures carry labels now, so the screen reader says "paste" and "edit".
  *
  * combinedClickable is the only way to have both from one modifier, and it
  * is still a foundation API behind an opt-in.
@@ -256,49 +343,75 @@ private fun ClipRow(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface, RoundedCornerShape(Radius.md))
-            .combinedClickable(onClick = onPaste, onLongClick = onEdit)
-            .padding(Space.lg)
-            .clearAndSetSemantics {
-                contentDescription = buildString {
-                    append(position).append(". ")
-                    clip.title?.takeIf { it.isNotBlank() }?.let { append(it).append(": ") }
-                    append(clip.content)
-                }
-            },
+            .combinedClickable(
+                onClickLabel = stringResource(R.string.clip_paste_action),
+                onLongClickLabel = stringResource(R.string.clip_edit_action),
+                onClick = onPaste,
+                onLongClick = onEdit
+            )
+            .padding(start = Space.lg, top = Space.md, bottom = Space.md, end = Space.xs),
         verticalAlignment = Alignment.Top
     ) {
-        // The row number. Positional, not an identity: it renumbers as clips
-        // arrive and are deleted, which is what makes "the third one down"
-        // useful.
-        Box(
+        // Read as one sentence rather than a number, then a title, then a
+        // body. The pencil stays outside this so it remains its own control.
+        Row(
             modifier = Modifier
-                .size(28.dp)
-                .background(colors.surfaceSunken, RoundedCornerShape(Radius.sm)),
-            contentAlignment = Alignment.Center
+                .weight(1f)
+                .padding(vertical = Space.xs)
+                .clearAndSetSemantics {
+                    contentDescription = buildString {
+                        append(position).append(". ")
+                        clip.title?.takeIf { it.isNotBlank() }?.let { append(it).append(": ") }
+                        append(clip.content)
+                    }
+                },
+            verticalAlignment = Alignment.Top
         ) {
-            Text(
-                text = position.toString(),
-                style = MaterialTheme.typography.bodySmall,
-                color = colors.inkSoft
-            )
-        }
-
-        Column(modifier = Modifier.padding(start = Space.md)) {
-            clip.title?.takeIf { it.isNotBlank() }?.let {
+            // The row number. Positional, not an identity: it renumbers as
+            // clips arrive and are deleted, which is what makes "the third one
+            // down" useful. A minimum rather than a size, so at large text
+            // "100" widens the badge instead of spilling out of it.
+            Box(
+                modifier = Modifier
+                    .sizeIn(minWidth = BadgeMin, minHeight = BadgeMin)
+                    .background(colors.surfaceSunken, RoundedCornerShape(Radius.sm))
+                    .padding(horizontal = Space.xs),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = colors.ink,
-                    maxLines = 1,
+                    text = position.toString(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.inkSoft,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            Column(modifier = Modifier.padding(start = Space.md)) {
+                clip.title?.takeIf { it.isNotBlank() }?.let {
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = colors.ink,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    text = clip.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = colors.inkSoft,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Text(
-                text = clip.content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.inkSoft,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis
+        }
+
+        IconButton(onClick = onEdit, modifier = Modifier.size(MinTouchTarget)) {
+            Icon(
+                imageVector = Icons.Filled.Edit,
+                contentDescription = stringResource(R.string.clip_edit_description, position),
+                tint = colors.inkSoft,
+                modifier = Modifier.size(IconSm)
             )
         }
     }

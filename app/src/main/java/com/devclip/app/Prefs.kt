@@ -79,9 +79,14 @@ object Prefs {
      * takes touches, which is indistinguishable from a phone that has started
      * ignoring part of the screen — so the slider stops well before the point
      * where the user could lose the list entirely.
+     *
+     * 60, not the 20 it was. The list floats over somebody else's app, and at
+     * 20% the clip text was a faint grey over whatever that app had drawn —
+     * legible in no light at all, let alone daylight. A value stored under
+     * the old floor is lifted to this one wherever it is read.
      */
     const val KEY_POPUP_ALPHA = "popup_alpha"
-    const val MIN_ALPHA = 20
+    const val MIN_ALPHA = 60
     const val DEFAULT_ALPHA = 100
 
     /**

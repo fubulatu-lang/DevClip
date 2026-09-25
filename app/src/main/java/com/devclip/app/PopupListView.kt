@@ -36,8 +36,13 @@ import android.widget.TextView
 @SuppressLint("ViewConstructor")
 class PopupListView(context: Context) : LinearLayout(context) {
 
-    /** Paste this clip into whatever field is focused underneath. */
-    var onPaste: ((String) -> Unit)? = null
+    /**
+     * Paste this clip into whatever field is focused underneath.
+     *
+     * Handed the row, not its text: the row may hold only a preview, and
+     * what gets pasted has to be the whole clip.
+     */
+    var onPaste: ((DevClipDatabaseHelper.Clip) -> Unit)? = null
 
     /** Open the launcher app, which also closes this window. */
     var onOpenFullApp: (() -> Unit)? = null
@@ -60,7 +65,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
      * somebody's message.
      */
     private var armedId: Long? = null
-    private val disarm = Runnable { armedId = null; redraw() }
+    private val disarm = Runnable { setArmed(null) }
 
     private var clips: List<DevClipDatabaseHelper.Clip> = emptyList()
     private var confirmBeforePaste = true
@@ -275,15 +280,20 @@ class PopupListView(context: Context) : LinearLayout(context) {
             setTextColor(palette.inkSoft)
             sp(this, DevClipTheme.MiniText.CAPTION)
             gravity = Gravity.CENTER
+            // A minimum, not a size. At this window's type scale a two-digit
+            // number fits in 20dp; at a large font size it does not, and a
+            // fixed box clipped it. The badge grows with its number instead.
+            minWidth = dp(DevClipTheme.Badge.MINI_MIN)
+            minHeight = dp(DevClipTheme.Badge.MINI_MIN)
+            includeFontPadding = false
+            setPadding(dp(DevClipTheme.Spacing.XS), 0, dp(DevClipTheme.Spacing.XS), 0)
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = dp(DevClipTheme.Radius.SM).toFloat()
                 setColor(palette.surfaceSunken)
             }
         }
-        // 20dp, not 24: at this window's type scale a two-digit number still
-        // fits, and the four dp go to the clip.
-        card.addView(badge, LayoutParams(dp(20), dp(20)).apply {
+        card.addView(badge, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
             rightMargin = dp(DevClipTheme.Spacing.SM)
             topMargin = dp(2)
         })
@@ -316,10 +326,14 @@ class PopupListView(context: Context) : LinearLayout(context) {
 
         card.addView(column, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
 
+        // The description replaces the visible "Tap again to paste", so it
+        // has to carry the armed state itself or a screen reader never hears
+        // that the next double-tap pastes.
         card.contentDescription = buildString {
             append(position).append(". ")
             if (!clip.title.isNullOrBlank()) append(clip.title).append(": ")
             append(clip.content)
+            if (armed) append(". ").append(context.getString(R.string.devclip_popup_armed))
         }
         card.setOnClickListener { onRowTapped(clip) }
 
@@ -339,20 +353,47 @@ class PopupListView(context: Context) : LinearLayout(context) {
      */
     private fun onRowTapped(clip: DevClipDatabaseHelper.Clip) {
         if (!confirmBeforePaste) {
-            onPaste?.invoke(clip.content)
+            onPaste?.invoke(clip)
             return
         }
         if (armedId == clip.id) {
             handler.removeCallbacks(disarm)
-            armedId = null
-            redraw()
-            onPaste?.invoke(clip.content)
+            setArmed(null)
+            onPaste?.invoke(clip)
             return
         }
-        armedId = clip.id
-        redraw()
+        setArmed(clip.id)
+        announceForAccessibility(context.getString(R.string.devclip_popup_armed_announcement))
         handler.removeCallbacks(disarm)
         handler.postDelayed(disarm, ARM_TIMEOUT_MS)
+    }
+
+    /**
+     * Moves the arm, rebuilding only the rows it leaves and lands on.
+     *
+     * It used to redraw the whole list — fifty rows of views torn down and
+     * built again on every tap, to change the outline on at most two of them.
+     */
+    private fun setArmed(id: Long?) {
+        val before = armedId
+        armedId = id
+        if (clips.isEmpty()) return
+        listOfNotNull(before, id).distinct().forEach { changed ->
+            val index = clips.indexOfFirst { it.id == changed }
+            if (index < 0 || index >= rows.childCount) return@forEach
+            val focused = rows.getChildAt(index).createAccessibilityNodeInfo().isAccessibilityFocused
+            rows.removeViewAt(index)
+            val row = buildRow(clips[index], index + 1)
+            rows.addView(row, index)
+            // Put TalkBack's focus back where it was, or it drops to the top
+            // of the window every time a row is armed.
+            if (focused) row.post {
+                row.performAccessibilityAction(
+                    android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS,
+                    null
+                )
+            }
+        }
     }
 
     /** Releases the arm timer so a torn-down window leaves nothing pending. */
@@ -377,14 +418,14 @@ class StrokeIconView(context: Context, private val icon: StrokeIcon, tint: Int) 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tint
         style = Paint.Style.STROKE
-        strokeWidth = context.resources.displayMetrics.density * 1.8f
+        strokeWidth = context.resources.displayMetrics.density * DevClipTheme.IconSize.STROKE_DP
         strokeCap = Paint.Cap.ROUND
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
-        val glyph = 18f * density
+        val glyph = DevClipTheme.IconSize.SM * density
         val left = (width - glyph) / 2f
         val top = (height - glyph) / 2f
         val right = left + glyph

@@ -23,6 +23,13 @@
     <string name="devclip_popup_empty">No clips yet</string>
     <string name="devclip_popup_tap_to_paste">Tap to paste</string>
     <string name="devclip_popup_armed">Tap again to paste</string>
+    <!-- Spoken when a row is armed, so a screen reader user knows the next
+         double-tap pastes rather than wondering why the first did nothing. -->
+    <string name="devclip_popup_armed_announcement">Ready. Double-tap again to paste</string>
+    <!-- The bubble, to TalkBack. It has no visible text; this is its name. -->
+    <string name="devclip_bubble_description">DevClip bubble</string>
+    <string name="devclip_bubble_tap_action">Save highlighted text, or show clips</string>
+    <string name="devclip_bubble_long_action">Show clips</string>
     <string name="devclip_paste_copied_only">Couldn’t paste automatically, so it’s on your clipboard — paste it manually.</string>
     <string name="devclip_handle_description">Show the DevClip bubble</string>
     <string name="devclip_notification_channel">DevClip bubble</string>
@@ -56,6 +63,14 @@
     <string name="search_clear">Clear search</string>
     <string name="more_options">More options</string>
     <string name="paste_done">Pasted</string>
+    <!-- What TalkBack says a tap and a hold on a clip will do. -->
+    <string name="clip_paste_action">Paste</string>
+    <string name="clip_edit_action">Edit</string>
+    <string name="clip_edit_description">Edit clip %1$d</string>
+    <string name="clip_deleted">Clip deleted</string>
+    <string name="clip_gone">That clip has already been deleted</string>
+    <string name="clip_restore_failed">Couldn’t bring that clip back</string>
+    <string name="undo">Undo</string>
 
     <!-- Editing a clip. -->
     <string name="edit_title_label">Title</string>
@@ -102,6 +117,10 @@
     <string name="history_export">Export a backup</string>
     <string name="history_import">Import a backup</string>
     <string name="history_clear">Delete all clips</string>
+    <string name="history_clear_confirm_title">Delete all clips?</string>
+    <string name="history_clear_confirm_body">Every clip is removed from DevClip, and this can’t be undone. Export a backup first if you might want them back.</string>
+    <string name="history_clear_confirm">Delete all</string>
+    <string name="cancel">Cancel</string>
 
     <string name="settings_appearance">Appearance</string>
     <string name="theme">Theme</string>

@@ -108,10 +108,17 @@ object OneUiHeaderDefaults {
      * get to — which on a phone this tall is not the top third. The floor is
      * what keeps that true on a small screen, where 44% of not very much is
      * still not very far.
+     *
+     * The floor gives way on a short window. A phone on its side is about
+     * 380dp tall, and a 300dp floor there opened the bar over nearly all of
+     * it; half the window is as far as it goes.
      */
     @Composable
-    fun expandedHeight(): Dp =
-        (LocalConfiguration.current.screenHeightDp * 0.44f).dp.coerceIn(300.dp, 460.dp)
+    fun expandedHeight(): Dp {
+        val height = LocalConfiguration.current.screenHeightDp.toFloat()
+        val floor = minOf(300f, height * 0.5f)
+        return (height * 0.44f).coerceIn(floor, 460f).dp
+    }
 }
 
 @Composable

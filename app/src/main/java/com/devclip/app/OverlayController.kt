@@ -264,6 +264,7 @@ object OverlayController {
 
     fun popupAlpha(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_POPUP_ALPHA, Prefs.DEFAULT_ALPHA)
+            .coerceIn(Prefs.MIN_ALPHA, 100)
 
     fun tuckDelay(context: Context): Int =
         prefs(context).getInt(Prefs.KEY_TUCK_DELAY_SEC, Prefs.DEFAULT_TUCK_DELAY_SEC)

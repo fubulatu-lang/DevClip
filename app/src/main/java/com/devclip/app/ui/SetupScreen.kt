@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,7 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import com.devclip.app.OverlayController
 import com.devclip.app.R
 
@@ -81,6 +81,7 @@ fun SetupScreen(onDone: () -> Unit) {
     ) { /* The resume tick re-reads it; nothing to do with the result here. */ }
 
     val allDone = captureOn && overlayOn && notificationsOn && batteryFree
+    val layout = rememberWindowLayout()
 
     Box(
         modifier = Modifier
@@ -95,8 +96,8 @@ fun SetupScreen(onDone: () -> Unit) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(
-                    start = Space.keyline,
-                    end = Space.keyline,
+                    start = layout.margin,
+                    end = layout.margin,
                     top = Space.keyline
                 ),
                 verticalArrangement = Arrangement.spacedBy(Space.sm)
@@ -193,8 +194,8 @@ fun SetupScreen(onDone: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = Space.keyline,
-                        end = Space.keyline,
+                        start = layout.margin,
+                        end = layout.margin,
                         bottom = Space.keyline,
                         top = Space.md
                     ),
@@ -255,9 +256,11 @@ private fun StepCard(
             .padding(Space.lg),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // A minimum, so the number grows the circle at large text rather
+        // than spilling out of it.
         Box(
             modifier = Modifier
-                .size(28.dp)
+                .sizeIn(minWidth = BadgeMin, minHeight = BadgeMin)
                 .background(
                     if (done) colors.success else colors.surfaceSunken,
                     CircleShape
@@ -267,7 +270,8 @@ private fun StepCard(
             Text(
                 text = number.toString(),
                 style = MaterialTheme.typography.bodySmall,
-                color = if (done) colors.onAccent else colors.inkSoft
+                color = if (done) colors.onAccent else colors.inkSoft,
+                textAlign = TextAlign.Center
             )
         }
 
@@ -281,7 +285,7 @@ private fun StepCard(
                 text = body,
                 style = MaterialTheme.typography.bodySmall,
                 color = colors.inkSoft,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = Space.xs)
             )
         }
 

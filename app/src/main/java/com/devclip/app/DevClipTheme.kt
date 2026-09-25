@@ -244,4 +244,66 @@ object DevClipTheme {
      * its time.
      */
     const val MIN_TOUCH_TARGET = 48
+
+    /**
+     * The status mark beside each row under Settings › Status, in dp. Small,
+     * because the words beside it carry the meaning; the mark is the glance.
+     */
+    const val STATUS_DOT = 10
+
+    /**
+     * The row-number badge, in dp.
+     *
+     * Minimums, never fixed sizes. The number inside is in sp and follows the
+     * user's font size; a fixed box around it clipped "100" at large text,
+     * and the clip limit goes to a thousand.
+     */
+    object Badge {
+        const val MIN = 28
+        const val MINI_MIN = 20
+    }
+
+    /**
+     * One UI's adaptive margins, from `AdaptiveCoordinatorLayout`.
+     *
+     * Driven by the window, never the device: a foldable opening, a tablet in
+     * split screen and a phone turned sideways are all just widths. Below
+     * [MEDIUM] the keyline is the margin. The height condition is One UI's
+     * own — a phone on its side is wide but short, and gets the phone layout.
+     */
+    object Breakpoint {
+        const val MEDIUM = 589
+        const val EXPANDED = 960
+        const val MEDIUM_MIN_HEIGHT = 412
+        const val MEDIUM_MARGIN = 0.05f
+        const val EXPANDED_MARGIN = 0.125f
+    }
+
+    /**
+     * The colours drawn over other people's apps, which no theme governs.
+     *
+     * The bubble's ring, the edge handle and the drag-to-hide target all sit
+     * on a background DevClip does not control, so they cannot follow light
+     * or dark: they pair a white with a black so that whichever one the app
+     * underneath swallows, the other survives. Named here so they are the
+     * design system's exceptions rather than literals scattered through three
+     * files.
+     */
+    object Overlay {
+        val LIGHT = Color.WHITE
+        val DARK = Color.BLACK
+
+        /** The drag-to-hide circle at rest: dark enough to hold a white ✕ over anything. */
+        val DISMISS_IDLE = Color.argb(210, 40, 40, 40)
+
+        /**
+         * The drag-to-hide circle once the bubble is over it. Light-theme
+         * `danger`: removal is what that colour means, and it is also bigger
+         * when engaged, so colour is not the only change.
+         */
+        val DISMISS_ENGAGED = light.danger
+
+        /** The fade behind the drag-to-hide target, at its darkest. */
+        val DISMISS_SCRIM = Color.argb(150, 0, 0, 0)
+    }
 }

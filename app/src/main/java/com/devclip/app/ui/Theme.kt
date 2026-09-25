@@ -5,6 +5,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -16,6 +17,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.devclip.app.DevClipEvents
@@ -84,6 +86,52 @@ object Radius {
 
 /** The minimum touch target. A control may be drawn smaller; its target may not. */
 val MinTouchTarget = DevClipTheme.MIN_TOUCH_TARGET.dp
+
+/** The row-number badge's smallest size. It grows past this with the text in it. */
+val BadgeMin = DevClipTheme.Badge.MIN.dp
+
+/** One UI's compact symbol size, for an icon sharing a row with text. */
+val IconSm = DevClipTheme.IconSize.SM.dp
+
+/** The Settings status mark, and the stroke of its hollow "off by choice" form. */
+val StatusDot = DevClipTheme.STATUS_DOT.dp
+val StatusRing = DevClipTheme.IconSize.STROKE_DP.dp
+
+/**
+ * How the current window is laid out: the side margin, and how many columns
+ * of clips fit across it.
+ *
+ * Read from the window rather than the device, so a foldable opening, a
+ * tablet in split screen and a phone on its side each get the shape that fits
+ * the width they actually have. The margin follows One UI's adaptive rule,
+ * including its height condition, which keeps a phone on its side on the
+ * keyline. Columns only ask about width: a sideways phone is short, but it is
+ * still wide enough for two cards.
+ */
+@Immutable
+data class WindowLayout(val margin: Dp, val columns: Int)
+
+@Composable
+fun rememberWindowLayout(): WindowLayout {
+    val configuration = LocalConfiguration.current
+    val width = configuration.screenWidthDp
+    val height = configuration.screenHeightDp
+    return remember(width, height) {
+        val bp = DevClipTheme.Breakpoint
+        val tallEnough = height >= bp.MEDIUM_MIN_HEIGHT
+        val share = when {
+            !tallEnough -> 0f
+            width >= bp.EXPANDED -> bp.EXPANDED_MARGIN
+            width >= bp.MEDIUM -> bp.MEDIUM_MARGIN
+            else -> 0f
+        }
+        WindowLayout(
+            // Never inside the keyline, whatever the percentage works out to.
+            margin = maxOf(Space.keyline, (width * share).dp),
+            columns = if (width >= bp.MEDIUM) 2 else 1
+        )
+    }
+}
 
 private val LocalDevClipColors = staticCompositionLocalOf<DevClipColors> {
     error("DevClipComposeTheme is missing from the tree")
