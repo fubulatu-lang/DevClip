@@ -58,17 +58,37 @@
     <string name="search_close">Leave search</string>
     <string name="search_clear">Clear search</string>
     <string name="more_options">More options</string>
-    <string name="paste_done">Pasted</string>
     <!-- What TalkBack says a tap and a hold on a clip will do. -->
-    <string name="clip_paste_action">Paste</string>
-    <string name="clip_edit_action">Edit</string>
-    <string name="clip_edit_description">Edit clip %1$d</string>
+    <string name="clip_open_action">Open</string>
+    <string name="clip_copy">Copy</string>
+    <string name="clip_copy_description">Copy clip %1$d</string>
+    <string name="copied">Copied</string>
+    <string name="copy_failed">Couldn’t copy that clip</string>
     <string name="clip_deleted">Clip deleted</string>
     <string name="clip_gone">That clip has already been deleted</string>
     <string name="clip_restore_failed">Couldn’t bring that clip back</string>
     <string name="undo">Undo</string>
 
-    <!-- Editing a clip. -->
+    <!-- A new note, from the + in the app or the floating list. -->
+    <string name="note_add">New note</string>
+    <string name="note_new_heading">New note</string>
+    <string name="note_placeholder">Type or paste anything</string>
+    <string name="note_saved">Note saved</string>
+    <string name="note_save_failed">Couldn’t save the note. Your text is still here.</string>
+
+    <!-- The bubble button at the top of the clip list. -->
+    <string name="bubble_show">Show bubble</string>
+    <string name="bubble_shown">Bubble is on screen</string>
+    <string name="bubble_needs_overlay">Allow DevClip to appear on top, then tap the bubble button again</string>
+
+    <!-- What's new. -->
+    <string name="whats_new_title">What’s new</string>
+    <string name="whats_new_version">Version %1$s</string>
+    <string name="whats_new_close">Close</string>
+    <string name="whats_new_link">%1$s · What’s new</string>
+
+    <!-- Opening a clip. -->
+    <string name="edit_heading">Clip</string>
     <string name="edit_title_label">Title</string>
     <string name="edit_title_placeholder">Optional</string>
     <string name="edit_content_label">Text</string>

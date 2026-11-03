@@ -163,11 +163,12 @@ hold still when animations are off; the haptic still fires.
 **Accessibility is not a later pass.**
 
 - Icon-only controls have a content description that says what they do
-  ("Edit clip 3", "Close DevClip").
+  ("Copy clip 3", "Close DevClip").
 - A control and its label are one node: switch rows use `toggleable` with
   `Role.Switch`; sliders carry their label and their value in the units on
   screen; choice chips are a `selectableGroup` of `Role.RadioButton`.
-- Gestures carry labels: a clip row says "paste" and "edit"; the bubble's
+- Gestures carry labels: a clip row in the app says "open"; its copy button
+  says which clip it copies ("Copy clip 3"); the bubble's
   click and long click are named accessibility actions.
 - Status messages are live regions.
 - Section titles are headings.

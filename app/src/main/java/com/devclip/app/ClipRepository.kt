@@ -52,6 +52,21 @@ object ClipRepository {
 
     suspend fun count(context: Context): Int = withDb(context) { it.countClips() }
 
+    /**
+     * Saves a typed note, holds the user's clip limit, and tells every open
+     * list. False if the write failed, so the caller can say so instead of
+     * closing the sheet on text that went nowhere.
+     */
+    suspend fun addNote(context: Context, content: String, title: String?): Boolean {
+        val saved = withDb(context) { db ->
+            db.insertNote(title, content).also { ok ->
+                if (ok) db.trimToMax(OverlayController.maxClips(context))
+            }
+        }
+        if (saved) DevClipEvents.emitClipsChanged()
+        return saved
+    }
+
     suspend fun update(context: Context, id: Long, content: String, title: String?) =
         withDb(context) { it.updateClip(id, content, title) }
 

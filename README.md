@@ -6,6 +6,37 @@ saved. No switching apps, no pressing a Capture button, no clipboard involved.
 **Start here:** [SETUP_GUIDE.md](./SETUP_GUIDE.md) — step-by-step, phone +
 GitHub only, no computer required.
 
+## v1.4.0 — Clips open when you tap them, and notes start with a +
+
+The newest release. Every release adds a section here, newest first, with the
+same version and title as the newest entry in "What's new"
+(`app/src/main/java/com/devclip/app/Changelog.kt`). That entry is for the
+person using the app; this section is for whoever works on it. The build
+refuses to run if `versionName`, that entry and this heading disagree — see
+`checkVersion` in `app/build.gradle.kts`.
+
+- **Tap opens, not pastes.** In the launcher app a tap on a clip opens the
+  sheet; the trailing button on each card copies. The floating list is
+  unchanged: tap (or tap twice, with confirm on) pastes.
+- **The sheet** is one composable for an opened clip and a new note
+  (`EditClipSheet` with `clip = null`). Opened: Copy, Delete, Cancel, Save.
+  New: Cancel, Save. Save is disabled on empty text.
+- **New notes** go through `DevClipDatabaseHelper.insertNote`, not
+  `insertClip` — no top-of-list duplicate guard, and a title from the start.
+  They respect the clip limit and emit `clipsChanged`.
+- **The floating list's +** starts `QuickNoteActivity`: translucent,
+  excluded from Recents, its own task. The list's window is not focusable by
+  design, so it cannot host a keyboard itself.
+- **Show bubble** in the app bar calls `OverlayController.startBubble`, which
+  sends `ACTION_WAKE` and so also brings back a hidden or tucked bubble.
+- **What's new** follows the Design-Constants changelog spec, adapted:
+  `AppVersion` (the version alone), `Changelog` (the entries), `ChangelogGate`
+  (once per version, keyed per install because there are no accounts), and
+  `WhatsNewDialog`. A fresh install is marked as seen when setup finishes.
+- **Icons** are hand-drawn line glyphs in `ui/Glyphs.kt`, on the same 1.8dp
+  stroke token as the floating list, replacing Material's filled icons. The
+  app bar shows the launcher icon, read from the package manager.
+
 ## The one thing to understand
 
 **DevClip never reads the clipboard to capture.** It reads the text you have

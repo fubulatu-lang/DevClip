@@ -1365,6 +1365,7 @@ class OverlayService : Service() {
             // within its own touch dispatch is the same trouble the drag-to-
             // hide gesture already avoids this way.
             onOpenFullApp = { mainHandler.post { this@OverlayService.openFullApp() } }
+            onAddNote = { mainHandler.post { this@OverlayService.openQuickNote() } }
             onClose = { mainHandler.post { this@OverlayService.hidePopup() } }
             onPaste = { clip -> this@OverlayService.pasteFromPopup(fullText(clip)) }
         }
@@ -1665,6 +1666,23 @@ class OverlayService : Service() {
     private fun openFullApp() {
         hidePopup()
         val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        startActivity(intent)
+    }
+
+    /**
+     * A new note, typed over whatever app is underneath.
+     *
+     * Its own small activity rather than a field in this window. The list's
+     * window is deliberately not focusable — that is what lets a paste land
+     * in the app below — and a window that cannot take focus cannot take a
+     * keyboard either. QuickNoteActivity can, and it is translucent, so the
+     * app the user was in stays visible behind the sheet.
+     */
+    private fun openQuickNote() {
+        hidePopup()
+        val intent = Intent(this, QuickNoteActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)

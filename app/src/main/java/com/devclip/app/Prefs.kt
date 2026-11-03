@@ -55,6 +55,9 @@ object Prefs {
      * limit until DevClip was next opened.
      */
     const val KEY_MAX_CLIPS = "max_clips"
+
+    /** The versionName whose "What's new" was last seen. See ChangelogGate. */
+    const val KEY_CHANGELOG_SEEN = "changelog_seen_version"
     const val DEFAULT_MAX_CLIPS = 500
 
     /**

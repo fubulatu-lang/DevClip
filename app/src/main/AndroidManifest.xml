@@ -70,6 +70,25 @@
             </intent-filter>
         </activity>
 
+        <!--
+          The + in the floating list: a sheet for typing a new note, over
+          whatever app the user is in.
+
+          Translucent, so that app stays visible behind the sheet.
+          excludeFromRecents and an empty taskAffinity for the same reasons
+          as the selection-menu entry above: it is not a screen of DevClip's,
+          and closing it must return to the app underneath, not the clip list.
+          adjustResize so the keyboard pushes the sheet up instead of covering
+          the field being typed into.
+        -->
+        <activity
+            android:name=".QuickNoteActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.DevClip.Sheet"
+            android:windowSoftInputMode="adjustResize|stateVisible" />
+
         <!-- Owns the bubble, the floating list and the drag-to-hide target. -->
         <service
             android:name=".OverlayService"

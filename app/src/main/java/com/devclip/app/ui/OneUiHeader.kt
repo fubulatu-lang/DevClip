@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,10 @@ import com.devclip.app.DevClipTheme
  * here unspent; that leftover is exactly the "there is nowhere left to go"
  * signal the gesture needs. Dragging up collapses the bar first and moves the
  * list afterwards, which is the order One UI uses.
+ *
+ * [leading] is drawn beside the title and moves with it — the app's own
+ * icon, on the screen that is the app's front door. It is handed the open
+ * fraction so it can grow in step with the title.
  *
  * Collapsed, the title and the controls share one row. Expanded, the title
  * rises and grows and the controls sit at the bottom edge, just above the
@@ -142,6 +147,7 @@ fun OneUiHeader(
     state: OneUiHeaderState,
     modifier: Modifier = Modifier,
     navigationIcon: @Composable (() -> Unit)? = null,
+    leading: @Composable ((fraction: Float) -> Unit)? = null,
     actionsWidth: Dp = 0.dp,
     actions: @Composable RowScope.() -> Unit = {}
 ) {
@@ -204,14 +210,23 @@ fun OneUiHeader(
                 verticalBias = 0f
             )
         ) {
-            Text(
-                text = title,
-                color = colors.ink,
-                fontSize = titleSize.sp,
-                fontWeight = FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            // The leading mark travels with the title as one unit, so the
+            // pair centres together when the bar opens rather than the title
+            // centring and the mark being left behind on the keyline.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (leading != null) {
+                    leading(f)
+                    Spacer(Modifier.width(Space.md))
+                }
+                Text(
+                    text = title,
+                    color = colors.ink,
+                    fontSize = titleSize.sp,
+                    fontWeight = FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Row(
