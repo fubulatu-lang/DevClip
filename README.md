@@ -6,6 +6,30 @@ saved. No switching apps, no pressing a Capture button, no clipboard involved.
 **Start here:** [SETUP_GUIDE.md](./SETUP_GUIDE.md) — step-by-step, phone +
 GitHub only, no computer required.
 
+## v1.5.0 — Notes you type straight into the bubble's list
+
+- **The floating list's + composes in place.** `PopupListView.startComposing`
+  inserts an `EditText` under the header; `QuickNoteActivity` and its
+  translucent theme are gone. The + in the launcher app still opens
+  `EditClipSheet`.
+- **Focus is borrowed, not kept.** While a note is open the popup window
+  drops `FLAG_NOT_FOCUSABLE` and adds `FLAG_NOT_TOUCH_MODAL` (without it a
+  focusable window would take every touch on screen), with
+  `SOFT_INPUT_STATE_ALWAYS_VISIBLE`. `leaveNoteMode` restores both the
+  moment the note closes, so pasting into the app underneath is unaffected.
+- **Every close saves.** `hidePopup` calls `commitNote` first: blank text
+  saves nothing, a save goes through `DevClipDatabaseHelper.insertNote` and
+  trims to the clip limit, and a failed save keeps the list open with an
+  inline error. `hidePopup(force = true)` (the bubble being hidden) closes
+  regardless; the draft survives.
+- **Drafts.** `Prefs.KEY_NOTE_DRAFT` is written on every keystroke and
+  cleared on save, and offered back as "Draft restored".
+- **Geometry.** While composing, the window keeps above 55% of the screen
+  height (`NOTE_KEYBOARD_LINE`) so the field is never under the keyboard.
+- **Taps during a note.** A row tap commits the note instead of pasting;
+  a bubble tap closes (and saves) instead of capturing, because the
+  selection it would read may be in the note.
+
 ## v1.4.0 — Clips open when you tap them, and notes start with a +
 
 The newest release. Every release adds a section here, newest first, with the

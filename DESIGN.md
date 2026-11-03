@@ -24,9 +24,8 @@ Two moments are *read* rather than operated: the setup wall, the only place `DIS
 
 | Surface | Built in | Shape | Depth of function |
 |---|---|---|---|
-| **Floating list** | Views, `PopupListView` in a window `OverlayService` owns | Tethered to the bubble, 320×460dp by default, resizable from any edge (220–560 × 160–900dp) | **Paste**, plus a + that opens the quick-note sheet. No search, no editing, no long press — a gesture is never the only route to anything |
+| **Floating list** | Views, `PopupListView` in a window `OverlayService` owns | Tethered to the bubble, 320×460dp by default, resizable from any edge (220–560 × 160–900dp) | **Paste**, plus a + that opens a note at the top of the list which saves itself when the list closes. While the note is open — and only then — the window takes focus and the keyboard. No search, no editing, no long press — a gesture is never the only route to anything |
 | **Full app** | Compose, `MainActivity` | Whole screen from the launcher | Reading, search, editing, new notes, settings, backup. **Tap opens a clip; it does not paste** — the trailing button copies |
-| **Quick note** | Compose, `QuickNoteActivity`, translucent | The new-note sheet over whatever app is open, from the floating list's + | Type a note, save, return to the app underneath |
 | **Bubble, edge handle, hide target** | Views and drawables in `OverlayService` | Floating over whatever app is open | Capture, open the list, hide |
 
 They are not one screen at two sizes. The floating list is views on purpose: it draws into a window a service owns, where Compose needs lifecycle owners wired by hand and fails by rendering nothing. It runs its type 15% below the full app's roles — proportional to the user's font scale, not a fixed small number, with 12sp as the floor — so someone running large text still gets large text there, just more compact.
@@ -69,6 +68,6 @@ The bubble, its selection ring, the edge handle and the drag-to-hide target sit 
 - **The tertiary grey is for disabled only.** One UI publishes `#8C8C8C` as tertiary text; at 3.14:1 on the light surface it fails WCAG AA, so DevClip uses it only for disabled states and the faintest readable text is the published secondary `#505050`.
 - **"What's new" is a dialog.** It is news, which this world gives to a snack, but a release's worth of notes does not fit in one. It appears once per version, after an update, and is otherwise only opened on purpose from the version link at the foot of Settings or the overflow menu.
 - **Symbols are drawn, not Material's.** `ui/Glyphs.kt` holds line glyphs on the 1.8dp stroke token; the filled Material icons read as a second system on top of this one.
-- **Toasts from the services.** The quick-note activity also confirms with a toast: it has finished, and its window gone, by the time the save is news. The overlay service has no Activity to hold a snack, and the windows it would draw one in have often just been torn down.
+- **Toasts from the services.** "Note saved" from the floating list is a toast too: the list has closed by the time the save is news. The overlay service has no Activity to hold a snack, and the windows it would draw one in have often just been torn down.
 
 Each is recorded with its reason in `ONE-UI.md`.

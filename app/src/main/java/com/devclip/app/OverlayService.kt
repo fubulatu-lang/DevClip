@@ -217,6 +217,9 @@ class OverlayService : Service() {
         private const val TETHER_GAP_DP = 8
         private const val EDGE_MARGIN_DP = 8
 
+        /** Where a note keeps the list above: the share of the screen a phone keyboard leaves. */
+        private const val NOTE_KEYBOARD_LINE = 0.55f
+
         /**
          * Thickness of the ring that says "a selection is live, tapping will
          * capture it".
@@ -786,7 +789,7 @@ class OverlayService : Service() {
         removeHandle()
         // Hiding the bubble hides what hangs off it. Leaving the list floating
         // with nothing to be tethered to would be its own bug.
-        hidePopup()
+        hidePopup(force = true)
         removeBubble()
         refreshNotification()
 
@@ -1303,6 +1306,12 @@ class OverlayService : Service() {
      * selected is asking for.
      */
     private fun onBubbleTapped() {
+        // With a note open, the selection the capture would read is likely
+        // in the note itself. The tap means "done", as the close button does.
+        if (popupVisible && popupContent?.isComposing == true) {
+            hidePopup()
+            return
+        }
         when (val outcome = Capture.attempt(this)) {
             is Capture.Outcome.Saved -> {
                 buzz()
@@ -1365,7 +1374,10 @@ class OverlayService : Service() {
             // within its own touch dispatch is the same trouble the drag-to-
             // hide gesture already avoids this way.
             onOpenFullApp = { mainHandler.post { this@OverlayService.openFullApp() } }
-            onAddNote = { mainHandler.post { this@OverlayService.openQuickNote() } }
+            onAddNote = { this@OverlayService.startNote() }
+            onComposeStart = { this@OverlayService.enterNoteMode() }
+            onDraftChanged = { text -> this@OverlayService.keepDraft(text) }
+            onCommitRequested = { this@OverlayService.commitNote() }
             onClose = { mainHandler.post { this@OverlayService.hidePopup() } }
             onPaste = { clip -> this@OverlayService.pasteFromPopup(fullText(clip)) }
         }
@@ -1622,7 +1634,19 @@ class OverlayService : Service() {
         hidePopup()
     }
 
-    private fun hidePopup() {
+    /**
+     * Closes the list — and, if a note is open, saves it first.
+     *
+     * Every way the list closes comes through here: the close button, a tap
+     * outside, Back, the bubble, dragging the bubble away, opening the full
+     * app. So this is the one place that has to know a note saves itself.
+     * If the save fails the list stays open with the note in it, because
+     * closing would be the one thing that could lose it; [force] closes
+     * regardless, for the service going away — the draft is kept for then.
+     */
+    private fun hidePopup(force: Boolean = false) {
+        if (!commitNote() && !force) return
+        popupContent?.let { if (it.isComposing) leaveNoteMode() }
         popupView?.let {
             try { windowManager.removeView(it) } catch (e: Exception) { /* already removed */ }
         }
@@ -1657,10 +1681,22 @@ class OverlayService : Service() {
             y = (bubble?.y ?: area.top) - height - gap
         }
 
+        // A note brings the keyboard up over the bottom of the screen, and
+        // the field is at the top of this window. Keep the window above the
+        // keyboard's line rather than tethered under a bubble the keyboard
+        // may be about to cover: a little over half the screen, which is
+        // where a phone keyboard stops.
+        var h = height
+        if (popupContent?.isComposing == true) {
+            val keyboardTop = area.top + (area.height * NOTE_KEYBOARD_LINE).toInt()
+            h = min(height, keyboardTop - area.top - dp(EDGE_MARGIN_DP)).coerceAtLeast(1)
+            if (y + h > keyboardTop) y = keyboardTop - h
+        }
+
         params.width = width
-        params.height = height
+        params.height = h
         params.x = clamp(x, area.left, area.right - width)
-        params.y = clamp(y, area.top, area.bottom - height)
+        params.y = clamp(y, area.top, area.bottom - h)
     }
 
     private fun openFullApp() {
@@ -1671,21 +1707,106 @@ class OverlayService : Service() {
         startActivity(intent)
     }
 
+    // ---- A note typed in the floating list ----
+
+    /** The + in the list: open a note, bringing back any interrupted draft. */
+    private fun startNote() {
+        val content = popupContent ?: return
+        content.startComposing(prefs().getString(Prefs.KEY_NOTE_DRAFT, null))
+    }
+
     /**
-     * A new note, typed over whatever app is underneath.
+     * Lets the list take the keyboard, for as long as a note is open.
      *
-     * Its own small activity rather than a field in this window. The list's
-     * window is deliberately not focusable — that is what lets a paste land
-     * in the app below — and a window that cannot take focus cannot take a
-     * keyboard either. QuickNoteActivity can, and it is translucent, so the
-     * app the user was in stays visible behind the sheet.
+     * The window is normally not focusable, and that is what lets a paste
+     * land in the app underneath. A window that cannot take focus cannot
+     * take typing either, so for the note — and only the note — it can.
+     * NOT_TOUCH_MODAL with it, or a focusable window would swallow every
+     * touch on the screen, the bubble and the app below included.
+     * leaveNoteMode puts both back the moment the note closes.
      */
-    private fun openQuickNote() {
-        hidePopup()
-        val intent = Intent(this, QuickNoteActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun enterNoteMode() {
+        val params = popupParams ?: return
+        params.flags = (params.flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv()) or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        // Shows the keyboard when the window gains focus, which is a moment
+        // after this layout lands — too late for a direct request alone.
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE or
+            WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+        applyPopupGeometry()
+        updatePopupLayout()
+        popupContent?.focusNote()
+    }
+
+    private fun leaveNoteMode() {
+        popupContent?.stopComposing()
+        val params = popupParams ?: return
+        params.flags = (params.flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) and
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL.inv()
+        params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_STATE_UNSPECIFIED
+        applyPopupGeometry()
+        updatePopupLayout()
+    }
+
+    /**
+     * Kept on every keystroke, so a note interrupted by anything — the screen
+     * locking, a call, Android stopping this service — is still there the
+     * next time + is tapped.
+     */
+    private fun keepDraft(text: String) {
+        prefs().edit().apply {
+            if (text.isBlank()) remove(Prefs.KEY_NOTE_DRAFT) else putString(Prefs.KEY_NOTE_DRAFT, text)
+        }.apply()
+    }
+
+    /**
+     * Saves the open note, if there is one, and returns the list to pasting.
+     *
+     * True when the list may now close: no note was open, the note was empty
+     * (nothing is saved and nothing is said — the field going away is the
+     * whole outcome), or it saved. False only when the save failed, and then
+     * the note stays open, shows why, and keeps its text.
+     */
+    private fun commitNote(): Boolean {
+        val content = popupContent ?: return true
+        if (!content.isComposing) return true
+
+        val text = content.noteText().trim()
+        if (text.isEmpty()) {
+            keepDraft("")
+            leaveNoteMode()
+            return true
         }
-        startActivity(intent)
+
+        val saved = saveNote(text)
+        if (!saved) {
+            content.showSaveError()
+            return false
+        }
+        keepDraft("")
+        leaveNoteMode()
+        refreshPopupContent()
+        toast(getString(R.string.note_saved))
+        return true
+    }
+
+    /**
+     * On the main thread, as every read and write from this window is: one
+     * insert, in response to a tap, with nothing else for the user to wait
+     * on.
+     */
+    private fun saveNote(text: String): Boolean {
+        val helper = DevClipDatabaseHelper(applicationContext)
+        val ok = try {
+            helper.insertNote(null, text).also { if (it) helper.trimToMax(OverlayController.maxClips(this)) }
+        } catch (e: Exception) {
+            android.util.Log.e("DevClip", "Could not save a note from the floating list", e)
+            false
+        } finally {
+            try { helper.close() } catch (e: Exception) { }
+        }
+        if (ok) DevClipEvents.emitClipsChanged()
+        return ok
     }
 
     override fun onDestroy() {

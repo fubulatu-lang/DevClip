@@ -75,6 +75,10 @@
     <string name="note_placeholder">Type or paste anything</string>
     <string name="note_saved">Note saved</string>
     <string name="note_save_failed">Couldn’t save the note. Your text is still here.</string>
+    <string name="note_saves_on_close">Saves when you close</string>
+    <string name="note_draft_restored">Draft restored</string>
+    <string name="note_save_failed_inline">Couldn’t save. Your note is still here. Close again to retry.</string>
+    <string name="note_close_and_save">Close and save the note</string>
 
     <!-- The bubble button at the top of the clip list. -->
     <string name="bubble_show">Show bubble</string>
