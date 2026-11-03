@@ -17,15 +17,4 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!--
-      The quick-note sheet's window: nothing of its own is drawn, so the app
-      the user was in stays visible behind the sheet. No dim here: the sheet
-      brings its own scrim, and two would stack.
-    -->
-    <style name="Theme.DevClip.Sheet" parent="Theme.DevClip">
-        <item name="android:windowIsTranslucent">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:backgroundDimEnabled">false</item>
-        <item name="android:windowNoTitle">true</item>
-    </style>
 </resources>

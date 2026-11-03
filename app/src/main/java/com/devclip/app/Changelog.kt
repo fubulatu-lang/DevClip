@@ -32,6 +32,17 @@ object Changelog {
 
     val entries: List<Entry> = listOf(
         Entry(
+            version = "1.5.0",
+            title = "Notes you type straight into the bubble's list",
+            items = listOf(
+                "The + in the floating list now opens a note right there, at the top of the list, with the keyboard up. You stay in the app you were using the whole time.",
+                "There is no Save button. Close the list any way you like — the close button, a tap outside, Back or the bubble — and the note is saved as clip 1. Closing with nothing typed saves nothing.",
+                "If something interrupts you, like the screen locking or a call, what you had typed comes back the next time you tap +.",
+                "Tapping a clip while a note is open saves the note first. The next tap pastes, so a clip is never pasted into your own note by accident.",
+                "Pasting works exactly as before once the note is closed. The + in the app itself is unchanged.",
+            )
+        ),
+        Entry(
             version = "1.4.0",
             title = "Clips open when you tap them, and notes start with a +",
             items = listOf(

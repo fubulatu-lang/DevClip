@@ -21,8 +21,8 @@ android {
         // the APK is named after and what Settings shows, so the file on the
         // phone and the file on the release page can be told apart without
         // opening either.
-        versionCode = 7
-        versionName = "1.4.0"
+        versionCode = 8
+        versionName = "1.5.0"
     }
 
     buildTypes {

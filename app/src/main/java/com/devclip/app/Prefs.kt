@@ -58,6 +58,12 @@ object Prefs {
 
     /** The versionName whose "What's new" was last seen. See ChangelogGate. */
     const val KEY_CHANGELOG_SEEN = "changelog_seen_version"
+
+    /**
+     * A note being typed in the floating list, kept on every keystroke and
+     * cleared when it saves, so an interrupted note comes back next time.
+     */
+    const val KEY_NOTE_DRAFT = "note_draft"
     const val DEFAULT_MAX_CLIPS = 500
 
     /**

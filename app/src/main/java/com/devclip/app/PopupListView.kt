@@ -11,6 +11,7 @@ import android.os.Looper
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -29,8 +30,10 @@ import android.widget.TextView
  * immediately, whether or not any React instance has ever existed in this
  * process.
  *
- * One shape, tethered to the bubble, paste-only, at a smaller type scale — the
- * same surface it always was. No search and no editing: those live in the full
+ * One shape, tethered to the bubble, at a smaller type scale — the same
+ * surface it always was. It pastes, and the + opens a note at the top of it
+ * that saves itself when the list closes. No search and no editing of
+ * existing clips: those live in the full
  * app, where there is room for a keyboard and a result list.
  */
 @SuppressLint("ViewConstructor")
@@ -44,8 +47,23 @@ class PopupListView(context: Context) : LinearLayout(context) {
      */
     var onPaste: ((DevClipDatabaseHelper.Clip) -> Unit)? = null
 
-    /** Start a new note, which also closes this window. */
+    /** The + was tapped: the service starts a note in this window. */
     var onAddNote: (() -> Unit)? = null
+
+    /**
+     * A note has started. The service makes this window able to take the
+     * keyboard, which it otherwise deliberately cannot.
+     */
+    var onComposeStart: (() -> Unit)? = null
+
+    /** The note's text changed. The service keeps it as a draft. */
+    var onDraftChanged: ((String) -> Unit)? = null
+
+    /**
+     * A clip was tapped while a note was open. The service saves the note and
+     * returns the list to pasting; the tap itself pastes nothing.
+     */
+    var onCommitRequested: (() -> Unit)? = null
 
     /** Open the launcher app, which also closes this window. */
     var onOpenFullApp: (() -> Unit)? = null
@@ -69,6 +87,20 @@ class PopupListView(context: Context) : LinearLayout(context) {
      */
     private var armedId: Long? = null
     private val disarm = Runnable { setArmed(null) }
+
+    /**
+     * Whether a note is open at the top of the list.
+     *
+     * While it is, this window can take focus and the keyboard, and so a
+     * paste from it would land in the note rather than in the app beneath.
+     * That is why a row tap during a note saves the note instead of pasting.
+     */
+    var isComposing = false
+        private set
+    private var composer: View? = null
+    private var noteField: EditText? = null
+    private var noteError: View? = null
+    private var noteFieldBg: GradientDrawable? = null
 
     private var clips: List<DevClipDatabaseHelper.Clip> = emptyList()
     private var confirmBeforePaste = true
@@ -152,7 +184,23 @@ class PopupListView(context: Context) : LinearLayout(context) {
         val rebuilt = buildHeader()
         header = rebuilt
         addView(rebuilt, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+        if (isComposing) {
+            // Rebuilt in the new palette with the same text and caret, so a
+            // theme change mid-note costs nothing that was typed.
+            val text = noteText()
+            val caret = noteField?.selectionEnd ?: text.length
+            composer?.let { removeView(it) }
+            addComposer(text, restored = false)
+            noteField?.setSelection(caret.coerceIn(0, text.length))
+        }
         redraw()
+    }
+
+    private fun rebuildHeader() {
+        header?.let { removeView(it) }
+        val rebuilt = buildHeader()
+        header = rebuilt
+        addView(rebuilt, 0, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
     }
 
     private fun sp(view: TextView, value: Float) =
@@ -177,6 +225,30 @@ class PopupListView(context: Context) : LinearLayout(context) {
             setBackgroundColor(palette.bg)
         }
 
+        // While a note is open the bar says so, and offers only the way out.
+        // Close saves: there is no separate Save, because the user asked for
+        // a note that keeps itself, and a second button would mean that
+        // closing without pressing it could lose something.
+        if (isComposing) {
+            val label = TextView(context).apply {
+                text = context.getString(R.string.note_new_heading)
+                setTextColor(palette.ink)
+                sp(this, DevClipTheme.MiniText.BODY)
+                typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+                setPadding(dp(DevClipTheme.Spacing.LG), 0, 0, 0)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                    isAccessibilityHeading = true
+                }
+            }
+            bar.addView(label, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+            bar.addView(
+                iconButton(StrokeIcon.CLOSE, R.string.note_close_and_save) {
+                    onClose?.invoke()
+                }
+            )
+            return wrapHeader(bar)
+        }
+
         // New note first, furthest from Close: the two do opposite things,
         // and a slip between neighbours should not turn one into the other.
         bar.addView(
@@ -195,6 +267,10 @@ class PopupListView(context: Context) : LinearLayout(context) {
             }
         )
 
+        return wrapHeader(bar)
+    }
+
+    private fun wrapHeader(bar: View): View {
         val divider = View(context).apply { setBackgroundColor(palette.divider) }
         val wrap = LinearLayout(context).apply { orientation = VERTICAL }
         wrap.addView(
@@ -225,6 +301,206 @@ class PopupListView(context: Context) : LinearLayout(context) {
         view.layoutParams =
             LayoutParams(dp(DevClipTheme.MIN_TOUCH_TARGET), dp(DevClipTheme.MIN_TOUCH_TARGET))
         return view
+    }
+
+    // ---- The note ----
+
+    /**
+     * Opens a note at the top of the list, or returns to the one already open.
+     *
+     * [draft] is what was being typed when a note was last interrupted —
+     * the screen locked, a call came in, Android stopped the service — and
+     * it comes back exactly as it was left.
+     */
+    fun startComposing(draft: String?) {
+        if (isComposing) {
+            focusNote()
+            return
+        }
+        isComposing = true
+        handler.removeCallbacks(disarm)
+        armedId = null
+        rebuildHeader()
+        addComposer(draft.orEmpty(), restored = !draft.isNullOrBlank())
+        redraw()
+        // The clips step back while a note is open: still there to read, but
+        // plainly not what a tap is for until the note is closed.
+        scroller.alpha = 0.45f
+        onComposeStart?.invoke()
+        focusNote()
+    }
+
+    /** Closes the note, keeping nothing of it in this view. */
+    fun stopComposing() {
+        if (!isComposing) return
+        hideKeyboard()
+        isComposing = false
+        composer?.let { removeView(it) }
+        composer = null
+        noteField = null
+        noteError = null
+        noteFieldBg = null
+        scroller.alpha = 1f
+        rebuildHeader()
+        redraw()
+    }
+
+    fun noteText(): String = noteField?.text?.toString().orEmpty()
+
+    /**
+     * The save failed. The note stays, the field turns the error colour and
+     * a line says what happened and what to do — words and an icon as well
+     * as colour, and read out by TalkBack.
+     */
+    fun showSaveError() {
+        noteFieldBg?.setStroke(dp(2), palette.danger)
+        noteError?.visibility = View.VISIBLE
+        announceForAccessibility(context.getString(R.string.note_save_failed_inline))
+    }
+
+    fun focusNote() {
+        val field = noteField ?: return
+        field.requestFocus()
+        field.post {
+            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+                as? android.view.inputmethod.InputMethodManager
+            imm?.showSoftInput(field, 0)
+        }
+    }
+
+    private fun hideKeyboard() {
+        val field = noteField ?: return
+        val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE)
+            as? android.view.inputmethod.InputMethodManager
+        imm?.hideSoftInputFromWindow(field.windowToken, 0)
+    }
+
+    private fun addComposer(text: String, restored: Boolean) {
+        val built = buildComposer(text, restored)
+        composer = built
+        // Directly under the header, above the clips: the field has to stay
+        // in the part of the window the keyboard does not reach.
+        addView(built, 1, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun buildComposer(text: String, restored: Boolean): View {
+        val column = LinearLayout(context).apply {
+            orientation = VERTICAL
+            setPadding(
+                dp(DevClipTheme.Spacing.SM + 2), dp(DevClipTheme.Spacing.SM + 2),
+                dp(DevClipTheme.Spacing.SM + 2), dp(DevClipTheme.Spacing.XS)
+            )
+        }
+
+        val bg = GradientDrawable().apply {
+            cornerRadius = dp(DevClipTheme.Radius.MD).toFloat()
+            setColor(palette.surface)
+            setStroke(dp(2), palette.accent)
+        }
+        noteFieldBg = bg
+
+        val field = EditText(context).apply {
+            setText(text)
+            setSelection(text.length)
+            // The hint names the field for TalkBack while it is empty; a
+            // content description would replace what was typed when it reads.
+            hint = context.getString(R.string.note_placeholder)
+            setTextColor(palette.ink)
+            setHintTextColor(palette.inkFaint)
+            highlightColor = palette.accentSoft
+            sp(this, DevClipTheme.MiniText.BODY)
+            background = bg
+            setPadding(dp(DevClipTheme.Spacing.MD), dp(10), dp(DevClipTheme.Spacing.MD), dp(10))
+            gravity = Gravity.TOP or Gravity.START
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
+            // No full-screen extract editor in landscape: it would hide the
+            // list and the app underneath, which is the point of typing here.
+            imeOptions = android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            // Grows to six lines and then scrolls inside itself. No limit on
+            // length: a pasted log saves in full.
+            minHeight = dp(96)
+            maxLines = 6
+            isVerticalScrollBarEnabled = true
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                // The platform caret is the theme's teal. An ink one, the way
+                // every other mark on this surface is ink.
+                textCursorDrawable = GradientDrawable().apply {
+                    setColor(palette.ink)
+                    setSize(dp(2), 0)
+                }
+            }
+            addTextChangedListener(object : android.text.TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+                override fun afterTextChanged(s: android.text.Editable?) {
+                    // Any edit clears a failed save's warning: the next close
+                    // is a fresh attempt.
+                    if (noteError?.visibility == View.VISIBLE) {
+                        noteError?.visibility = View.GONE
+                        noteFieldBg?.setStroke(dp(2), palette.accent)
+                    }
+                    onDraftChanged?.invoke(s?.toString().orEmpty())
+                }
+            })
+        }
+        noteField = field
+        column.addView(field, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT))
+
+        column.addView(
+            statusLine(
+                if (restored) StrokeIcon.HISTORY else StrokeIcon.CHECK,
+                context.getString(if (restored) R.string.note_draft_restored else R.string.note_saves_on_close),
+                palette.inkFaint
+            )
+        )
+        val error = statusLine(
+            StrokeIcon.ALERT,
+            context.getString(R.string.note_save_failed_inline),
+            palette.danger
+        ).apply {
+            visibility = View.GONE
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        noteError = error
+        column.addView(error)
+        return column
+    }
+
+    /** An icon and a caption under the note: how it saves, or why it did not. */
+    private fun statusLine(icon: StrokeIcon, text: String, color: Int): View {
+        val row = LinearLayout(context).apply {
+            orientation = HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(DevClipTheme.Spacing.XS), dp(6), dp(DevClipTheme.Spacing.XS), 0)
+        }
+        val glyph = StrokeIconView(context, icon, color, glyphDp = 14).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        row.addView(glyph, LayoutParams(dp(16), dp(16)))
+        row.addView(
+            TextView(context).apply {
+                this.text = text
+                setTextColor(color)
+                sp(this, DevClipTheme.MiniText.CAPTION)
+                setPadding(dp(6), 0, 0, 0)
+            },
+            LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f)
+        )
+        return row
+    }
+
+    /**
+     * Back closes the note — and so saves it — once the keyboard is down.
+     * The first Back is the keyboard's own and only hides it.
+     */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (isComposing && event.keyCode == android.view.KeyEvent.KEYCODE_BACK) {
+            if (event.action == android.view.KeyEvent.ACTION_UP) onClose?.invoke()
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     // ---- Content ----
@@ -362,6 +638,10 @@ class PopupListView(context: Context) : LinearLayout(context) {
      * do nothing at all.
      */
     private fun onRowTapped(clip: DevClipDatabaseHelper.Clip) {
+        if (isComposing) {
+            onCommitRequested?.invoke()
+            return
+        }
         if (!confirmBeforePaste) {
             onPaste?.invoke(clip)
             return
@@ -413,17 +693,22 @@ class PopupListView(context: Context) : LinearLayout(context) {
 }
 
 /** The glyphs the floating list needs, drawn rather than shipped. */
-enum class StrokeIcon { ADD, EXPAND, CLOSE }
+enum class StrokeIcon { ADD, EXPAND, CLOSE, CHECK, HISTORY, ALERT }
 
 /**
  * Draws an icon with strokes instead of loading a drawable.
  *
- * Three shapes at one weight is not worth a vector asset each, and drawing them
+ * A handful of shapes at one weight is not worth a vector asset each, and drawing them
  * means the stroke width and colour follow the same tokens as everything else
  * on this surface rather than being baked into an XML file.
  */
 @SuppressLint("ViewConstructor")
-class StrokeIconView(context: Context, private val icon: StrokeIcon, tint: Int) : View(context) {
+class StrokeIconView(
+    context: Context,
+    private val icon: StrokeIcon,
+    tint: Int,
+    private val glyphDp: Int = DevClipTheme.IconSize.SM
+) : View(context) {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = tint
@@ -435,7 +720,7 @@ class StrokeIconView(context: Context, private val icon: StrokeIcon, tint: Int) 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val density = resources.displayMetrics.density
-        val glyph = DevClipTheme.IconSize.SM * density
+        val glyph = glyphDp * density
         val left = (width - glyph) / 2f
         val top = (height - glyph) / 2f
         val right = left + glyph
@@ -448,6 +733,32 @@ class StrokeIconView(context: Context, private val icon: StrokeIcon, tint: Int) 
                 val cy = (top + bottom) / 2f
                 canvas.drawLine(cx, top + inset, cx, bottom - inset, paint)
                 canvas.drawLine(left + inset, cy, right - inset, cy, paint)
+            }
+            StrokeIcon.CHECK -> {
+                val path = android.graphics.Path().apply {
+                    moveTo(left + glyph * 0.2f, top + glyph * 0.52f)
+                    lineTo(left + glyph * 0.42f, top + glyph * 0.72f)
+                    lineTo(left + glyph * 0.8f, top + glyph * 0.3f)
+                }
+                canvas.drawPath(path, paint)
+            }
+            // A circle with the stroke left open at the top left and an
+            // arrowhead there: going back to where you were.
+            StrokeIcon.HISTORY -> {
+                val r = glyph * 0.36f
+                val cx = (left + right) / 2f
+                val cy = (top + bottom) / 2f
+                canvas.drawArc(cx - r, cy - r, cx + r, cy + r, 200f, 300f, false, paint)
+                canvas.drawLine(cx, cy - r * 0.5f, cx, cy, paint)
+                canvas.drawLine(cx, cy, cx + r * 0.45f, cy + r * 0.3f, paint)
+            }
+            StrokeIcon.ALERT -> {
+                val r = glyph * 0.4f
+                val cx = (left + right) / 2f
+                val cy = (top + bottom) / 2f
+                canvas.drawCircle(cx, cy, r, paint)
+                canvas.drawLine(cx, cy - r * 0.5f, cx, cy + r * 0.1f, paint)
+                canvas.drawPoint(cx, cy + r * 0.45f, paint)
             }
             StrokeIcon.CLOSE -> {
                 canvas.drawLine(left + inset, top + inset, right - inset, bottom - inset, paint)
