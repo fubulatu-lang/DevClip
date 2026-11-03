@@ -12,7 +12,7 @@ A single primary user: the developer/owner, using DevClip on their own phone. No
 
 ## Product Purpose
 
-DevClip saves the text you have highlighted, anywhere on the phone, when you tap its floating bubble. No switching apps, no pressing a Capture button. It keeps that history in a list you can reach from any app, and tapping a clip performs a real paste directly into whatever text field was last focused in the app underneath, with a "it's on your clipboard" fallback when there is no field to paste into.
+DevClip saves the text you have highlighted, anywhere on the phone, when you tap its floating bubble. No switching apps, no pressing a Capture button. It keeps that history in a list you can reach from any app, and tapping a clip in that floating list performs a real paste directly into whatever text field was last focused in the app underneath, with a "it's on your clipboard" fallback when there is no field to paste into.
 
 ## Positioning
 
@@ -28,7 +28,7 @@ A selection inside a WebView — Chrome, and every app that renders its text in 
 - The bubble is docked to the left or right edge and remembers where it was left, as an edge plus a fraction — so the position survives rotation, split screen, a foldable opening, and a reboot. Dragging it into a target at the bottom **centre** hides it, which is a gesture that edge-docking makes safe: dragging straight down the rail never reaches the middle.
 - Left alone, the bubble can tuck itself into a slim handle on the screen edge. The handle thickens and breathes when a selection goes live, so capture is still one touch away.
 - Three service states, not two: stopped, running with the bubble visible, and running with the bubble hidden. Hidden is not a preference and does not survive a reboot.
-- Two distinct surfaces, not one UI at two sizes. The **floating list** is ordinary Android views drawn into a window the overlay service owns — tethered to the bubble, paste-only, at a smaller type scale, resizable from any edge. The **launcher app** is Jetpack Compose, full screen, and carries search, editing, settings and backup.
+- Two distinct surfaces, not one UI at two sizes. The **floating list** is ordinary Android views drawn into a window the overlay service owns — tethered to the bubble, paste-only, at a smaller type scale, resizable from any edge. The **launcher app** is Jetpack Compose, full screen, and carries reading, search, editing, new notes, settings and backup. A tap there opens a clip rather than pasting it: from the launcher app there is nowhere to paste into.
 - The floating list is views and not Compose, and the whole app is native and not React Native, for one reason: a surface that needs a host (a React instance, a Compose lifecycle owner) draws nothing until something starts that host, and after a reboot nothing had. The list came up empty until the app was opened once. Views draw when they are added.
 - Layout is driven by window size class, not device model: below 589dp the 24dp keyline is the margin; from 589dp it is 5% of the width, from 960dp 12.5%, both only when the window is at least 412dp tall. Clip cards go to two columns from 589dp wide.
 - Settings surfaces live status — whether text capture is actually running, not just switched on; the overlay and notification permissions; battery restriction — because Android can silently revoke or suspend any of these later, and re-reads it every time the screen comes back to the front.
@@ -42,7 +42,7 @@ A selection inside a WebView — Chrome, and every app that renders its text in 
 - `DevClipEvents` carries "something changed, go and look" from the services to any screen that is open. It is allowed to be dropped; the database is what is true.
 - Single flat `clips` table (id, title, content, created_at, sort_order). `sort_order` is unused since manual reordering was removed and is left in place deliberately.
 - One order, newest first, app-wide. Rows are numbered by position.
-- Lists read previews — the first 400 characters of each clip — and a paste or an edit reads the whole clip back by id. A single clip can be most of a megabyte; the lists show three lines of it.
+- Lists read previews — the first 400 characters of each clip — and a paste, a copy or opening a clip reads the whole clip back by id. A single clip can be most of a megabyte; the lists show three lines of it.
 - Duplicate suppression against the top clip only: catches the double tap, allows a deliberate recapture later.
 - Password fields are skipped explicitly rather than saved as a row of bullets.
 - The clip limit is enforced at capture time as well as in the app, because capture happens with the app closed.

@@ -22,8 +22,6 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -52,6 +50,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import com.devclip.app.AppVersion
 import com.devclip.app.OverlayController
 import com.devclip.app.Prefs
 import com.devclip.app.R
@@ -110,6 +109,7 @@ fun SettingsScreen(
     // taken back, and it sat one tap from Import. A dialog is right here and
     // nowhere else in the app: this is a decision, not news.
     var confirmingClear by remember { mutableStateOf(false) }
+    var showingChangelog by remember { mutableStateOf(false) }
 
     // Edge to edge, so the bars are this screen's to account for. The colour
     // goes under them; only the content is inset.
@@ -133,7 +133,7 @@ fun SettingsScreen(
                     modifier = Modifier.size(MinTouchTarget)
                 ) {
                     Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        imageVector = Glyphs.Back,
                         contentDescription = stringResource(R.string.back),
                         tint = colors.ink
                     )
@@ -362,9 +362,21 @@ fun SettingsScreen(
             // name; this is the other half of that pair. Without it there is
             // no way to tell, from the phone, whether the thing you just
             // installed is the thing you just downloaded.
-            item { Note(appVersion(context)) }
+            //
+            // It is also the way into "What's new", which opens from here
+            // whatever has been seen before.
+            item {
+                VersionLink(
+                    label = stringResource(R.string.whats_new_link, appVersion(context)),
+                    onClick = { showingChangelog = true }
+                )
+            }
         }
         }
+    }
+
+    if (showingChangelog) {
+        WhatsNewDialog(onDismiss = { showingChangelog = false })
     }
 
     if (confirmingClear) {
@@ -439,22 +451,16 @@ private fun ConfirmClearDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 }
 
 /**
- * "DevClip 1.1.0 (2)" — the name, the version, and the code Android compares.
+ * "DevClip 1.4.0 (7)" — the name, the version, and the code Android compares.
  *
- * Read from the installed package rather than from BuildConfig, so it is
- * what the phone believes it is running, not what the source said at the
- * moment it was compiled.
+ * The APK on the release page carries the same version in its file name, so
+ * this is how to tell from the phone whether what is installed is what was
+ * downloaded.
  */
-private fun appVersion(context: android.content.Context): String = try {
-    val info = context.packageManager.getPackageInfo(context.packageName, 0)
-    val code = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-        info.longVersionCode
-    } else {
-        @Suppress("DEPRECATION") info.versionCode.toLong()
-    }
-    "DevClip ${info.versionName} ($code)"
-} catch (e: Exception) {
-    "DevClip"
+private fun appVersion(context: android.content.Context): String {
+    val name = AppVersion.name(context) ?: return "DevClip"
+    val code = AppVersion.code(context)
+    return if (code == null) "DevClip $name" else "DevClip $name ($code)"
 }
 
 /** The clip limits offered. 0 means no limit. */

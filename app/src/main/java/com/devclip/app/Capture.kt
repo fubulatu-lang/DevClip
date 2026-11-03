@@ -129,7 +129,7 @@ object Capture {
      * Android gates on window focus. That asymmetry is the reason capture
      * cannot use the clipboard and this step can.
      */
-    private fun writeClipboard(context: Context, text: String): Boolean =
+    fun writeClipboard(context: Context, text: String): Boolean =
         try {
             val manager =
                 context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager

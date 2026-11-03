@@ -50,6 +50,13 @@ share a name while being different software.
   It is the only number Android compares when deciding whether an install
   is an update, and it must never repeat or go backwards.
 
+The same commit also adds the release to "What's new": a new entry at the
+top of `Changelog.kt` (written for the person using the app — see the
+comment at the top of that file) and a matching `## vX.Y.Z — <title>`
+section at the top of `README.md` (for whoever works on it). Shipped
+entries are never edited. `checkVersion` in `app/build.gradle.kts` runs
+before every build and fails, naming the file, if the three disagree.
+
 The workflow reads `versionName` out of that file to name the APK, so the
 name on the release page cannot disagree with what is inside it. Settings
 shows the installed version at the bottom of the list, read from the

@@ -21,8 +21,8 @@ android {
         // the APK is named after and what Settings shows, so the file on the
         // phone and the file on the release page can be told apart without
         // opening either.
-        versionCode = 6
-        versionName = "1.3.1"
+        versionCode = 7
+        versionName = "1.4.0"
     }
 
     buildTypes {
@@ -69,6 +69,55 @@ android {
         compose = true
     }
 }
+
+/*
+ * The version is written in three places that cannot read each other:
+ * versionName above, the newest entry in Changelog.kt ("What's new"), and the
+ * newest release section in README.md. They drift the moment the only thing
+ * keeping them together is somebody remembering, so the build checks them —
+ * every build, debug included, because preBuild runs for every variant — and
+ * fails naming the file that was missed.
+ *
+ * Regex over the raw text on purpose: no dependency, nothing to compile, and
+ * it behaves the same in CI as on a laptop.
+ */
+val checkVersion by tasks.registering {
+    group = "verification"
+    description = "Fails if versionName, Changelog.kt and README.md disagree."
+    val gradleFile = file("build.gradle.kts")
+    val changelogFile = file("src/main/java/com/devclip/app/Changelog.kt")
+    val readmeFile = rootProject.file("README.md")
+    inputs.files(gradleFile, changelogFile, readmeFile)
+    doLast {
+        fun find(label: String, f: java.io.File, re: Regex): Pair<String, String?> =
+            "$label (${f.relativeTo(rootDir)})" to re.find(f.readText())?.groupValues?.get(1)
+
+        val sources = listOf(
+            find("versionName", gradleFile, Regex("""versionName\s*=\s*"([^"]+)"""")),
+            find("newest changelog entry", changelogFile, Regex("""version\s*=\s*"([^"]+)"""")),
+            find("newest README release section", readmeFile, Regex("""(?m)^##\s+v(\S+)\s+—"""))
+        )
+
+        val missing = sources.filter { it.second == null }
+        if (missing.isNotEmpty()) {
+            throw GradleException(
+                "Version check failed — could not find a version in:\n" +
+                    missing.joinToString("\n") { "  ${it.first}" } +
+                    "\nThe file moved or its format changed; update checkVersion to match."
+            )
+        }
+        if (sources.map { it.second }.toSet().size > 1) {
+            throw GradleException(
+                "Version check failed — the app version disagrees with itself:\n" +
+                    sources.joinToString("\n") { "  ${it.second!!.padEnd(10)} ${it.first}" } +
+                    "\nA release bumps all of these together: versionName and versionCode, " +
+                    "a new entry at the top of Changelog.kt, and a matching README section."
+            )
+        }
+    }
+}
+
+tasks.named("preBuild") { dependsOn(checkVersion) }
 
 dependencies {
     // Pulled in by the floating windows, which predate Compose and stay in

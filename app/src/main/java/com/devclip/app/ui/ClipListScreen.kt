@@ -1,9 +1,8 @@
 package com.devclip.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,12 +22,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -47,8 +40,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -56,6 +51,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.devclip.app.Capture
 import com.devclip.app.ClipRepository
 import com.devclip.app.DevClipDatabaseHelper
 import com.devclip.app.DevClipEvents
@@ -86,7 +82,10 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
     var menuOpen by remember { mutableStateOf(false) }
     var clips by remember { mutableStateOf<List<DevClipDatabaseHelper.Clip>>(emptyList()) }
     var loaded by remember { mutableStateOf(false) }
-    var editing by remember { mutableStateOf<DevClipDatabaseHelper.Clip?>(null) }
+    // What the sheet is showing: a clip opened from the list, a new note,
+    // or nothing. One state, so the two can never be open at once.
+    var sheet by remember { mutableStateOf<Sheet?>(null) }
+    var showingChangelog by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<SnackMessage?>(null) }
 
     val header = rememberOneUiHeaderState()
@@ -147,16 +146,41 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
                 OneUiHeader(
                     title = stringResource(R.string.clips_title),
                     state = header,
-                    actionsWidth = actionsWidthFor(2),
+                    leading = { f ->
+                        AppIcon(size = AppIconMinSize + (AppIconMaxSize - AppIconMinSize) * f)
+                    },
+                    actionsWidth = actionsWidthFor(4),
                     actions = {
                         HeaderIcon(
-                            icon = Icons.Filled.Search,
+                            icon = Glyphs.Add,
+                            contentDescription = stringResource(R.string.note_add)
+                        ) { sheet = Sheet.New }
+
+                        // Brings the bubble up from wherever it is: off,
+                        // hidden by the drag-to-hide target, or tucked at the
+                        // edge. Without the overlay permission there is no
+                        // bubble to bring, so the button goes to the switch
+                        // that allows one instead of failing silently.
+                        HeaderIcon(
+                            icon = Glyphs.Bubble,
+                            contentDescription = stringResource(R.string.bubble_show)
+                        ) {
+                            message = if (OverlayController.startBubble(context)) {
+                                SnackMessage(context.getString(R.string.bubble_shown))
+                            } else {
+                                OverlayController.requestOverlay(context)
+                                SnackMessage(context.getString(R.string.bubble_needs_overlay))
+                            }
+                        }
+
+                        HeaderIcon(
+                            icon = Glyphs.Search,
                             contentDescription = stringResource(R.string.search_open)
                         ) { searching = true }
 
                         Box {
                             HeaderIcon(
-                                icon = Icons.Filled.MoreVert,
+                                icon = Glyphs.More,
                                 contentDescription = stringResource(R.string.more_options)
                             ) { menuOpen = true }
 
@@ -165,19 +189,20 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
                                 onDismissRequest = { menuOpen = false },
                                 containerColor = colors.surface
                             ) {
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = stringResource(R.string.settings_title),
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = colors.ink
-                                        )
-                                    },
-                                    onClick = {
-                                        menuOpen = false
-                                        onOpenSettings()
-                                    }
-                                )
+                                MenuItem(
+                                    icon = Glyphs.History,
+                                    label = stringResource(R.string.whats_new_title)
+                                ) {
+                                    menuOpen = false
+                                    showingChangelog = true
+                                }
+                                MenuItem(
+                                    icon = Glyphs.Settings,
+                                    label = stringResource(R.string.settings_title)
+                                ) {
+                                    menuOpen = false
+                                    onOpenSettings()
+                                }
                             }
                         }
                     }
@@ -211,32 +236,27 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
                         ClipRow(
                             clip = clip,
                             position = index + 1,
-                            onPaste = {
+                            onOpen = {
                                 scope.launch {
-                                    // The row holds a preview. What goes into
-                                    // somebody's text field is the whole clip.
+                                    // The row holds a preview. What opens is
+                                    // the whole clip, read again by id.
                                     val full = ClipRepository.get(context, clip.id)
-                                    message = SnackMessage(
-                                        context.getString(
-                                            when {
-                                                full == null -> R.string.clip_gone
-                                                OverlayController.paste(full.content) ->
-                                                    R.string.paste_done
-                                                else -> R.string.devclip_paste_copied_only
-                                            }
-                                        )
-                                    )
-                                    if (full == null) reload()
+                                    if (full == null) {
+                                        message = SnackMessage(context.getString(R.string.clip_gone))
+                                        reload()
+                                    } else {
+                                        sheet = Sheet.Open(full)
+                                    }
                                 }
                             },
-                            onEdit = {
+                            onCopy = {
                                 scope.launch {
                                     val full = ClipRepository.get(context, clip.id)
                                     if (full == null) {
                                         message = SnackMessage(context.getString(R.string.clip_gone))
                                         reload()
                                     } else {
-                                        editing = full
+                                        copyMessage(context, full.content)?.let { message = it }
                                     }
                                 }
                             }
@@ -247,46 +267,73 @@ fun ClipListScreen(onOpenSettings: () -> Unit) {
         }
     }
 
-    editing?.let { clip ->
-        EditClipSheet(
-            clip = clip,
-            onDismiss = { editing = null },
+    when (val current = sheet) {
+        null -> Unit
+        Sheet.New -> EditClipSheet(
+            clip = null,
+            onDismiss = { sheet = null },
             onSave = { content, title ->
                 scope.launch {
-                    ClipRepository.update(context, clip.id, content, title)
-                    editing = null
-                    reload()
-                }
-            },
-            onDelete = {
-                scope.launch {
-                    val removed = ClipRepository.delete(context, clip.id)
-                    editing = null
-                    reload()
-                    // Delete is immediate and Undo is how it is taken back:
-                    // news with a way out, not a question asked beforehand.
-                    // "Never lose a clip" has to include the one deleted by a
-                    // thumb that meant Save.
+                    val saved = ClipRepository.addNote(context, content, title)
+                    // Kept open on failure: closing it would throw away
+                    // what was just typed, with nothing to show for it.
+                    if (saved) sheet = null
                     message = SnackMessage(
-                        text = context.getString(R.string.clip_deleted),
-                        actionLabel = removed?.let { context.getString(R.string.undo) },
-                        onAction = removed?.let { stored ->
-                            {
-                                scope.launch {
-                                    val back = ClipRepository.restore(context, stored)
-                                    reload()
-                                    if (!back) {
-                                        message = SnackMessage(
-                                            context.getString(R.string.clip_restore_failed)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        context.getString(if (saved) R.string.note_saved else R.string.note_save_failed)
                     )
+                    reload()
                 }
             }
         )
+        is Sheet.Open -> {
+            val clip = current.clip
+            EditClipSheet(
+                clip = clip,
+                onDismiss = { sheet = null },
+                onCopy = { content ->
+                    copyMessage(context, content)?.let { message = it }
+                },
+                onSave = { content, title ->
+                    scope.launch {
+                        ClipRepository.update(context, clip.id, content, title)
+                        sheet = null
+                        reload()
+                    }
+                },
+                onDelete = {
+                    scope.launch {
+                        val removed = ClipRepository.delete(context, clip.id)
+                        sheet = null
+                        reload()
+                        // Delete is immediate and Undo is how it is taken back:
+                        // news with a way out, not a question asked beforehand.
+                        // "Never lose a clip" has to include the one deleted by a
+                        // thumb that meant Save.
+                        message = SnackMessage(
+                            text = context.getString(R.string.clip_deleted),
+                            actionLabel = removed?.let { context.getString(R.string.undo) },
+                            onAction = removed?.let { stored ->
+                                {
+                                    scope.launch {
+                                        val back = ClipRepository.restore(context, stored)
+                                        reload()
+                                        if (!back) {
+                                            message = SnackMessage(
+                                                context.getString(R.string.clip_restore_failed)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    if (showingChangelog) {
+        WhatsNewDialog(onDismiss = { showingChangelog = false })
     }
 
     // Keyed on the message itself, not its words: two deletes in a row say
@@ -311,49 +358,84 @@ data class SnackMessage(
     val onAction: (() -> Unit)? = null
 )
 
+/**
+ * What to say after a copy, or null to say nothing.
+ *
+ * From Android 13 the system shows its own confirmation whenever anything
+ * lands on the clipboard, so a snack saying "Copied" as well is the same news
+ * twice, stacked. Below 13 there is no such thing and the snack is the only
+ * sign it worked. A failure is always reported: the system says nothing then.
+ */
+private fun copyMessage(context: android.content.Context, text: String): SnackMessage? {
+    val ok = Capture.writeClipboard(context, text)
+    return when {
+        !ok -> SnackMessage(context.getString(R.string.copy_failed))
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU -> null
+        else -> SnackMessage(context.getString(R.string.copied))
+    }
+}
+
+/** What the bottom sheet is open on. */
+private sealed interface Sheet {
+    data object New : Sheet
+    data class Open(val clip: DevClipDatabaseHelper.Clip) : Sheet
+}
+
+/** An overflow menu entry: a symbol and a label, at a full touch target. */
+@Composable
+private fun MenuItem(icon: ImageVector, label: String, onClick: () -> Unit) {
+    val colors = Tokens.colors
+    DropdownMenuItem(
+        leadingIcon = { Icon(imageVector = icon, contentDescription = null, tint = colors.ink) },
+        text = {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = colors.ink
+            )
+        },
+        onClick = onClick,
+        modifier = Modifier.heightIn(min = MinTouchTarget)
+    )
+}
+
 /** How long typing has to pause before a search runs. */
 private const val SEARCH_SETTLE_MS = 150L
 
 /**
  * One clip.
  *
- * Tap pastes, hold edits — the same pair the floating list uses for the same
- * reason: pasting is what this is for, and editing is the occasional thing
- * that should not be one mis-tap away.
+ * Tap opens it. This screen is where clips are read, kept and changed; it
+ * used to paste on a tap, which from the launcher app had nowhere useful to
+ * paste into and made reading a long clip a matter of luck. The floating
+ * list is still tap-to-paste, because over another app that is the point.
  *
- * Hold is a shortcut, not the way in. The pencil at the end of the row does
- * the same thing where it can be seen: a long press nobody discovers is an
- * edit feature that does not exist, and TalkBack users met it only as
- * "double-tap and hold", with no word for what holding would do. Both
- * gestures carry labels now, so the screen reader says "paste" and "edit".
- *
- * combinedClickable is the only way to have both from one modifier, and it
- * is still a foundation API behind an opt-in.
+ * The button at the end copies, which is the one thing worth doing to a clip
+ * without opening it. It is its own control, outside the row's description,
+ * so a screen reader reaches it separately and says which clip it copies.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ClipRow(
     clip: DevClipDatabaseHelper.Clip,
     position: Int,
-    onPaste: () -> Unit,
-    onEdit: () -> Unit
+    onOpen: () -> Unit,
+    onCopy: () -> Unit
 ) {
     val colors = Tokens.colors
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(colors.surface, RoundedCornerShape(Radius.md))
-            .combinedClickable(
-                onClickLabel = stringResource(R.string.clip_paste_action),
-                onLongClickLabel = stringResource(R.string.clip_edit_action),
-                onClick = onPaste,
-                onLongClick = onEdit
+            .clip(RoundedCornerShape(Radius.md))
+            .clickable(
+                onClickLabel = stringResource(R.string.clip_open_action),
+                onClick = onOpen
             )
             .padding(start = Space.lg, top = Space.md, bottom = Space.md, end = Space.xs),
         verticalAlignment = Alignment.Top
     ) {
         // Read as one sentence rather than a number, then a title, then a
-        // body. The pencil stays outside this so it remains its own control.
+        // body. The copy button stays outside this so it remains its own control.
         Row(
             modifier = Modifier
                 .weight(1f)
@@ -406,10 +488,10 @@ private fun ClipRow(
             }
         }
 
-        IconButton(onClick = onEdit, modifier = Modifier.size(MinTouchTarget)) {
+        IconButton(onClick = onCopy, modifier = Modifier.size(MinTouchTarget)) {
             Icon(
-                imageVector = Icons.Filled.Edit,
-                contentDescription = stringResource(R.string.clip_edit_description, position),
+                imageVector = Glyphs.Copy,
+                contentDescription = stringResource(R.string.clip_copy_description, position),
                 tint = colors.inkSoft,
                 modifier = Modifier.size(IconSm)
             )
@@ -464,7 +546,7 @@ private fun SearchBar(
     ) {
         IconButton(onClick = onClose, modifier = Modifier.size(MinTouchTarget)) {
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                imageVector = Glyphs.Back,
                 contentDescription = stringResource(R.string.search_close),
                 tint = colors.ink
             )
@@ -488,7 +570,7 @@ private fun SearchBar(
                         modifier = Modifier.size(MinTouchTarget)
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.Close,
+                            imageVector = Glyphs.Close,
                             contentDescription = stringResource(R.string.search_clear),
                             tint = colors.inkSoft
                         )

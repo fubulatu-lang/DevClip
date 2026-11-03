@@ -272,6 +272,27 @@ class DevClipDatabaseHelper(context: Context) :
         }
     }
 
+    /**
+     * Saves a note the user typed, from the + in the app or the floating list.
+     *
+     * Not [insertClip]: the double-tap guard there is for a gesture that can
+     * fire twice by accident, and Save on a sheet cannot. A note can also
+     * carry a title from the moment it exists.
+     */
+    fun insertNote(title: String?, content: String): Boolean = try {
+        val db = writableDatabase
+        val nextOrder = db.rawQuery("SELECT MAX(sort_order) FROM clips;", null)
+            .use { if (it.moveToFirst() && !it.isNull(0)) it.getInt(0) + 1 else 0 }
+        db.execSQL(
+            "INSERT INTO clips (title, content, created_at, sort_order) VALUES (?, ?, ?, ?);",
+            arrayOf<Any?>(title, content, System.currentTimeMillis(), nextOrder)
+        )
+        true
+    } catch (e: Exception) {
+        android.util.Log.e("DevClip", "Could not save a note", e)
+        false
+    }
+
     /** Shared cursor walk for every read that returns clips. */
     private fun read(sql: String, args: Array<String>?): List<Clip> = try {
         readableDatabase.rawQuery(sql, args).use { cursor ->

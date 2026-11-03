@@ -18,6 +18,7 @@ import com.devclip.app.ui.DevClipComposeTheme
 import com.devclip.app.ui.SetupScreen
 import com.devclip.app.ui.SettingsScreen
 import com.devclip.app.ui.Snack
+import com.devclip.app.ui.WhatsNewDialog
 import kotlinx.coroutines.launch
 
 /**
@@ -57,6 +58,14 @@ class MainActivity : ComponentActivity() {
                 }
                 var message by remember { mutableStateOf<String?>(null) }
 
+                // "What's new", once per version, after an update. Mounted
+                // here, at the top, rather than in a screen: inside the clip
+                // list it would be asked again every time Settings closed.
+                // Not over setup — a first install has nothing to compare to.
+                var showChangelog by remember {
+                    mutableStateOf(hasOnboarded() && ChangelogGate.shouldShow(context))
+                }
+
                 // The user picks the file each time rather than DevClip
                 // holding a standing claim on a folder for something that
                 // happens twice a year.
@@ -92,6 +101,7 @@ class MainActivity : ComponentActivity() {
                     Screen.Setup -> SetupScreen(
                         onDone = {
                             markOnboarded()
+                            ChangelogGate.markSeen(context)
                             screen = Screen.Clips
                         }
                     )
@@ -107,6 +117,15 @@ class MainActivity : ComponentActivity() {
                                 ClipRepository.clearAll(context)
                                 message = getString(R.string.backup_cleared)
                             }
+                        }
+                    )
+                }
+
+                if (showChangelog) {
+                    WhatsNewDialog(
+                        onDismiss = {
+                            showChangelog = false
+                            ChangelogGate.markSeen(context)
                         }
                     )
                 }

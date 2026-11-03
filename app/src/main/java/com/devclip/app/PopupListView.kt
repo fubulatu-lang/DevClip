@@ -44,6 +44,9 @@ class PopupListView(context: Context) : LinearLayout(context) {
      */
     var onPaste: ((DevClipDatabaseHelper.Clip) -> Unit)? = null
 
+    /** Start a new note, which also closes this window. */
+    var onAddNote: (() -> Unit)? = null
+
     /** Open the launcher app, which also closes this window. */
     var onOpenFullApp: (() -> Unit)? = null
 
@@ -161,7 +164,7 @@ class PopupListView(context: Context) : LinearLayout(context) {
         // No title and no dot. A window that appeared out of the bubble the
         // user just tapped does not need to introduce itself, and the row it
         // cost was a row of clips — which is the only thing this surface is
-        // for. What is left is two controls and the rule under them.
+        // for. What is left is three controls and the rule under them.
         //
         // No padding above or below either: the row is exactly one touch
         // target tall. That is as slim as it goes without shrinking the
@@ -174,6 +177,13 @@ class PopupListView(context: Context) : LinearLayout(context) {
             setBackgroundColor(palette.bg)
         }
 
+        // New note first, furthest from Close: the two do opposite things,
+        // and a slip between neighbours should not turn one into the other.
+        bar.addView(
+            iconButton(StrokeIcon.ADD, R.string.note_add) {
+                onAddNote?.invoke()
+            }
+        )
         bar.addView(
             iconButton(StrokeIcon.EXPAND, R.string.devclip_popup_open_full) {
                 onOpenFullApp?.invoke()
@@ -402,13 +412,13 @@ class PopupListView(context: Context) : LinearLayout(context) {
     }
 }
 
-/** The two glyphs the floating list needs, drawn rather than shipped. */
-enum class StrokeIcon { EXPAND, CLOSE }
+/** The glyphs the floating list needs, drawn rather than shipped. */
+enum class StrokeIcon { ADD, EXPAND, CLOSE }
 
 /**
  * Draws an icon with strokes instead of loading a drawable.
  *
- * Two shapes at one weight is not worth a vector asset each, and drawing them
+ * Three shapes at one weight is not worth a vector asset each, and drawing them
  * means the stroke width and colour follow the same tokens as everything else
  * on this surface rather than being baked into an XML file.
  */
@@ -433,6 +443,12 @@ class StrokeIconView(context: Context, private val icon: StrokeIcon, tint: Int) 
         val inset = glyph * 0.18f
 
         when (icon) {
+            StrokeIcon.ADD -> {
+                val cx = (left + right) / 2f
+                val cy = (top + bottom) / 2f
+                canvas.drawLine(cx, top + inset, cx, bottom - inset, paint)
+                canvas.drawLine(left + inset, cy, right - inset, cy, paint)
+            }
             StrokeIcon.CLOSE -> {
                 canvas.drawLine(left + inset, top + inset, right - inset, bottom - inset, paint)
                 canvas.drawLine(right - inset, top + inset, left + inset, bottom - inset, paint)
